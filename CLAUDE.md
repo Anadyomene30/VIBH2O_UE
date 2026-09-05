@@ -1,97 +1,176 @@
-# CLAUDE.md — contexte projet VIBH2O
+# CLAUDE.md — Plugin Unreal VIBH2O
 
-> Fichier lu automatiquement par Claude Code au démarrage d'une session dans ce dépôt.
-> **Copier ce fichier à la racine du dépôt `VibH2o`** et le compléter au fil du travail.
+> Lu automatiquement par Claude Code au démarrage d'une session dans ce dépôt.
+> **Lis-le en entier avant d'écrire la moindre ligne de code.**
 
-## Le projet
+## Ce qu'il faut savoir en trente secondes
 
-VIBH2O capte les données cardiaques des spectateurs d'une salle de spectacle en temps réel,
-les envoie en **OSC** à un patch **Max/MSP** qui pilote le spectacle, et les restitue aux
-spectateurs sur un **dashboard web** accessible par QR code depuis leur siège.
+Ce dépôt sert à construire **un plugin Unreal Engine** qui reçoit en **OSC/UDP** les données
+cardiaques de spectateurs équipés de capteurs, et les donne à voir sous forme de **bulles**
+disposées comme le plan de la salle.
 
-## Architecture (4 dépôts)
+Rien n'est encore codé. **Le dépôt ne contient que de la documentation.** Ta mission est de
+construire le plugin à partir de la spécification. Commence par lire, dans l'ordre :
 
-```
-VIBH2O/
-├── VibH2o/            (PRIVÉ) cœur du projet — Max/MSP + scripts
-├── VibH2OServer/      serveur Node/Express — dashboard + QR codes
-├── VIBH2O_UE/         documentation et passation (ce dépôt)
-└── VIBH2O_REBORN/     réécriture Unreal Engine — vide à ce jour
-```
+1. Ce fichier — les contraintes et le pourquoi des décisions.
+2. [`docs/ROADMAP.md`](docs/ROADMAP.md) — par où commencer, et comment savoir que c'est fait.
+3. [`docs/SPEC.md`](docs/SPEC.md) — la liste complète des fonctions à réaliser.
+4. [`docs/OSC_PROTOCOL.md`](docs/OSC_PROTOCOL.md) — le protocole réseau et ses pièges.
 
-### `VibH2o` — cœur du projet
+## Le dispositif
 
 ```
-Vib-e.motion/
-├── VIB.e-motion.maxpat              patch principal
-├── VIBH2O_AcquisitionIntervalles.maxpat   acquisition intervalles cardiaques
-├── VIBH2O_Mapping.maxpat            mapping données → sorties
-├── VibH2O_RoomMapping.maxpat        plan de salle / sièges
-├── VIBH2O_TriggerEvents.maxpat      déclenchement d'événements
-├── VIBH2O_DetectionEvent.maxpat     détection d'événements
-├── EventCreator.maxpat              création d'événements
-├── Scripts/         scripts js/jsui appelés PAR les patchs (HRV.js, SensorFilter.js,
-│                    FillSeats.js, PresetManager.js, RecordSensor.js, DataMapping.js…)
-│                    + OSC_SIMULATOR.py (simule 176 capteurs BPM en OSC)
-├── Externals/       CNMAT-Externals 6, Heartbeat
-├── Maxpat/          abstractions et médias
-├── RoomMapping_Presets/, Sequences/, Dict/, shell/
-└── *.json           configurations de spectacle (CONFIGURATION_ALES_1110.json,
-                     Config_Ales_FINAL.json, CIRCLE.json, DictSeats.json…)
-
-Ressources/
-├── RECORDS/         enregistrements de spectacles (⚠ données personnelles)
-├── PyScripts/       analyse de données (MergeFiles, FilterData, CleanBaseline,
-│                    ExtractTimestamps, CompareSensorsBetweenFiles, Renumber)
-├── Makeseat/        génération des plans de sièges (makeseats.py)
-└── MakeDMG/         packaging macOS
+   SALLE                    MAC                        PC WINDOWS
+ spectateurs   ──────►    Max/MSP      ──OSC/UDP──►      Unreal
+  + capteurs             (analyse)                    (ce plugin)
 ```
 
-### `VibH2OServer` — serveur web
+Unreal **ne fait que recevoir et afficher**. Toute l'analyse du signal — filtrage, calcul de
+variabilité, baseline, synchronie — reste dans Max. Ne propose jamais de déporter du traitement
+de signal vers Unreal : ce n'est pas une limite technique, c'est le partage des rôles voulu.
 
-```
-server.js            Express, port 3000
-templates/           dashboard.html, authentication.html, error.html, shared-styles.css
-lib/                 chart.min.js, chartjs-plugin-annotation.min.js (versionnés)
-scripts/             generate_qr.sh, remove_lines.py, extract_landmarks.py
-data/                (ignoré par git) bpm_data.txt, landmarks.txt
-```
+L'œuvre se joue en **tableaux** successifs :
 
-## Commandes utiles
+- **Tableau 1 — le plan de salle.** Une bulle par siège occupé, à sa place réelle. Chaque bulle
+  bat au rythme du cœur de sa personne, grossit, se colore et dérive selon son excitation.
+- **Tableau 2 — le flock.** Le plan se dissout, les bulles forment un banc enroulé en vortex
+  (un cône qui s'évase vers le haut). La synchronie collective en règle l'ordre.
 
-```shell
-# Serveur
-cd VibH2OServer && npm install && node server.js     # → http://localhost:3000
-                                                      # → http://localhost:3000/user/user1
+**Périmètre de la première livraison : le tableau 1 complet, avec l'architecture prête pour le 2.**
 
-# QR codes des sièges (macOS, nécessite qrencode)
-./scripts/generate_qr.sh 200 qr_output
+## Contraintes dures
 
-# Nettoyer les lignes de synchronie d'un enregistrement
-python3 scripts/remove_lines.py       # éditer input_file dans le script au préalable
+| Contrainte | Détail |
+|---|---|
+| **Versions** | UE **5.5 aujourd'hui, 5.8 ensuite**, avec **un seul code source**. N'utilise que des API stables entre les deux. |
+| **Plateforme** | Le plugin tourne sous **Windows**. Le patch émetteur est sur Mac. |
+| **Échelle** | Jusqu'à **~200 bulles** simultanées (le simulateur existant du projet en pousse 176). Un acteur par bulle reste viable à cette échelle ; au-delà il faudrait passer aux meshes instanciés. |
+| **Déplaçable** | L'installation est un acteur du niveau : elle doit pouvoir être déplacée, tournée et redimensionnée dans le viewport, tout la suivant. |
+| **Sequencer** | Tout paramètre pilotable doit être animable dans Sequencer. |
 
-# Simuler 176 capteurs OSC
-python3 VibH2o/Vib-e.motion/Scripts/OSC_SIMULATOR.py --host 192.168.1.255 --port 9001
-```
+## Décisions déjà tranchées — et pourquoi
 
-## Conventions
+**Ne les remets pas en cause sans raison neuve.** Chacune a été prise en connaissance de cause ;
+la raison est donnée pour que tu puisses juger, pas pour que tu la redébattes.
 
-- **Branches** : `feat/…`, `fix/…`, `docs/…` — jamais de commit direct sur la branche par défaut.
-- **Ne jamais commiter** : `.DS_Store`, `node_modules/`, `data/`, `user/`, `qr_output/`,
-  et **aucun enregistrement de spectateur**.
-- **RGPD** : les données cardiaques par siège sont des données personnelles. Pas de dépôt
-  public, pas d'envoi à un service tiers sans base légale.
-- Les scripts de `Vib-e.motion/Scripts/` sont des scripts **Max** (`js`/`jsui`) : ils
-  s'exécutent dans les patchs, pas depuis un terminal.
+### Réseau : socket UDP et parseur OSC écrits dans le plugin
 
-## Points de vigilance
+**Ne pas utiliser le plugin OSC d'Epic.** Son statut et son API bougent d'une version d'Unreal à
+l'autre, ce qui rendrait impossible l'objectif « un seul code pour 5.5 et 5.8 ». Un parseur OSC
+1.0 fait environ 300 lignes, n'a aucune dépendance moteur, et se teste hors moteur.
 
-- Le dépôt `VibH2o` n'a **qu'un seul commit** : aucun historique à consulter.
-- Les patchs `.maxpat` sont du JSON volumineux (`VIB.e-motion.maxpat` ≈ 940 Ko) :
-  les diffs sont illisibles et les modifications se font **dans Max**, pas à la main.
-- `generate_qr.sh` suppose l'interface Wi-Fi macOS `en0`.
+### Battement : accumulateur de phase, jamais un timer
 
-## Documentation
+Max n'envoie **que le BPM**, pas d'événement par battement. Unreal doit donc fabriquer le rythme.
 
-Guide complet d'installation et de passation : [`PASSATION_CLAUDE_CODE.md`](PASSATION_CLAUDE_CODE.md)
-dans le dépôt `VIBH2O_UE`.
+La méthode est imposée : une **phase** par individu, avançant de `DeltaTime * (BPM / 60)` chaque
+frame, qui déclenche un battement en franchissant 1.0 et se décrémente.
+
+Un timer relancé à chaque nouvelle valeur de BPM ferait **sauter** le battement à chaque mise à
+jour, ce qui se voit immédiatement. Avec la phase, un changement de BPM ne modifie que la
+*vitesse* d'avancement : aucune discontinuité. Cette continuité est aussi ce qui permet aux
+anneaux concentriques du matériau de ne jamais glitcher.
+
+Prévois une **entrée d'événement de battement câblée mais inutilisée** : le jour où Max enverra
+les battements réels, le branchement suffira.
+
+### Espace local, jamais monde
+
+L'installation étant déplaçable, **toutes les positions se calculent en local** sous la racine de
+l'acteur de scène (`RelativeLocation`), y compris l'axe du vortex. Un calcul en coordonnées monde
+fonctionnerait tant que rien ne bouge, et casserait au premier déplacement.
+
+### Les bulles n'appartiennent à aucun tableau
+
+C'est **la décision structurante**. Les bulles sont possédées par un acteur de scène permanent ;
+un tableau n'est qu'une **fonction qui dit où va chaque bulle**.
+
+Si la salle possédait ses bulles, passer au vortex signifierait les détruire et en créer d'autres
+— donc perdre la phase de battement et toute continuité, et rendre impossible le morph progressif
+entre les tableaux. Les deux pilotes de position tournent **en permanence** et un curseur
+interpole entre eux, ce qui rend la transition continue, réversible et arrêtable à mi-chemin,
+sans machine à états. Un tableau 3 sera une classe de plus, pas une réécriture.
+
+### Threading
+
+Le thread réseau n'écrit **que** dans une file (`TQueue` SPSC). Toute la logique objet se fait sur
+le game thread, en vidant la file depuis le tick du subsystem. **Tout accès à un `UObject` depuis
+le thread réseau est un crash aléatoire en représentation** — c'est-à-dire le pire moment.
+
+### Le plugin ne possède pas l'apparence
+
+Le look est construit par l'artiste dans son Blueprint et son matériau. Le plugin **pousse des
+valeurs nommées** dans une instance dynamique de matériau et **émet des événements Blueprint**.
+Ne code jamais d'apparence en dur ; fournis une bulle de démonstration fonctionnelle, pas une
+direction artistique.
+
+### Le plugin ne pilote pas la caméra
+
+Il **expose** la cible de cadrage (centre, bornes, distance de recul). La caméra reste au
+metteur en scène — Cine Camera, Blueprint ou Level Sequence.
+
+## Pièges connus
+
+Ils sont tous décrits en détail dans [`docs/OSC_PROTOCOL.md`](docs/OSC_PROTOCOL.md). En résumé :
+
+1. **Slash final dans les adresses** (`/RoomMapping/columns/`) → ignorer les segments vides.
+2. **Le plan de salle arrive en rafale sans marqueur de fin** → attendre ~100 ms de silence avant
+   de construire, sinon la salle est reconstruite à chaque message.
+3. **Un ID de 0 signifie « siège vide »** → aucune bulle, et exclusion de toutes les moyennes.
+4. **L'ordre de parcours des sièges est ambigu** → une transposition est possible entre l'index
+   OSC et la lecture visuelle. **Invisible sur une grille carrée.** Rendre l'ordre basculable et
+   valider sur une salle non carrée (7 × 3).
+
+Et deux pièges de rendu :
+
+5. **Un matériau translucide ne reçoit correctement ni ombres ni caustiques** dans Unreal. Comme
+   l'environnement est sous-marin et que les bulles doivent recevoir les deux, viser un matériau
+   **opaque ou masked en subsurface**, la transparence étant feinte par du Fresnel.
+6. **Sequencer ne voit une propriété que si elle porte `Interp`** dans son `UPROPERTY`. Sans ce
+   spécificateur, elle n'apparaît pas dans les propriétés animables.
+
+## Conventions de travail
+
+- **Le code, les noms de classes et les commentaires en anglais.** La documentation et les
+  échanges avec Dimitri en **français**.
+- Préfixe des classes : `VibH2O` (`AVibH2OStageActor`, `UVibH2OSubsystem`…).
+- Le plugin vit dans `Plugins/VibH2O/` pour pouvoir être copié tel quel dans un autre projet.
+- **Ne commite jamais de données de spectacle** — les enregistrements de capteurs sont des
+  données personnelles. `.gitignore` couvre `data/` et `RECORDS/`.
+- Ne crée pas de pull request sans qu'on te le demande.
+
+## Vérifier son travail
+
+**Point important : Unreal ne peut pas être compilé dans un environnement Claude Code distant.**
+Le moteur n'y est pas installé. Si tu travailles à distance, écris le code avec une vigilance
+particulière sur ce qui casse un build Unreal (macros de réflexion, includes, modules déclarés
+dans le `.Build.cs`) et **dis clairement que la compilation reste à faire**. Ne prétends jamais
+avoir vérifié un build que tu n'as pas lancé.
+
+Deux choses restent vérifiables sans moteur :
+
+- Le **parseur OSC**, délibérément isolé de tout code moteur, se teste sur des trames d'octets.
+- Le **simulateur Python**, qui n'a besoin que de la bibliothèque standard.
+
+La procédure de recette complète est dans [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## Ressources du projet
+
+Le projet VIBH2O dépasse ce dépôt :
+
+| Dépôt | Contenu |
+|---|---|
+| `Anadyomene30/VibH2o` (privé) | Cœur du projet : patchs Max/MSP, scripts. **Contient déjà `Scripts/OSC_SIMULATOR.py`** qui simule 176 capteurs en OSC — à regarder avant d'en écrire un autre. |
+| `Anadyomene30/VIBH2O_UE` | Ce dépôt — le plugin Unreal. |
+| `Anadyomene30/VIBH2O_REBORN` | Décrit comme la réécriture Unreal, vide à ce jour. À clarifier avec Dimitri si la question du dépôt d'accueil se repose. |
+
+Le patch `VibH2O_RoomMapping.maxpat` est celui qui émet le plan de salle : c'est la source de
+vérité du protocole si un doute apparaît.
+
+## Contact
+
+Dimitri Sourzac — `dimitri.sourzac@gmail.com`
+
+Les points encore ouverts sont listés en fin de [`docs/SPEC.md`](docs/SPEC.md). Aucun ne bloque le
+démarrage : ils portent sur des noms d'adresses OSC et des plages de valeurs, tous rendus
+configurables pour que le code n'ait pas à être repris.

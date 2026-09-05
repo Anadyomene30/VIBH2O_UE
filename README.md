@@ -1,30 +1,63 @@
-# VIBH2O_UE
+# VIBH2O_UE — plugin Unreal
 
-Dépôt de **documentation et de passation** du projet VIBH2O.
+Plugin **Unreal Engine** qui reçoit en **OSC/UDP** les données cardiaques de spectateurs équipés
+de capteurs, et les donne à voir sous forme de **bulles** disposées comme le plan de la salle.
 
-## 👉 Commencer ici
+```
+   SALLE                    MAC                        PC WINDOWS
+ spectateurs   ──────►    Max/MSP      ──OSC/UDP──►      Unreal
+  + capteurs             (analyse)                    (ce plugin)
+```
 
-**[PASSATION_CLAUDE_CODE.md](PASSATION_CLAUDE_CODE.md)** — tout ce qu'il faut faire, dans
-l'ordre, pour installer Claude Code sur un nouvel ordinateur, récupérer le code, installer
-les dépendances et reprendre le travail sur le projet.
+> **État : rien n'est encore codé.** Ce dépôt contient la spécification complète et les
+> instructions permettant de démarrer la construction du plugin.
+
+## Par où commencer
+
+| Document | Contenu |
+|---|---|
+| **[CLAUDE.md](CLAUDE.md)** | **À lire en premier.** Contexte, contraintes dures, décisions d'architecture avec leur justification, et pièges connus. Lu automatiquement par Claude Code. |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | L'ordre de construction, étape par étape, avec un critère de terminaison vérifiable à chacune. |
+| [docs/SPEC.md](docs/SPEC.md) | La liste complète des fonctions à réaliser. |
+| [docs/OSC_PROTOCOL.md](docs/OSC_PROTOCOL.md) | Le protocole réseau, sa capture réelle et ses quatre pièges. |
+
+**Pour démarrer le travail :** ouvrir Claude Code à la racine de ce dépôt et lui demander de
+commencer à l'étape 1 de la feuille de route — le parseur OSC, seul morceau entièrement testable
+sans moteur Unreal.
+
+## L'œuvre en deux tableaux
+
+**Tableau 1 — le plan de salle.** Une bulle par siège occupé, à sa place réelle. Chaque bulle bat
+au rythme du cœur de sa personne, grossit, se colore et dérive selon son niveau d'excitation. Un
+mode focus permet d'isoler une partie de la salle en assombrissant le reste.
+
+**Tableau 2 — le flock.** Le plan de salle se dissout : les bulles quittent leur siège et forment
+un banc enroulé en vortex, un cône qui s'évase vers le haut. La synchronie collective en règle
+l'ordre — spirale serrée quand le public synchronise, dispersion quand il décroche. Le passage
+d'un tableau à l'autre se conduit à la main, en continu.
+
+*La première livraison couvre le tableau 1 complet, avec l'architecture prête pour le second.*
+
+## Cibles et contraintes
+
+- **Unreal 5.5 aujourd'hui, 5.8 ensuite**, avec un seul code source.
+- Le plugin tourne sous **Windows** ; le patch émetteur est sur **Mac**.
+- Jusqu'à **~200 bulles** simultanées.
+- L'installation est **déplaçable** dans le niveau, et tous ses paramètres sont **animables dans
+  Sequencer**.
 
 ## Les dépôts du projet
 
-| Dépôt | Visibilité | Contenu |
-|---|---|---|
-| [`Anadyomene30/VibH2o`](https://github.com/Anadyomene30/VibH2o) | **privé** | Cœur du projet : patchs Max/MSP, scripts JS et Python, ressources |
-| [`eva-decorps/VibH2OServer`](https://github.com/eva-decorps/VibH2OServer) | public | Serveur Node/Express : dashboard spectateurs, QR codes par siège |
-| [`Anadyomene30/VIBH2O_UE`](https://github.com/Anadyomene30/VIBH2O_UE) | public | Ce dépôt — documentation et passation |
-| [`Anadyomene30/VIBH2O_REBORN`](https://github.com/Anadyomene30/VIBH2O_REBORN) | public | Réécriture Unreal Engine — **vide à ce jour** |
+| Dépôt | Contenu |
+|---|---|
+| [`Anadyomene30/VibH2o`](https://github.com/Anadyomene30/VibH2o) *(privé)* | Cœur du projet : patchs Max/MSP, scripts. Contient `Scripts/OSC_SIMULATOR.py`. |
+| [`Anadyomene30/VIBH2O_UE`](https://github.com/Anadyomene30/VIBH2O_UE) | Ce dépôt — le plugin Unreal. |
+| [`eva-decorps/VibH2OServer`](https://github.com/eva-decorps/VibH2OServer) | Serveur web : dashboard spectateurs, QR codes par siège. |
+| [`Anadyomene30/VIBH2O_REBORN`](https://github.com/Anadyomene30/VIBH2O_REBORN) | Décrit comme la réécriture Unreal, vide à ce jour. |
 
-## Le projet en deux lignes
+> L'ancienne documentation de passation de l'écosystème VIBH2O reste accessible dans l'historique
+> Git : `git show 7da3dca:PASSATION_CLAUDE_CODE.md`
 
-VIBH2O capte en temps réel les données cardiaques (BPM / intervalles, HRV) des spectateurs
-assis dans une salle, les transmet en **OSC** vers un patch **Max/MSP** qui pilote le
-spectacle, et les restitue aux spectateurs via un **dashboard web** accessible par QR code
-depuis leur siège.
+## Contact
 
-## Contacts
-
-- Dimitri Sourzac — `dimitri.sourzac@gmail.com` (projet, patchs Max)
-- Eva Decorps — serveur web
+Dimitri Sourzac — `dimitri.sourzac@gmail.com`
