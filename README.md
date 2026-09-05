@@ -47,11 +47,16 @@ Plugins/VibH2O/          le plugin, autonome et copiable tel quel
   Source/VibH2O/Public/  parseur OSC, récepteur, réglages, subsystem, acteurs, pilotes
   Source/VibH2O/Private/ implémentations, et 14 tests d'automation
 Tools/
-  vibh2o_osc_sim.py      simulateur : salles 5×5, 7×3, Alès 23×4, 176 capteurs
-  vibh2o_osc_listen.py   écouteur de diagnostic, sans dépendance
-  selftest_osc.py        auto-test de l'outillage, sans Unreal
-  make_demo_map.py       générateur de la carte de démonstration
+  vibh2o_osc_sim.py       simulateur : salles 5×5, 7×3, Alès 23×4, 176 capteurs
+  vibh2o_osc_listen.py    écouteur de diagnostic, sans dépendance
+  selftest_osc.py         auto-test de l'outillage, sans Unreal
+  make_demo_map.py        générateur de la carte de démonstration
+  make_demo_material.py   générateur du matériau de démonstration (11 paramètres visibles)
+  make_demo_sequence.py   générateur de la séquence Sequencer de recette
 ```
+
+La recette visuelle se rejoue d'une commande — `VibH2O.DemoSweep` — qui capture chaque critère
+en PNG ; voir [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Le plugin **n'utilise pas le plugin OSC d'Epic** : son socket et son parseur OSC 1.0 sont écrits
 ici, sans dépendance, pour tenir l'objectif « un seul code source pour 5.5 et 5.8 ».

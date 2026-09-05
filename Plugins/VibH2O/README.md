@@ -204,6 +204,7 @@ rotation ne se voit pas.
 | `VibH2O.ShowDebug` | Bascule l'affichage réseau / salle / moyennes. |
 | `VibH2O.DumpRoom` | Écrit le plan dans le log, une ligne par rangée. **L'outil du test 7 × 3.** |
 | `VibH2O.Restart` | Redémarre l'écoute avec les réglages courants. |
+| `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
 
 ---
 
@@ -222,5 +223,7 @@ en français. La frontière retenue ici :
 
 - **Le comportement de banc** du tableau 2 : voisinage, séparation, alignement, cohésion. Le vortex
   livré donne la forme, ce qui suffit à rendre la transition testable.
-- **Le look définitif des bulles** : mesh, matériau subsurface, stries, anneaux. La sphère de
-  démonstration prouve que les données circulent, rien de plus.
+- **Le look définitif des bulles** : mesh, matériau subsurface, stries, anneaux. Le matériau de
+  démonstration (`/VibH2O/M_VibH2ODemoBubble`, régénérable par `Tools/make_demo_material.py`)
+  prouve que les onze paramètres circulent et agissent — il ne prétend à aucune direction
+  artistique.

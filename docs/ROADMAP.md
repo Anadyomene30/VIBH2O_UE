@@ -25,12 +25,12 @@ moyen :
 | 2 | Simulateur | ✅ | `Tools/selftest_osc.py` au vert, boucle UDP comprise. |
 | 3 | Socle réseau et état | ✅ | 2 tests d'intégration + un essai live à 2 500 msg/s. |
 | 4 | Salle et bulles | ✅ | **84 bulles créées** depuis le plan réel d'Alès, allées comprises. |
-| 5 | Battement et effets | 🟡 | Phase, dérive et flottement testés ; le rendu reste à voir à l'œil. |
-| 6 | Contrat matériau | 🟡 | Les onze paramètres sont poussés ; **un matériau de test reste à faire**. |
-| 7 | Géométrie de salle | 🟡 | Courbure, éventail, gradins et relief testés ; le balayage visuel reste à faire. |
-| 8 | Focus | 🟡 | Écrit et compilé ; **le cadrage sur salle courbée reste à vérifier à l'œil**. |
-| 9 | Tableaux et transition | 🟡 | Vortex testé ; le morph reste à voir en mouvement. |
-| 10 | Sequencer et finitions | 🟡 | `Interp` posé partout ; **la lecture dans Sequencer reste à faire**. |
+| 5 | Battement et effets | ✅ | Phase, dérive et flottement testés ; anneaux et pop visibles sur les captures du sweep. |
+| 6 | Contrat matériau | ✅ | `M_VibH2ODemoBubble` généré par `Tools/make_demo_material.py` — les onze paramètres ont chacun un effet visible distinct, constaté sur captures. |
+| 7 | Géométrie de salle | ✅ | Courbure testée au bit près, **et** vue en plongée dans les deux sens sur captures ; gradins et relief vus de profil. |
+| 8 | Focus | ✅ | Assombrissement hors groupe constaté sur capture ; bornes testées numériquement. |
+| 9 | Tableaux et transition | ✅ | Morph capturé à 0, mi-course et 1 ; le cône se lit de profil, teinté par `BlendAlpha`. La logique de banc reste hors périmètre, comme prévu. |
+| 10 | Sequencer et finitions | ✅ | `LS_VibH2O_Recette` (générée par script) anime les trois paramètres ; **lecture vérifiée en jeu** : BlendAlpha passe de 0 à 0,22 sous le seul contrôle de la piste. |
 
 ### Rejouer les vérifications
 
@@ -61,11 +61,36 @@ Et la cible qui compte vraiment pour la representation n'est pas l'editeur :
 "C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UE Win64 Shipping -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
 ```
 
-La carte de démonstration se régénère à volonté — elle n'est pas un asset à préserver :
+La carte, le matériau et la séquence de démonstration se régénèrent à volonté — ce ne sont pas
+des assets à préserver :
 
 ```bash
 "C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_map.py" -unattended -nosplash
 ```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_material.py" -unattended -nosplash
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_sequence.py" -unattended -nosplash
+```
+
+### La recette visuelle, en une commande
+
+`VibH2O.DemoSweep` déroule tout seul les critères que les tests numériques ne jugent pas :
+courbure dans les deux sens, espacement constant, gradins et relief, focus, capteurs muets,
+acteur déplacé, morph vers le vortex et retour, lecture Sequencer, salle de 176 avec mesure
+d'images par seconde — **une capture PNG étiquetée par phase** dans `Saved/VibH2OSweep/`, puis
+le moteur quitte.
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" VIBH2O_UE.uproject -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.DemoSweep" -NoSound -unattended -nosplash
+```
+
+Une fenêtre s'ouvre environ une minute. Le rendu hors écran (`-RenderOffscreen`) ne convient
+**pas** : la capture d'écran attend une présentation d'image qui n'y arrive jamais, et la frame
+se fige.
 
 ---
 
@@ -238,22 +263,23 @@ Avant de considérer la première livraison terminée :
 | # | Vérification | État |
 |---|---|---|
 | 1 | Tests du parseur au vert | ✅ automatisé |
-| 2 | Salle 5 × 5 : 25 bulles, chacune à son tempo | 🟡 à voir à l'œil |
+| 2 | Salle 5 × 5 : 25 bulles, chacune à son tempo | ✅ anneaux par bulle sur captures, à son BPM propre (fréquence des anneaux) |
 | 3 | Salle 7 × 3 : **orientation confirmée**, valeur notée dans `OSC_PROTOCOL.md` | ✅ notée, et vérifiée sur le plan d'Alès |
 | 4 | Sièges à 0 : aucune bulle, moyennes non faussées | ✅ automatisé |
-| 5 | ~176 sièges : le tout reste fluide | 🟡 92 sièges tenus à 2 500 msg/s ; reste à mesurer en images/s |
-| 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit | 🟡 à voir à l'œil |
-| 7 | Courbure balayée dans les deux sens, droite exacte à zéro | ✅ automatisé (exactitude au bit près) |
-| 8 | Chaque effet s'active et se désactive isolément | 🟡 bascule testée, effet visuel à voir |
-| 9 | Focus : assombrissement et cadrage justes sur salle courbée | 🟡 à voir à l'œil |
-| 10 | Blend 0 → 1 → 0 sans à-coup, flottement persistant | 🟡 à voir à l'œil |
-| 11 | Trois paramètres animés dans Sequencer | 🟡 à faire |
+| 5 | ~176 sièges : le tout reste fluide | ✅ **517 images/s mesurées** en rendu réel, sweep phase 14 |
+| 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit | ✅ capture `08_acteur_deplace` — translation + 35° de yaw, tout suit |
+| 7 | Courbure balayée dans les deux sens, droite exacte à zéro | ✅ automatisé au bit près, **et** vu en plongée sur captures |
+| 8 | Chaque effet s'active et se désactive isolément | 🟡 bascules testées ; l'isolement visuel effet par effet reste à regarder |
+| 9 | Focus : assombrissement et cadrage justes sur salle courbée | ✅ assombrissement sur capture ; bornes testées numériquement |
+| 10 | Blend 0 → 1 → 0 sans à-coup, flottement persistant | ✅ captures à 0, ½ et 1, retour capturé ; flottement testé |
+| 11 | Trois paramètres animés dans Sequencer | ✅ séquence générée, **lecture en jeu vérifiée** (BlendAlpha 0 → 0,22 par la piste seule) |
 | 12 | Capteur coupé : passage en muet en ~5 s, sortie des moyennes | ✅ automatisé |
 | 13 | Dans le niveau sous-marin : ombres et caustiques reçues | 🟡 à faire |
 | 14 | Depuis le vrai patch Max : adresses confirmées ou réglages ajustés | 🟡 relevées sur les patchs, à confirmer en salle |
 
-Les lignes marquées ✅ se rejouent d'une commande. Celles marquées 🟡 demandent un œil, un
-matériau ou une salle — c'est-à-dire ce qu'un test ne remplace pas.
+Les lignes marquées ✅ se rejouent d'une commande — `VibH2O.DemoSweep` pour les visuelles.
+Les deux 🟡 restants demandent ce qu'aucune machine de ce dépôt ne possède : l'environnement
+`underwater_bp` de l'artiste (caustiques), et la salle avec le vrai patch Max.
 
 ---
 

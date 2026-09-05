@@ -19,7 +19,11 @@ public class VibH2O : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"Sockets",
-			"Networking"
+			"Networking",
+			// Used only by the non-shipping VibH2O.DemoSweep console command,
+			// which plays the demo Level Sequence as part of its visual pass.
+			"LevelSequence",
+			"MovieScene"
 		});
 	}
 }
