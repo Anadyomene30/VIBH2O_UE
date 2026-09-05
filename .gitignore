@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+package-lock.json
+
+# Données de spectacle (données personnelles — ne jamais commiter)
+data/
+user/
+qr_output/
+
+# Claude Code — réglages locaux
+.claude/settings.local.json
