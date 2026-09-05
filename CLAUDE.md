@@ -9,8 +9,9 @@ Ce dépôt sert à construire **un plugin Unreal Engine** qui reçoit en **OSC/U
 cardiaques de spectateurs équipés de capteurs, et les donne à voir sous forme de **bulles**
 disposées comme le plan de la salle.
 
-Rien n'est encore codé. **Le dépôt ne contient que de la documentation.** Ta mission est de
-construire le plugin à partir de la spécification. Commence par lire, dans l'ordre :
+Le plugin **existe** : il compile sous UE 5.5 et ses 14 tests d'automation passent. Ce qui reste
+est listé dans [`docs/ROADMAP.md`](docs/ROADMAP.md), et tient à ce qu'un test ne remplace pas — un
+œil, un matériau, une vraie salle. Lis, dans l'ordre :
 
 1. Ce fichier — les contraintes et le pourquoi des décisions.
 2. [`docs/ROADMAP.md`](docs/ROADMAP.md) — par où commencer, et comment savoir que c'est fait.
@@ -133,6 +134,11 @@ Et deux pièges de rendu :
 
 - **Le code, les noms de classes et les commentaires en anglais.** La documentation et les
   échanges avec Dimitri en **français**.
+
+  La frontière retenue, en pratique : **ce que lit un développeur** — commentaires, noms — est en
+  anglais ; **ce que lit l'opérateur en salle** — messages de log, affichage de débogage, libellés
+  d'assertion des tests, noms affichés dans le panneau Details — reste en français. Les catégories
+  `UPROPERTY` suivent le panneau Details, donc le français.
 - Préfixe des classes : `VibH2O` (`AVibH2OStageActor`, `UVibH2OSubsystem`…).
 - Le plugin vit dans `Plugins/VibH2O/` pour pouvoir être copié tel quel dans un autre projet.
 - **Ne commite jamais de données de spectacle** — les enregistrements de capteurs sont des
@@ -141,18 +147,51 @@ Et deux pièges de rendu :
 
 ## Vérifier son travail
 
-**Point important : Unreal ne peut pas être compilé dans un environnement Claude Code distant.**
-Le moteur n'y est pas installé. Si tu travailles à distance, écris le code avec une vigilance
-particulière sur ce qui casse un build Unreal (macros de réflexion, includes, modules déclarés
-dans le `.Build.cs`) et **dis clairement que la compilation reste à faire**. Ne prétends jamais
-avoir vérifié un build que tu n'as pas lancé.
+**Ne prétends jamais avoir vérifié un build que tu n'as pas lancé.** C'est la règle, et elle ne
+bouge pas. Ce qui change, c'est ce que tu *peux* lancer.
 
-Deux choses restent vérifiables sans moteur :
+**En environnement Claude Code distant**, le moteur n'est pas installé : écris le code avec une
+vigilance particulière sur ce qui casse un build Unreal (macros de réflexion, includes, modules
+déclarés dans le `.Build.cs`) et dis clairement que la compilation reste à faire. Deux choses
+restent vérifiables sans moteur : le **parseur OSC**, délibérément isolé de tout code moteur, et le
+**simulateur Python**, qui n'a besoin que de la bibliothèque standard.
 
-- Le **parseur OSC**, délibérément isolé de tout code moteur, se teste sur des trames d'octets.
-- Le **simulateur Python**, qui n'a besoin que de la bibliothèque standard.
+**Sur la machine de Dimitri**, UE 5.5 et 5.8 sont installés sous `C:\Program Files\Epic Games\`.
+Tout est donc vérifiable, et doit l'être :
 
-La procédure de recette complète est dans [`docs/ROADMAP.md`](docs/ROADMAP.md).
+```bash
+python Tools/selftest_osc.py
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UEEditor Win64 Development -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound
+```
+
+**Trois cibles, pas une.** L'éditeur ne suffit pas : c'est la cible **Game** qui tourne en
+représentation, et elle compile sans l'éditeur. Une API `WITH_EDITOR` — `SetActorLabel`,
+`SetFolderPath`, `FPropertyChangedEvent` — passe en éditeur et casse en Game. À garder par
+`WITH_EDITOR`, jamais par une macro de configuration comme `!UE_BUILD_SHIPPING`.
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UE Win64 Shipping -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
+```
+
+**La contrainte 5.5 / 5.8 se vérifie, elle aussi.** Copier le projet dans un dossier au chemin
+**court** — au-delà de 260 caractères UnrealBuildTool refuse de compiler — et lancer le `Build.bat`
+de 5.8 dessus. Fait le 5 septembre 2026 : compilation propre, 14 tests au vert sous les deux
+moteurs.
+
+> **Piège du build.** `Build.bat` renvoie parfois **0 alors que la compilation a échoué** :
+> l'exécuteur réussit, le compilateur non. Lis toujours la sortie, ne te fie pas au code de retour.
+> De même, les résultats d'automation ne vont pas sur la sortie standard : ils sont dans
+> `Saved/Logs/VIBH2O_UE.log`, sur les lignes `Test Completed. Result=`.
+
+La procédure de recette complète, et l'état de chaque étape, sont dans
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Ressources du projet
 
@@ -160,12 +199,22 @@ Le projet VIBH2O dépasse ce dépôt :
 
 | Dépôt | Contenu |
 |---|---|
-| `Anadyomene30/VibH2o` (privé) | Cœur du projet : patchs Max/MSP, scripts. **Contient déjà `Scripts/OSC_SIMULATOR.py`** qui simule 176 capteurs en OSC — à regarder avant d'en écrire un autre. |
+| `Anadyomene30/VibH2o` (privé) | Cœur du projet : patchs Max/MSP, scripts. Les chemins réels sont `Vib-e.motion/Scripts/` et `Vib-e.motion/RoomMapping_Presets/`, et non `Scripts/`. |
 | `Anadyomene30/VIBH2O_UE` | Ce dépôt — le plugin Unreal. |
 | `Anadyomene30/VIBH2O_REBORN` | Décrit comme la réécriture Unreal, vide à ce jour. À clarifier avec Dimitri si la question du dépôt d'accueil se repose. |
 
 Le patch `VibH2O_RoomMapping.maxpat` est celui qui émet le plan de salle : c'est la source de
 vérité du protocole si un doute apparaît.
+
+**Trois fichiers de ce dépôt ont déjà tranché des points ouverts** — les relire avant de rouvrir
+une question :
+
+- `Vib-e.motion/Scripts/FormatRoomMapping.js` — la formule d'index de siège, donc le piège 4.
+- `Vib-e.motion/RoomMapping_Presets/ALES_FINAL.json` — le vrai plan d'Alès, 23 × 4 avec deux
+  allées. Non carré **et** troué : le meilleur cas de test qui existe.
+- `Vib-e.motion/Scripts/OSC_SIMULATOR.py` — attention, il simule les **capteurs en amont de Max**
+  (`/oh1/<hex>/bpm`), pas le flux que le plugin écoute. L'étendre serait un contresens ;
+  `Tools/vibh2o_osc_sim.py` en reprend les conventions et émet le bon maillon.
 
 ## Contact
 

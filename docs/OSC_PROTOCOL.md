@@ -56,6 +56,20 @@ Conséquences, toutes obligatoires :
 - Il est **exclu des bornes de cadrage du focus**, sinon la caméra viserait du vide.
 - Un siège peut **passer à 0 en cours de route** : la bulle doit alors disparaître.
 
+> **Une valeur de plus à surveiller.** `Scripts/FormatRoomMapping.js` remplace une cellule vide
+> par **999** sur l'un de ses chemins (`value === 0 ? 999 : value - 3`), et soustrait 3 aux autres.
+> Impossible de dire, sur pièces seules, lequel de ces chemins alimente l'envoi OSC réellement
+> capturé — la capture de référence, elle, montre bien des `0`.
+>
+> Le plugin traite donc **0 et 999** comme « siège vide » (`EmptySeatIds`), et expose un
+> `IndividualIdOffset` laissé à 0. Si les identifiants apparaissent décalés de 3 en salle, c'est ce
+> champ qu'il faut ajuster — pas le code.
+
+> **Un index absent n'est pas un siège vide.** Le protocole annonce toujours explicitement une
+> place libre. Un index manquant est du silence — le plus souvent un datagramme UDP perdu. Le
+> traiter comme un effacement ferait disparaître une bulle à chaque paquet perdu. Le réglage
+> `bTreatMissingSeatsAsEmpty` est donc **faux** par défaut.
+
 ### ⚠️ Piège 4 — l'ordre de parcours est ambigu
 
 Dans la capture de référence, les individus 1 à 5 apparaissent aux index **1, 6, 11, 16, 21** :
@@ -76,23 +90,49 @@ places.
 recompilation, et **valider sur une salle non carrée — 7 colonnes × 3 rangées**. C'est le seul
 test qui lève le doute. Une fois la bonne valeur connue, la noter dans ce fichier.
 
-> **Valeur correcte constatée :** *à remplir après le test 7 × 3.*
+> **Valeur correcte constatée :** **`ColumnMajor`** — l'index OSC descend une colonne, puis passe
+> à la suivante.
+>
+> Établie **sur pièces, pas par déduction**, dans le dépôt `VibH2o` :
+>
+> 1. `Vib-e.motion/Scripts/FormatRoomMapping.js` — le script qui fabrique les messages — calcule
+>    `index = (x * rows + y) + 1`.
+> 2. Dans un `matrixctrl` Max, la coordonnée est `x y` = **colonne, rangée**. Le preset réel
+>    `RoomMapping_Presets/ALES_FINAL.json` le confirme sans ambiguïté : pour `columns: 23,
+>    rows: 4`, ses clés vont de `"0 0"` à `"22 3"` — donc `x` va jusqu'à 22, c'est bien la colonne.
+> 3. Recoupement : avec cette formule et une numérotation visuelle en rangées, une salle 5 × 5
+>    place les individus 1 à 5 aux index 1, 6, 11, 16, 21 — **exactement la capture ci-dessus**.
+>
+> `Tools/selftest_osc.py` rejoue ce recoupement à chaque exécution.
+>
+> **Le test 7 × 3 en salle reste à faire malgré tout** : un patch Max peut être modifié sans que ce
+> code le soit, et seul le test in situ prouve que le patch tournant ce soir-là est bien celui-ci.
+> Le réglage `SeatOrder` est là pour cette raison.
 
 ---
 
 ## 2. Les données live
 
-**Format supposé, à confirmer avec le patch Max.** Il suit le style de `/RoomMapping` : une
-adresse par individu et par mesure.
+Format suivant le style de `/RoomMapping` : une adresse par individu et par mesure.
 
 ```
-/BPM/<id>/   72.3     rythme cardiaque, en battements par minute
-/SD/<id>/    0.42     excitation, DÉJÀ NORMALISÉE par Max
-/Sync/<id>/  0.81     synchronie de l'individu avec le groupe
+/BPM/<id>/          72.3     rythme cardiaque, en battements par minute
+/SD/<id>/           0.42     excitation, DÉJÀ NORMALISÉE par Max
+/Synchronie/<id>/   0.81     synchronie de l'individu avec le groupe
 ```
 
-Les préfixes (`/BPM`, `/SD`, `/Sync`) doivent être des **réglages de projet, pas des constantes**.
-Si le patch les nomme autrement, ce doit être un champ à modifier, pas du code à recompiler.
+> **Relevé sur les patchs.** Dans `VIBH2O_Mapping.maxpat`, les préfixes sont des **textedit**
+> initialisés à `/BPM` et à **`/Synchronie`** — et non `/Sync` comme le supposait ce document. Le
+> réglage `SynchronyPrefix` du plugin vaut donc `/Synchronie` par défaut.
+>
+> `/SD` **reste à confirmer** : aucun textedit correspondant n'a été retrouvé dans les patchs
+> consultés. Si l'adresse diffère, seul le champ `ExcitationPrefix` est à changer.
+>
+> Le port `9002` est confirmé deux fois : par le textedit du patch `VibH2O_RoomMapping` et par
+> l'objet `udpsend 192.168.0.255 9002` de `VIB.e-motion.maxpat`.
+
+Les préfixes sont des **réglages de projet, pas des constantes** — *Project Settings → Plugins →
+VibH2O*. Si le patch les nomme autrement, c'est un champ à modifier, pas du code à recompiler.
 
 ### Ce que Max envoie et n'envoie pas
 
@@ -159,6 +199,7 @@ Le simulateur doit permettre de couvrir :
 |---|---|
 | Salle 5 × 5 | Le fonctionnement nominal |
 | Salle 7 × 3 | **La transposition** — le test indispensable |
+| Salle d'Alès, 23 × 4 | Le vrai plan, avec ses deux allées : non carré **et** troué |
 | Sièges à 0 | Les trous dans la grille et l'exclusion des moyennes |
 | ~176 sièges | La tenue en charge à l'échelle réelle |
 | Vague d'excitation | Les effets continus |

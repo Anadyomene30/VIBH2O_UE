@@ -201,10 +201,25 @@ artistique.
 
 ## Points ouverts
 
-Aucun ne bloque le démarrage — tous sont rendus configurables pour que le code n'ait pas à être
-repris.
+Aucun ne bloque — tous sont configurables, donc réglables sans toucher au code.
 
-- **Les adresses exactes des données live** côté Max, à confirmer sur le patch.
-- **La plage de l'excitation normalisée** — on suppose 0→1 — et celle du BPM.
-- **Le sens de parcours des sièges**, que seul le test 7 × 3 peut trancher.
+### Tranchés depuis, sur pièces
+
+- **Le sens de parcours des sièges** → `ColumnMajor`. Établi par
+  `Vib-e.motion/Scripts/FormatRoomMapping.js` et confirmé par le preset `ALES_FINAL.json`, puis
+  vérifié de bout en bout sur le plan d'Alès reconstruit dans Unreal. Le test 7 × 3 en salle reste
+  souhaitable : il prouverait que le patch tournant ce soir-là est bien celui-ci.
+- **L'adresse de la synchronie** → `/Synchronie`, et non `/Sync`. Relevée dans le textedit de
+  `VIBH2O_Mapping.maxpat`.
+- **Le port** → `9002`, confirmé deux fois dans les patchs.
+
+### Toujours ouverts
+
+- **L'adresse de l'excitation.** `/SD` est supposé ; aucun textedit correspondant n'a été retrouvé.
+  Champ `ExcitationPrefix`.
+- **La plage de l'excitation normalisée** — on suppose 0→1 — et celle du BPM. Champs
+  `ExcitationInputMin` / `Max`, `MinBpm` / `MaxBpm`.
+- **L'encodage des identifiants.** `FormatRoomMapping.js` soustrait 3 et code le vide par 999 sur
+  l'un de ses chemins, alors que la capture de référence montre des `0`. Le plugin accepte les deux
+  valeurs de vide ; le décalage éventuel se règle par `IndividualIdOffset`.
 - **Le dépôt d'accueil définitif** : `VIBH2O_REBORN` est décrit comme la réécriture Unreal.

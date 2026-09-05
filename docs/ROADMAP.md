@@ -7,6 +7,65 @@ seule.
 > **Rappel :** Unreal n'est pas installé dans un environnement Claude Code distant. Les étapes 1
 > et 2 sont vérifiables sans moteur ; à partir de l'étape 3, la validation se fait sur la machine
 > Windows de Dimitri. Ne jamais annoncer une compilation qui n'a pas été lancée.
+>
+> **Sur la machine de Dimitri, en revanche, tout est vérifiable** : UE 5.5 y est installé, et les
+> commandes ci-dessous ont réellement été exécutées.
+
+---
+
+## État — 5 septembre 2026
+
+Les étapes 0 à 10 sont **écrites et compilées**. Ce qui a été vérifié pour de bon, et par quel
+moyen :
+
+| # | Étape | État | Comment |
+|---|---|---|---|
+| 0 | Squelette | ✅ | Compile et se lie sous **UE 5.5 et UE 5.8**, cibles Editor, Game et Shipping, sans avertissement. Les 14 tests passent sous les deux moteurs. |
+| 1 | Parseur OSC | ✅ | 5 tests d'automation, dont une trame de référence écrite à la main et 2 000 trames aléatoires. |
+| 2 | Simulateur | ✅ | `Tools/selftest_osc.py` au vert, boucle UDP comprise. |
+| 3 | Socle réseau et état | ✅ | 2 tests d'intégration + un essai live à 2 500 msg/s. |
+| 4 | Salle et bulles | ✅ | **84 bulles créées** depuis le plan réel d'Alès, allées comprises. |
+| 5 | Battement et effets | 🟡 | Phase, dérive et flottement testés ; le rendu reste à voir à l'œil. |
+| 6 | Contrat matériau | 🟡 | Les onze paramètres sont poussés ; **un matériau de test reste à faire**. |
+| 7 | Géométrie de salle | 🟡 | Courbure, éventail, gradins et relief testés ; le balayage visuel reste à faire. |
+| 8 | Focus | 🟡 | Écrit et compilé ; **le cadrage sur salle courbée reste à vérifier à l'œil**. |
+| 9 | Tableaux et transition | 🟡 | Vortex testé ; le morph reste à voir en mouvement. |
+| 10 | Sequencer et finitions | 🟡 | `Interp` posé partout ; **la lecture dans Sequencer reste à faire**. |
+
+### Rejouer les vérifications
+
+```bash
+python Tools/selftest_osc.py
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UEEditor Win64 Development -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound
+```
+
+```bash
+python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
+```
+
+Pour la contrainte « un seul code source pour 5.5 et 5.8 », copier le projet dans un dossier au
+chemin **court** — au-dela de 260 caracteres, UnrealBuildTool refuse de compiler — puis pointer le
+`Build.bat` de 5.8 dessus. La verification a ete faite ainsi : compilation propre, 14 tests au
+vert.
+
+Et la cible qui compte vraiment pour la representation n'est pas l'editeur :
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UE Win64 Shipping -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
+```
+
+La carte de démonstration se régénère à volonté — elle n'est pas un asset à préserver :
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_map.py" -unattended -nosplash
+```
 
 ---
 
@@ -176,22 +235,25 @@ animables, s'animent au scrub, et qu'un message OSC entrant ne perturbe pas une 
 
 Avant de considérer la première livraison terminée :
 
-| # | Vérification |
-|---|---|
-| 1 | Tests du parseur au vert |
-| 2 | Salle 5 × 5 : 25 bulles, chacune à son tempo |
-| 3 | Salle 7 × 3 : **orientation confirmée**, valeur notée dans `OSC_PROTOCOL.md` |
-| 4 | Sièges à 0 : aucune bulle, moyennes non faussées |
-| 5 | ~176 sièges : le tout reste fluide |
-| 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit |
-| 7 | Courbure balayée dans les deux sens, droite exacte à zéro |
-| 8 | Chaque effet s'active et se désactive isolément |
-| 9 | Focus : assombrissement et cadrage justes sur salle courbée |
-| 10 | Blend 0 → 1 → 0 sans à-coup, flottement persistant |
-| 11 | Trois paramètres animés dans Sequencer |
-| 12 | Capteur coupé : passage en muet en ~5 s, sortie des moyennes |
-| 13 | Dans le niveau sous-marin : ombres et caustiques reçues |
-| 14 | Depuis le vrai patch Max : adresses confirmées ou réglages ajustés |
+| # | Vérification | État |
+|---|---|---|
+| 1 | Tests du parseur au vert | ✅ automatisé |
+| 2 | Salle 5 × 5 : 25 bulles, chacune à son tempo | 🟡 à voir à l'œil |
+| 3 | Salle 7 × 3 : **orientation confirmée**, valeur notée dans `OSC_PROTOCOL.md` | ✅ notée, et vérifiée sur le plan d'Alès |
+| 4 | Sièges à 0 : aucune bulle, moyennes non faussées | ✅ automatisé |
+| 5 | ~176 sièges : le tout reste fluide | 🟡 92 sièges tenus à 2 500 msg/s ; reste à mesurer en images/s |
+| 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit | 🟡 à voir à l'œil |
+| 7 | Courbure balayée dans les deux sens, droite exacte à zéro | ✅ automatisé (exactitude au bit près) |
+| 8 | Chaque effet s'active et se désactive isolément | 🟡 bascule testée, effet visuel à voir |
+| 9 | Focus : assombrissement et cadrage justes sur salle courbée | 🟡 à voir à l'œil |
+| 10 | Blend 0 → 1 → 0 sans à-coup, flottement persistant | 🟡 à voir à l'œil |
+| 11 | Trois paramètres animés dans Sequencer | 🟡 à faire |
+| 12 | Capteur coupé : passage en muet en ~5 s, sortie des moyennes | ✅ automatisé |
+| 13 | Dans le niveau sous-marin : ombres et caustiques reçues | 🟡 à faire |
+| 14 | Depuis le vrai patch Max : adresses confirmées ou réglages ajustés | 🟡 relevées sur les patchs, à confirmer en salle |
+
+Les lignes marquées ✅ se rejouent d'une commande. Celles marquées 🟡 demandent un œil, un
+matériau ou une salle — c'est-à-dire ce qu'un test ne remplace pas.
 
 ---
 

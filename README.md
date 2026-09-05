@@ -9,21 +9,52 @@ de capteurs, et les donne à voir sous forme de **bulles** disposées comme le p
   + capteurs             (analyse)                    (ce plugin)
 ```
 
-> **État : rien n'est encore codé.** Ce dépôt contient la spécification complète et les
-> instructions permettant de démarrer la construction du plugin.
+> **État : la première livraison est écrite, compilée sous UE 5.5, et couverte par
+> 14 tests d'automation au vert.** Ce qui reste tient à ce qu'un test ne remplace pas — un œil, un
+> matériau, une vraie salle. Le détail est dans [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Essayer en trois commandes
+
+```bash
+python Tools/selftest_osc.py
+```
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" VIBH2O_UEEditor Win64 Development -Project="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -WaitMutex
+```
+
+```bash
+python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
+```
+
+Ouvrir ensuite `VIBH2O_UE.uproject`, lancer la carte `Maps/VibH2O_Demo`, et taper `VibH2O.ShowDebug`
+dans la console. Si rien n'apparaît, cet affichage dit pourquoi.
 
 ## Par où commencer
 
 | Document | Contenu |
 |---|---|
 | **[CLAUDE.md](CLAUDE.md)** | **À lire en premier.** Contexte, contraintes dures, décisions d'architecture avec leur justification, et pièges connus. Lu automatiquement par Claude Code. |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | L'ordre de construction, étape par étape, avec un critère de terminaison vérifiable à chacune. |
+| [Plugins/VibH2O/README.md](Plugins/VibH2O/README.md) | Le mode d'emploi du plugin : installation, classes, contrat matériau, focus, Sequencer. |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | L'ordre de construction, et **l'état de chaque étape**. |
 | [docs/SPEC.md](docs/SPEC.md) | La liste complète des fonctions à réaliser. |
 | [docs/OSC_PROTOCOL.md](docs/OSC_PROTOCOL.md) | Le protocole réseau, sa capture réelle et ses quatre pièges. |
 
-**Pour démarrer le travail :** ouvrir Claude Code à la racine de ce dépôt et lui demander de
-commencer à l'étape 1 de la feuille de route — le parseur OSC, seul morceau entièrement testable
-sans moteur Unreal.
+## Ce qui a été construit
+
+```
+Plugins/VibH2O/          le plugin, autonome et copiable tel quel
+  Source/VibH2O/Public/  parseur OSC, récepteur, réglages, subsystem, acteurs, pilotes
+  Source/VibH2O/Private/ implémentations, et 14 tests d'automation
+Tools/
+  vibh2o_osc_sim.py      simulateur : salles 5×5, 7×3, Alès 23×4, 176 capteurs
+  vibh2o_osc_listen.py   écouteur de diagnostic, sans dépendance
+  selftest_osc.py        auto-test de l'outillage, sans Unreal
+  make_demo_map.py       générateur de la carte de démonstration
+```
+
+Le plugin **n'utilise pas le plugin OSC d'Epic** : son socket et son parseur OSC 1.0 sont écrits
+ici, sans dépendance, pour tenir l'objectif « un seul code source pour 5.5 et 5.8 ».
 
 ## L'œuvre en deux tableaux
 
