@@ -31,16 +31,33 @@ Editor, Game et Shipping — les quatorze tests d'automation passent sous les de
 
 ## Démarrage rapide
 
+**Sans rien brancher.** Ouvrir la carte `Maps/VibH2O_Demo` et appuyer sur Play : le
+**simulateur intégré** (`VibH2O — Simulateur`, posé dans le niveau) joue le rôle de Max — plan de
+salle, BPM, excitation, synchronie — et la salle vit immédiatement.
+
+Dans un autre niveau, deux gestes suffisent :
+
+1. Poser un **`VibH2O — Acteur de scène`** (`AVibH2OStageActor`).
+2. Poser un **`VibH2O — Simulateur`** (`AVibH2OSimulatorActor`) — ou taper `VibH2O.Simulate`
+   dans la console, qui en crée un au besoin. `VibH2O.Simulate ales` charge la vraie salle
+   d'Alès, `22x8` une salle de 176, `off` l'arrête.
+
+Ses scénarios se règlent dans le panneau Details : nominal, vague d'excitation, balayage de
+synchronie (pour voir respirer le vortex avec `BlendAlpha`), pic collectif, coupure de capteurs.
+
+**Le jour où le vrai Max émet, il n'y a rien à faire** : dès que des paquets arrivent sur le
+socket, le simulateur se met en pause tout seul, et reprend après trois secondes de silence
+réseau. La même carte sert donc à la démo et à la répétition. Et comme il injecte ses messages
+par le même chemin que le réseau — adresses construites depuis les réglages du projet, rafale,
+silence, transposition — ce qu'on juge à l'œil est le vrai comportement du plugin.
+
+**Avec le vrai flux réseau :**
+
 ```bash
 python Tools/vibh2o_osc_sim.py --preset 7x3
 ```
 
-Puis, dans le niveau :
-
-1. Poser un **`VibH2O — Acteur de scène`** (`AVibH2OStageActor`).
-2. Lancer en PIE. Les bulles apparaissent.
-3. Console : `VibH2O.ShowDebug` pour l'état réseau, `VibH2O.DumpRoom` pour le plan en texte.
-
+Console : `VibH2O.ShowDebug` pour l'état réseau, `VibH2O.DumpRoom` pour le plan en texte.
 Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paquet, plan absent.
 
 ---
@@ -53,6 +70,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `UVibH2OSubsystem` | Le modèle vivant : réseau, plan de salle, état par individu, moyennes. Ne connaît aucun acteur. |
 | `AVibH2OStageActor` | La racine de l'installation. **Possède les bulles**, en permanence. |
 | `AVibH2OBubbleActor` | Une bulle. À dériver en Blueprint pour lui donner son apparence. |
+| `AVibH2OSimulatorActor` | Le Max de poche : simule plan et données par le chemin d'injection, et s'efface dès que le vrai réseau parle. |
 | `UVibH2OPositionDriver` | Un tableau : une fonction qui dit où va chaque bulle. |
 | `UVibH2OGridDriver` | Tableau 1 — le plan de salle. |
 | `UVibH2OVortexDriver` | Tableau 2 — le vortex, amorce. |
@@ -204,6 +222,7 @@ rotation ne se voit pas.
 | `VibH2O.ShowDebug` | Bascule l'affichage réseau / salle / moyennes. |
 | `VibH2O.DumpRoom` | Écrit le plan dans le log, une ligne par rangée. **L'outil du test 7 × 3.** |
 | `VibH2O.Restart` | Redémarre l'écoute avec les réglages courants. |
+| `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
 
 ---

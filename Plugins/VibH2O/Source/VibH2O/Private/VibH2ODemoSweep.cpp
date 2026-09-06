@@ -37,6 +37,7 @@
 #include "VibH2OStageActor.h"
 #include "VibH2OSubsystem.h"
 #include "VibH2OBubbleActor.h"
+#include "VibH2OSimulatorActor.h"
 
 #if WITH_EDITOR
 #include "ShaderCompiler.h"
@@ -458,6 +459,13 @@ bool FVibH2ODemoSweep::Tick(float DeltaTime)
 				Finish();
 				return false;
 			}
+		}
+		// The demo map ships with an auto-starting simulator; the sweep drives
+		// its own rooms and data, so the two would fight over the same
+		// individuals. The sweep wins, explicitly.
+		for (TActorIterator<AVibH2OSimulatorActor> It(World.Get()); It; ++It)
+		{
+			It->StopSimulation();
 		}
 #if WITH_EDITOR
 		// Judging a screenshot rendered with placeholder shaders would be

@@ -83,6 +83,7 @@ player = actor_subsystem.spawn_actor_from_class(
 player.set_actor_label('VibH2O_SequencePlayer')
 player.set_sequence(sequence)
 
-editor_subsystem.save_current_level()
+saved_level = editor_subsystem.save_current_level()
+assert saved_level, 'sauvegarde de la carte impossible - fichier verrouille ?'
 
 unreal.log(f'VibH2O: sequence ecrite dans {full_path}, acteur de lecture place dans la carte')

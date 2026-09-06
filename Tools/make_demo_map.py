@@ -19,7 +19,18 @@ MAP_PACKAGE = '/Game/Maps/VibH2O_Demo'
 editor_subsystem = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
-editor_subsystem.new_level(MAP_PACKAGE)
+# new_level over an EXISTING package leaves save_current_level failing: the
+# regenerate path must delete the old asset first, like the material and
+# sequence generators do. The target may also be the editor startup map, i.e.
+# the level currently loaded - step through a scratch level so it can be
+# deleted at all.
+if unreal.EditorAssetLibrary.does_asset_exist(MAP_PACKAGE):
+    editor_subsystem.new_level('/Game/Maps/VibH2O_Scratch')
+    deleted = unreal.EditorAssetLibrary.delete_asset(MAP_PACKAGE)
+    assert deleted, 'suppression de l ancienne carte impossible - fichier verrouille ?'
+
+created = editor_subsystem.new_level(MAP_PACKAGE)
+assert created, 'creation du niveau impossible'
 
 # --- Lighting. Nothing elaborate: the artistic environment is underwater_bp,
 # which lives outside this plugin. This is just enough to see the bubbles.
@@ -70,6 +81,17 @@ group.set_editor_property('row_min', 0)
 group.set_editor_property('row_max', 1)
 stage.set_editor_property('focus_groups', [group])
 
+# --- The built-in simulator: press Play, the room lives, nothing to wire up.
+#
+# It auto-starts, and steps aside on its own the moment real OSC traffic
+# arrives from Max - so this same map serves both the zero-wiring demo and the
+# real rehearsal.
+simulator = actor_subsystem.spawn_actor_from_class(
+    unreal.VibH2OSimulatorActor, unreal.Vector(0.0, 0.0, 100.0))
+simulator.set_actor_label('VibH2O_Simulateur')
+simulator.set_editor_property('columns', 7)
+simulator.set_editor_property('rows', 3)
+
 # --- A camera, placed at the framing distance the plugin itself computes.
 # It is a modest but real check that GetFocusFitDistance returns something
 # usable, rather than a number that merely looks plausible.
@@ -77,6 +99,16 @@ camera = actor_subsystem.spawn_actor_from_class(
     unreal.CameraActor, unreal.Vector(-1400.0, -250.0, 700.0), unreal.Rotator(-12.0, 0.0, 0.0))
 camera.set_actor_label('VibH2O_Camera')
 
-editor_subsystem.save_current_level()
+# Assert on the save: a locked file (an editor still shutting down, an
+# antivirus scan) fails the save WITHOUT failing the script otherwise, and a
+# generator that lies about having written its asset is worse than one that
+# stops.
+# new_level writes its file at once: the scratch stepping-stone must not
+# survive the run.
+if unreal.EditorAssetLibrary.does_asset_exist('/Game/Maps/VibH2O_Scratch'):
+    unreal.EditorAssetLibrary.delete_asset('/Game/Maps/VibH2O_Scratch')
+
+saved = editor_subsystem.save_current_level()
+assert saved, 'sauvegarde de la carte impossible - le fichier est-il verrouille par un autre processus ?'
 
 unreal.log('VibH2O: carte de demonstration ecrite dans {}'.format(MAP_PACKAGE))

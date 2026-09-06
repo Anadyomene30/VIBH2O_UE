@@ -27,8 +27,9 @@ python Tools/selftest_osc.py
 python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
 ```
 
-Ouvrir ensuite `VIBH2O_UE.uproject`, lancer la carte `Maps/VibH2O_Demo`, et taper `VibH2O.ShowDebug`
-dans la console. Si rien n'apparaît, cet affichage dit pourquoi.
+**Ou en zéro commande** : ouvrir `VIBH2O_UE.uproject`, carte `Maps/VibH2O_Demo`, **Play** — le
+simulateur intégré anime la salle sans Python ni Max, et s'efface de lui-même dès que de vraies
+données réseau arrivent. `VibH2O.ShowDebug` dans la console montre l'état si quelque chose cloche.
 
 ## Par où commencer
 
