@@ -331,6 +331,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation")
 	bool bPreviewShowOrientation = true;
 
+	/**
+	 * Animate the preview: the float, and a fake heartbeat pulsing the markers.
+	 *
+	 * No data exists in the editor - there is no game world, so no subsystem
+	 * and no individuals. The preview therefore invents a plausible BPM per
+	 * seat, purely so the room reads as alive while the geometry is being
+	 * dialled in. It proves nothing about real data; that is what Simulate and
+	 * Play are for.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation")
+	bool bPreviewAnimate = true;
+
 	// =====================================================  Access
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O")
@@ -348,6 +360,10 @@ public:
 	/** Root of every local position. */
 	UFUNCTION(BlueprintPure, Category = "VibH2O")
 	USceneComponent* GetStageRoot() const { return StageRoot; }
+
+	/** Seconds since this actor started ticking. Advances in the editor too. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O")
+	float GetStageTime() const { return StageTime; }
 
 	/** Forces a full rebuild. Rarely useful; it serves diagnosis. */
 	UFUNCTION(BlueprintCallable, Category = "VibH2O")
@@ -389,6 +405,16 @@ private:
 	UPROPERTY(Transient)
 	FVibH2ORoomSnapshot Room;
 
+	/**
+	 * Seconds since this actor started ticking - the clock every float, drift
+	 * and vortex spin reads from.
+	 *
+	 * Exposed to Blueprint because an artist driving their own effects needs
+	 * the same clock the plugin uses, and because it is the plainest evidence
+	 * that the actor ticks in the editor: outside Play it still climbs.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "VibH2O", meta = (AllowPrivateAccess = "true"))
 	float StageTime = 0.0f;
+
 	bool bBoundToSubsystem = false;
 };

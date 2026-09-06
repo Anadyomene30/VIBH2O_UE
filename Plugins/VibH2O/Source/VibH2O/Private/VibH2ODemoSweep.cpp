@@ -567,6 +567,65 @@ void FVibH2ODemoSweep::Finish()
 	Active.Reset();
 }
 
+/**
+ * VibH2O.PreviewProbe - does the stage actor tick in the EDITOR, no Play?
+ *
+ * StageTime is the clock every preview animation reads from, and it only
+ * advances from Tick. Sampling it across a few seconds of editor ticking
+ * answers the question with a number rather than an opinion. An FTSTicker runs
+ * in the editor, which is exactly why the probe lives here and not in Python.
+ */
+static void PreviewProbe(UWorld* World)
+{
+	if (World == nullptr)
+	{
+		return;
+	}
+
+	AVibH2OStageActor* Stage = nullptr;
+	for (TActorIterator<AVibH2OStageActor> It(World); It; ++It)
+	{
+		Stage = *It;
+		break;
+	}
+	if (Stage == nullptr)
+	{
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: PREVIEW aucun acteur de scene."));
+		return;
+	}
+
+	const float First = Stage->GetStageTime();
+	const bool bGameWorld = World->IsGameWorld();
+	// The world clock tells the two failure modes apart: a world that does not
+	// advance means the viewport is not realtime, which no amount of actor
+	// configuration would fix; a world that advances while the actor does not
+	// means the tick registration is wrong.
+	const double FirstWorld = World->GetTimeSeconds();
+	const bool bActorTickEnabled = Stage->IsActorTickEnabled();
+	const bool bViewportsOnly = Stage->ShouldTickIfViewportsOnly();
+	TWeakObjectPtr<UWorld> WeakWorld(World);
+	TWeakObjectPtr<AVibH2OStageActor> WeakStage(Stage);
+
+	// Sample again after three seconds of whatever ticking the editor does.
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+		[WeakStage, WeakWorld, First, FirstWorld, bGameWorld, bActorTickEnabled, bViewportsOnly](float) -> bool
+		{
+			const float Second = WeakStage.IsValid() ? WeakStage->GetStageTime() : -1.0f;
+			const double SecondWorld = WeakWorld.IsValid() ? WeakWorld->GetTimeSeconds() : -1.0;
+			UE_LOG(LogVibH2O, Display,
+				TEXT("VibH2O: PREVIEW monde_de_jeu=%d tick_actif=%d viewports_only=%d | monde %.3f -> %.3f | StageTime %.3f -> %.3f — VERDICT=%s"),
+				bGameWorld ? 1 : 0, bActorTickEnabled ? 1 : 0, bViewportsOnly ? 1 : 0,
+				FirstWorld, SecondWorld, First, Second,
+				(Second > First + 0.5f) ? TEXT("ANIME_SANS_PLAY") : TEXT("FIGE"));
+			return false;
+		}), 3.0f);
+}
+
+static FAutoConsoleCommandWithWorld GVibH2OPreviewProbeCommand(
+	TEXT("VibH2O.PreviewProbe"),
+	TEXT("Mesure si l'acteur de scene tourne dans l'editeur, hors Play."),
+	FConsoleCommandWithWorldDelegate::CreateStatic(&PreviewProbe));
+
 static FAutoConsoleCommandWithWorld GVibH2ODemoSweepCommand(
 	TEXT("VibH2O.DemoSweep"),
 	TEXT("Deroule la recette visuelle complete et enregistre une capture par phase dans Saved/VibH2OSweep/, puis quitte."),

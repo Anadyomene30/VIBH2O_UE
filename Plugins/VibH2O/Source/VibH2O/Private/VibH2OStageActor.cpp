@@ -624,23 +624,56 @@ void AVibH2OStageActor::DrawEditorPreview() const
 	const float MinSpacing = FMath::Min(ColumnSpacing, RowSpacing);
 	const float MarkerRadius = FMath::Max(MinSpacing * 0.12f, 2.0f);
 
+	FVibH2OFloatParams FloatParams;
+	FloatParams.Amplitude = FloatAmplitude;
+	FloatParams.Speed = FloatSpeed;
+	FloatParams.RotationAmount = FloatRotationAmount;
+
 	for (int32 Row = 0; Row < Rows; ++Row)
 	{
 		for (int32 Column = 0; Column < Columns; ++Column)
 		{
+			const int32 SeatIndex = FVibH2OLayoutMath::ColumnRowToSeatIndex(Column, Row, Columns, Rows, EVibH2OSeatOrder::ColumnMajor);
 			const FVibH2OSeatLayout Layout = FVibH2OLayoutMath::EvaluateGrid(Params, Column, Row);
-			const FVector WorldLocation = StageTransform.TransformPosition(Layout.Location);
+
+			FVector LocalLocation = Layout.Location;
+			FQuat LocalRotation = Layout.Rotation.Quaternion();
+			float Radius = MarkerRadius;
+
+			if (bPreviewAnimate)
+			{
+				// The same float the real bubbles use, so what is dialled in
+				// here is what will be seen in game.
+				if (FloatAmplitude > 0.0f)
+				{
+					LocalLocation += FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, SeatIndex, StageTime);
+				}
+				if (FloatRotationAmount > 0.0f)
+				{
+					LocalRotation = LocalRotation * FVibH2OLayoutMath::EvaluateFloatRotation(FloatParams, SeatIndex, StageTime).Quaternion();
+				}
+
+				// A plausible heartbeat per seat, invented here and nowhere
+				// else: the editor has no data. It only makes the preview
+				// breathe while the geometry is being adjusted.
+				const float FakeBpm = FMath::Lerp(58.0f, 92.0f, FVibH2ONoise::UnitFloat(SeatIndex * 17 + 3));
+				const float Phase = FMath::Frac(FVibH2ONoise::UnitFloat(SeatIndex * 31 + 7) + StageTime * (FakeBpm / 60.0f));
+				const float Pulse = FMath::Pow(1.0f - Phase, 4.0f);
+				Radius *= 1.0f + Pulse * 0.35f;
+			}
+
+			const FVector WorldLocation = StageTransform.TransformPosition(LocalLocation);
 
 			// The first row in a lighter tone: with no landmark, a room curved
 			// one way looks just like a room curved the other.
 			const FColor Color = (Row == 0) ? FColor(120, 220, 255) : FColor(60, 130, 190);
-			DrawDebugSphere(World, WorldLocation, MarkerRadius, 8, Color, false, -1.0f, SDPG_Foreground, 1.0f);
+			DrawDebugSphere(World, WorldLocation, Radius, 8, Color, false, -1.0f, SDPG_Foreground, 1.0f);
 
 			if (bPreviewShowOrientation)
 			{
 				// The arrow is the only way to check bOrientToCenter: on
 				// spheres, a rotation simply does not show.
-				const FQuat WorldRotation = StageTransform.TransformRotation(Layout.Rotation.Quaternion());
+				const FQuat WorldRotation = StageTransform.TransformRotation(LocalRotation);
 				const FVector Forward = WorldRotation.GetForwardVector() * MinSpacing * 0.4f;
 				DrawDebugDirectionalArrow(World, WorldLocation, WorldLocation + Forward,
 					MarkerRadius * 2.0f, FColor(255, 180, 60), false, -1.0f, SDPG_Foreground, 1.0f);

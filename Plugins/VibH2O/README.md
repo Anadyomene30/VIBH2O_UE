@@ -207,7 +207,13 @@ n'éteint rien en silence.
 ## Prévisualisation dans l'éditeur
 
 `bPreviewInEditor` dessine la grille dans le viewport **sans instancier la moindre bulle** : le
-niveau reste propre. C'est ce qui permet de balayer `CurvatureAngle` et de vérifier
+niveau reste propre. `bPreviewAnimate` y ajoute le flottement et un battement de convenance, pour
+que la salle respire pendant qu'on règle la géométrie — l'éditeur n'a aucune donnée, ce battement
+n'est donc qu'un artifice de lisibilité.
+
+**Mesuré, pas supposé :** hors Play, `StageTime` avance en continu dans le monde éditeur —
+`VibH2O.PreviewProbe` le vérifie en une commande. C'est ce qui permet de balayer `CurvatureAngle`
+et de vérifier
 `bOrientToCenter` sans lancer le jeu ni le simulateur.
 
 `bPreviewShowOrientation` ajoute une flèche par siège — indispensable, car sur des sphères une
@@ -222,6 +228,7 @@ rotation ne se voit pas.
 | `VibH2O.ShowDebug` | Bascule l'affichage réseau / salle / moyennes. |
 | `VibH2O.DumpRoom` | Écrit le plan dans le log, une ligne par rangée. **L'outil du test 7 × 3.** |
 | `VibH2O.Restart` | Redémarre l'écoute avec les réglages courants. |
+| `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
 
