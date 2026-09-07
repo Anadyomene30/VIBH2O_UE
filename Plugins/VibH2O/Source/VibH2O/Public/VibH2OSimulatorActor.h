@@ -150,6 +150,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
 	void ConfigureAles();
 
+	/**
+	 * Resizes the room while it is running.
+	 *
+	 * The new plan goes out immediately, and the stage actor reconciles: seats
+	 * that survive keep their bubble, the rest are created or destroyed. It is
+	 * the same path a resize from Max would take.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	void SetRoomSize(int32 InColumns, int32 InRows);
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 private:
 	UVibH2OSubsystem* GetSubsystem() const;
 

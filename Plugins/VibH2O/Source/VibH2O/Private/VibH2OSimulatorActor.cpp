@@ -115,6 +115,37 @@ void AVibH2OSimulatorActor::ConfigureAles()
 	}
 }
 
+void AVibH2OSimulatorActor::SetRoomSize(int32 InColumns, int32 InRows)
+{
+	Columns = FMath::Clamp(InColumns, 1, 64);
+	Rows = FMath::Clamp(InRows, 1, 32);
+	if (bSimulating)
+	{
+		SendRoomNow();
+	}
+}
+
+#if WITH_EDITOR
+void AVibH2OSimulatorActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// Typing a new column count in the Details panel resends the plan at once,
+	// so the room resizes under the cursor instead of at the next restart.
+	static const TSet<FName> RoomProperties = {
+		GET_MEMBER_NAME_CHECKED(AVibH2OSimulatorActor, Columns),
+		GET_MEMBER_NAME_CHECKED(AVibH2OSimulatorActor, Rows),
+		GET_MEMBER_NAME_CHECKED(AVibH2OSimulatorActor, AisleColumns),
+		GET_MEMBER_NAME_CHECKED(AVibH2OSimulatorActor, ExtraEmptySeatIndices)
+	};
+
+	if (bSimulating && RoomProperties.Contains(PropertyChangedEvent.GetPropertyName()))
+	{
+		SendRoomNow();
+	}
+}
+#endif
+
 bool AVibH2OSimulatorActor::IsSeatEmpty(int32 Column, int32 Row, int32 SeatIndex) const
 {
 	return AisleColumns.Contains(Column) || ExtraEmptySeatIndices.Contains(SeatIndex);
@@ -378,10 +409,9 @@ namespace VibH2OSimulatorInternal
 			FString Right;
 			if (Arg.Split(TEXT("x"), &Left, &Right) && Left.IsNumeric() && Right.IsNumeric())
 			{
-				Simulator->Columns = FMath::Clamp(FCString::Atoi(*Left), 1, 64);
-				Simulator->Rows = FMath::Clamp(FCString::Atoi(*Right), 1, 32);
 				Simulator->AisleColumns.Reset();
 				Simulator->ExtraEmptySeatIndices.Reset();
+				Simulator->SetRoomSize(FCString::Atoi(*Left), FCString::Atoi(*Right));
 			}
 			else
 			{

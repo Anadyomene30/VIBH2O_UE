@@ -15,6 +15,7 @@
 class UMaterialInstanceDynamic;
 class UMeshComponent;
 class UStaticMeshComponent;
+class UTextRenderComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OBubbleBeatSignature, int32, BeatCount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OBubbleDataSignature, const FVibH2OIndividualState&, State);
@@ -173,6 +174,18 @@ public:
 	/** Called by the stage actor on creation or reassignment. */
 	void AssignSeat(const FVibH2OSeat& Seat);
 
+	/** Shows or hides the number floating over this bubble. */
+	void SetSeatLabelVisible(bool bVisible);
+
+	/**
+	 * Turns the number toward the viewer.
+	 *
+	 * A text component renders on a fixed plane, so without this it is edge-on
+	 * and invisible from most angles. The stage actor passes the view position
+	 * once per frame rather than every bubble asking for it.
+	 */
+	void OrientSeatLabel(const FVector& ViewLocation);
+
 	/**
 	 * Called by the stage actor every frame, once the bubble has been placed.
 	 * Updates the state, measures the speed, pushes the material parameters and
@@ -196,6 +209,15 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O|Bulle", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> DemoMesh;
+
+	/**
+	 * The individual's number, floating over the bubble.
+	 *
+	 * Not decoration: it is how a seating plan is checked against the real
+	 * room, and how a wrong seat order is spotted in one look.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O|Bulle", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTextRenderComponent> SeatLabel;
 
 	/** Local position last frame, used to measure speed. */
 	FVector PreviousLocalLocation = FVector::ZeroVector;

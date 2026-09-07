@@ -4,6 +4,7 @@
 #include "Curves/CurveLinearColor.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Layout/VibH2OLayoutMath.h"
 #include "VibH2OBubbleActor.h"
 #include "VibH2OModule.h"
@@ -26,7 +27,9 @@ AVibH2OStageActor::AVibH2OStageActor()
 	BubbleClass = AVibH2OBubbleActor::StaticClass();
 
 	GridDriver = CreateDefaultSubobject<UVibH2OGridDriver>(TEXT("GridDriver"));
-	FlockDriver = CreateDefaultSubobject<UVibH2OVortexDriver>(TEXT("FlockDriver"));
+	// A real school by default: the cone was the placeholder that proved the
+	// morph, the boids are what the piece asks for.
+	FlockDriver = CreateDefaultSubobject<UVibH2OFlockDriver>(TEXT("FlockDriver"));
 }
 
 UVibH2OSubsystem* AVibH2OStageActor::GetSubsystem() const
@@ -307,6 +310,38 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 	const float RawBlend = FMath::Clamp(BlendAlpha, 0.0f, 1.0f);
 	const float Blend = BlendCurve ? FMath::Clamp(BlendCurve->GetFloatValue(RawBlend), 0.0f, 1.0f) : RawBlend;
 
+	// Drivers that carry state step forward once, as a whole, before anyone
+	// asks where a single bubble is. A school has to move as a school.
+	FVibH2OFrameContext Frame;
+	Frame.Stage = this;
+	Frame.DeltaSeconds = DeltaSeconds;
+	Frame.TimeSeconds = StageTime;
+	Frame.OccupiedCount = OccupiedCount;
+	Frame.CollectiveSynchrony = CollectiveSynchrony;
+	Frame.AverageExcitation = Subsystem->GetAverageExcitation();
+	Frame.BlendAlpha = Blend;
+
+	if (GridDriver != nullptr)
+	{
+		GridDriver->PrepareFrame(Frame);
+	}
+	if (FlockDriver != nullptr)
+	{
+		FlockDriver->PrepareFrame(Frame);
+	}
+
+	// One view position for the whole room: every seat number turns toward it,
+	// and asking the player controller once beats asking it two hundred times.
+	FVector ViewLocation = GetActorLocation();
+	if (bShowSeatNumbers)
+	{
+		if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			FRotator ViewRotation = FRotator::ZeroRotator;
+			PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+		}
+	}
+
 	FVibH2OFloatParams FloatParams;
 	FloatParams.Amplitude = FloatAmplitude;
 	FloatParams.Speed = FloatSpeed;
@@ -396,12 +431,37 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 			Scale *= 1.0f + State.Excitation * ScalePerExcitation + State.BeatPulse * BeatPopAmount;
 		}
 
+		// Three axes, three slightly different rates, a phase of its own: the
+		// bubble is never a sphere, and never the same shape twice. Arousal
+		// deepens it, so an excited bubble is visibly more restless in
+		// silhouette before any colour has changed.
+		FVector ScaleVector(Scale);
+		if (bScaleEnabled && OrganicDeform > 0.0f)
+		{
+			const float Amount = OrganicDeform * (0.6f + State.Excitation * 0.9f);
+			const float W = StageTime * OrganicSpeed * 2.0f * PI;
+			const float P0 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 1) * 2.0f * PI;
+			const float P1 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 2) * 2.0f * PI;
+			const float P2 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 3) * 2.0f * PI;
+
+			ScaleVector = FVector(
+				Scale * (1.0f + Amount * FMath::Sin(W * 1.00f + P0)),
+				Scale * (1.0f + Amount * FMath::Sin(W * 0.79f + P1)),
+				Scale * (1.0f + Amount * FMath::Sin(W * 1.23f + P2)));
+		}
+
 		Bubble->SetActorRelativeLocation(Location);
 		Bubble->SetActorRelativeRotation(Rotation);
-		Bubble->SetActorRelativeScale3D(FVector(Scale));
+		Bubble->SetActorRelativeScale3D(ScaleVector);
 
 		const float Mask = bFocusEnabled ? ComputeFocusMask(Seat) : 1.0f;
 		const FLinearColor Tint = bTintEnabled ? ComputeTint(State.Excitation) : CalmColor;
+
+		Bubble->SetSeatLabelVisible(bShowSeatNumbers);
+		if (bShowSeatNumbers)
+		{
+			Bubble->OrientSeatLabel(ViewLocation);
+		}
 
 		Bubble->UpdateFromState(State, Mask, Tint, CollectiveSynchrony, Blend, StriationSpeedScale, DeltaSeconds);
 	}

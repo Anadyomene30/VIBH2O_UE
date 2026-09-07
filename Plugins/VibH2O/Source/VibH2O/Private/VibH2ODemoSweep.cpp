@@ -568,6 +568,71 @@ void FVibH2ODemoSweep::Finish()
 }
 
 /**
+ * VibH2O.Shot - capture what is ON SCREEN, without touching the camera.
+ *
+ * DemoSweep frames its own camera, so it cannot answer "what does someone see
+ * when they just press Play". This one waits a couple of seconds, shoots the
+ * current view as-is, and reports what the scene contains.
+ */
+static void ShotCommand(UWorld* World)
+{
+	if (World == nullptr)
+	{
+		return;
+	}
+	TWeakObjectPtr<UWorld> WeakWorld(World);
+
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+		[WeakWorld](float) -> bool
+		{
+			UWorld* W = WeakWorld.Get();
+			if (W == nullptr)
+			{
+				return false;
+			}
+
+			int32 Bubbles = 0;
+			for (TActorIterator<AVibH2OBubbleActor> It(W); It; ++It)
+			{
+				++Bubbles;
+			}
+
+			FString ViewInfo = TEXT("aucun controleur");
+			if (APlayerController* PC = W->GetFirstPlayerController())
+			{
+				FVector Loc = FVector::ZeroVector;
+				FRotator Rot = FRotator::ZeroRotator;
+				PC->GetPlayerViewPoint(Loc, Rot);
+				const AActor* Target = PC->GetViewTarget();
+				ViewInfo = FString::Printf(TEXT("cible=%s pos=(%.0f, %.0f, %.0f) rot=(%.0f, %.0f)"),
+					Target ? *Target->GetName() : TEXT("aucune"), Loc.X, Loc.Y, Loc.Z, Rot.Pitch, Rot.Yaw);
+			}
+
+			UE_LOG(LogVibH2O, Display, TEXT("VibH2O: SHOT %d bulles | vue %s"), Bubbles, *ViewInfo);
+
+			const FString File = FPaths::ProjectSavedDir() / TEXT("VibH2OShot") / TEXT("vue_par_defaut.png");
+			IFileManager::Get().MakeDirectory(*FPaths::GetPath(File), true);
+			FScreenshotRequest::RequestScreenshot(File, false, false);
+
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+				[WeakWorld](float) -> bool
+				{
+					if (GEngine != nullptr && WeakWorld.IsValid())
+					{
+						GEngine->Exec(WeakWorld.Get(), TEXT("QUIT"));
+					}
+					return false;
+				}), 1.0f);
+			return false;
+		}), 3.0f);
+}
+
+static FAutoConsoleCommandWithWorld GVibH2OShotCommand(
+	TEXT("VibH2O.Shot"),
+	TEXT("Capture la vue courante telle quelle, sans imposer de camera."),
+	FConsoleCommandWithWorldDelegate::CreateStatic(&ShotCommand));
+
+/**
  * VibH2O.PreviewProbe - does the stage actor tick in the EDITOR, no Play?
  *
  * StageTime is the clock every preview animation reads from, and it only

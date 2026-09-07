@@ -71,6 +71,8 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `AVibH2OStageActor` | La racine de l'installation. **Possède les bulles**, en permanence. |
 | `AVibH2OBubbleActor` | Une bulle. À dériver en Blueprint pour lui donner son apparence. |
 | `AVibH2OSimulatorActor` | Le Max de poche : simule plan et données par le chemin d'injection, et s'efface dès que le vrai réseau parle. |
+| `UVibH2OFlockDriver` | Tableau 2 — vrais boids : séparation, alignement, cohésion, attracteur mouvant. Pilote par défaut. |
+| `AVibH2OWaterMotes` | Les particules en suspension dans l'eau. |
 | `UVibH2OPositionDriver` | Un tableau : une fonction qui dit où va chaque bulle. |
 | `UVibH2OGridDriver` | Tableau 1 — le plan de salle. |
 | `UVibH2OVortexDriver` | Tableau 2 — le vortex, amorce. |
@@ -231,6 +233,29 @@ rotation ne se voit pas.
 | `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
+
+---
+
+## La passe artistique de la carte de démonstration
+
+Ce que la carte montre, et où le régler :
+
+| Effet | Où |
+|---|---|
+| **Silhouette organique** | `VibH2O_Stage` → `Organic Deform` / `Organic Speed`. Trois axes, trois cadences, une phase par bulle : aucune n'est une sphère, aucune ne se déforme comme sa voisine, et l'excitation accentue l'irrégularité. |
+| **Couleur selon l'excitation** | Rampe à **trois** paliers dans `M_VibH2ODemoBubble` — bleu profond, sarcelle, ambre. Un dégradé à deux couleurs passerait par un gris mort au milieu, là où se tient la majorité du public. |
+| **Numéros sur les bulles** | `VibH2O_Stage` → `Show Seat Numbers`. Tournés vers la caméra à chaque frame. |
+| **Banc de poissons** | `VibH2O_Stage` → `Flock Driver`, catégorie `Banc`. La synchronie collective serre ou disperse le banc. |
+| **Particules dans l'eau** | Acteur `VibH2O_Particules`. Le champ entier dérive comme un corps, pas mote par mote. |
+| **Éclairage** | Brouillard **volumétrique** + soleil diffusant + `PostProcess` (bloom, vignette, étalonnage froid). |
+
+> **Trois limites de l'API Python d'Unreal 5.5, rencontrées et contournées.** Le *world position
+> offset* d'un matériau n'est pas atteignable depuis Python : la déformation de silhouette se fait
+> donc dans le C++, sur l'échelle de l'acteur. Le nœud `Noise` refuse sa propriété `Function`.
+> Et un composant **instancié** rendait toutes ses instances noires avec un matériau qui
+> s'affiche correctement sur un composant ordinaire — vérifié par deux témoins côte à côte — d'où
+> quelques centaines de particules sur le chemin qui marche plutôt que des milliers sur celui qui
+> ne marche pas.
 
 ---
 

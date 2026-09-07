@@ -72,6 +72,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Bulles")
 	TObjectPtr<UCurveLinearColor> ExcitationGradient;
 
+	/**
+	 * How much each bubble deforms out of a perfect sphere, 0 to 1.
+	 *
+	 * A room of identical spheres reads as manufactured no matter how good the
+	 * material is. Each bubble breathes on three axes at slightly different
+	 * rates, with a phase of its own, so no two are the same shape at the same
+	 * instant - and arousal deepens it.
+	 *
+	 * This lives here rather than in the material because Unreal 5.5 does not
+	 * expose the world position offset input to Python, so a generated material
+	 * cannot reach it.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.6"))
+	float OrganicDeform = 0.16f;
+
+	/** How fast that deformation breathes, in cycles per second. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
+	float OrganicSpeed = 0.42f;
+
 	/** Converts the measured speed (cm/s) into striation speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float StriationSpeedScale = 0.01f;
@@ -189,7 +208,10 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "VibH2O|Tableaux")
 	TObjectPtr<UVibH2OPositionDriver> GridDriver;
 
-	/** Tableau 2 driver. */
+	/**
+	 * Tableau 2 driver. Defaults to the boids school; swap in the vortex driver
+	 * for the simpler cone.
+	 */
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "VibH2O|Tableaux")
 	TObjectPtr<UVibH2OPositionDriver> FlockDriver;
 
@@ -330,6 +352,15 @@ public:
 	/** Also draws one arrow per seat, to check the orientation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation")
 	bool bPreviewShowOrientation = true;
+
+	/**
+	 * Writes each individual's number over their bubble.
+	 *
+	 * How a seating plan is checked against the real room, and how a wrong seat
+	 * order is caught in one look rather than on opening night.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Bulles")
+	bool bShowSeatNumbers = false;
 
 	/**
 	 * Animate the preview: the float, and a fake heartbeat pulsing the markers.

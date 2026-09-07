@@ -1,6 +1,7 @@
 #include "VibH2OBubbleActor.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -21,6 +22,19 @@ AVibH2OBubbleActor::AVibH2OBubbleActor()
 	DemoMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	DemoMesh->SetGenerateOverlapEvents(false);
 	DemoMesh->SetCastShadow(true);
+
+	SeatLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("SeatLabel"));
+	SeatLabel->SetupAttachment(BubbleRoot);
+	SeatLabel->SetHorizontalAlignment(EHTA_Center);
+	SeatLabel->SetVerticalAlignment(EVRTA_TextCenter);
+	SeatLabel->SetWorldSize(26.0f);
+	SeatLabel->SetTextRenderColor(FColor(255, 255, 255));
+	SeatLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 46.0f));
+	SeatLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SeatLabel->SetGenerateOverlapEvents(false);
+	SeatLabel->SetCastShadow(false);
+	// Off by default: the numbers are a checking aid, not part of the piece.
+	SeatLabel->SetVisibility(false);
 
 	// Demonstration sphere, taken from engine content. It proves the data
 	// flows, nothing more.
@@ -102,11 +116,40 @@ void AVibH2OBubbleActor::AssignSeat(const FVibH2OSeat& Seat)
 	// WITH_EDITOR, and not a build-configuration macro: SetActorLabel only
 	// exists when the editor is compiled in. A Development Game build - the one
 	// used in rehearsal - has no editor and would not link.
+	if (SeatLabel != nullptr)
+	{
+		SeatLabel->SetText(FText::AsNumber(IndividualId));
+	}
+
 #if WITH_EDITOR
 	SetActorLabel(FString::Printf(TEXT("Bubble_S%03d_I%03d"), SeatIndex, IndividualId));
 #endif
 
 	ReceiveSeatAssigned(SeatIndex, IndividualId);
+}
+
+void AVibH2OBubbleActor::SetSeatLabelVisible(bool bVisible)
+{
+	if (SeatLabel != nullptr && SeatLabel->IsVisible() != bVisible)
+	{
+		SeatLabel->SetVisibility(bVisible);
+	}
+}
+
+void AVibH2OBubbleActor::OrientSeatLabel(const FVector& ViewLocation)
+{
+	if (SeatLabel == nullptr || !SeatLabel->IsVisible())
+	{
+		return;
+	}
+	// Toward the viewer, not away from them: pointing the text's forward axis
+	// away renders its back face, and the digits come out mirrored. Measured on
+	// a capture - "17" read as its own reflection.
+	const FVector Toward = ViewLocation - SeatLabel->GetComponentLocation();
+	if (Toward.SizeSquared() > KINDA_SMALL_NUMBER)
+	{
+		SeatLabel->SetWorldRotation(Toward.Rotation());
+	}
 }
 
 void AVibH2OBubbleActor::UpdateFromState(const FVibH2OIndividualState& NewState, float InFocusMask, const FLinearColor& Tint,

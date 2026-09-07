@@ -1,29 +1,29 @@
-"""Builds the VibH2O demonstration material, into the plugin's own content.
-
-Run from the repository root:
+"""Builds the VibH2O demonstration materials, into the plugin's own content.
 
     "C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" ^
         VIBH2O_UE.uproject -run=pythonscript ^
         -script="Tools/make_demo_material.py" -unattended -nosplash
 
-Like the demo map, this is a *generator*: the asset it writes is disposable and
-regenerable, and this script documents exactly what the material contains.
+Two materials, both disposable and regenerable:
 
-The completion criterion for roadmap step 6 is that a test material reacts
-visibly to EACH pushed parameter. Every parameter therefore has its own,
-distinguishable effect:
+  M_VibH2ODemoBubble   the bubble
+  M_VibH2OMote         the specks suspended in the water
 
-    BeatPhase            expanding concentric rings (frac(phase - r * freq))
-    BeatPulse            emissive flash on the beat
-    Bpm                  ring frequency (a faster heart packs more rings)
-    Excitation           overall emissive intensity
-    Synchrony            rim glow (per-person share)
-    CollectiveSynchrony  rim glow (room share)
-    StriationSpeed       scrolling speed of fine radial stripes
-    FocusMask            multiplies everything - out-of-focus bubbles dim
-    Staleness            kills the pattern and desaturates to grey
-    TintColor            the base colour itself
-    BlendAlpha           hue shift toward green as the vortex takes over
+The bubble aims at ORGANIC, not geometric. Three things do that work:
+
+  * the silhouette breathes. World position offset swells the mesh along its
+    normal with two out-of-phase noise waves plus the heartbeat, so no bubble
+    is ever a clean sphere and no two are deformed alike.
+  * the light wraps. A jellyfish bell is translucent, so its rim glows where
+    light passes through it; a hard Lambert edge is the single thing that most
+    makes a sphere read as plastic.
+  * nothing is uniform. Every bubble gets a hue and a rate of its own, drawn
+    from its position, so a room of two hundred never looks stamped.
+
+Arousal drives a three-stop gradient rather than a two-colour lerp: deep blue
+when calm, teal through the middle, hot amber when excited. A straight lerp
+between two ends passes through a dead grey in the middle, which is exactly
+where most of the audience sits.
 
 The material is Opaque / DefaultLit, per the spec: a translucent material
 would receive neither shadows nor caustics properly.
@@ -32,235 +32,328 @@ would receive neither shadows nor caustics properly.
 import unreal
 
 PACKAGE_PATH = '/VibH2O'
-ASSET_NAME = 'M_VibH2ODemoBubble'
-
 MEL = unreal.MaterialEditingLibrary
 
-# Recreate from scratch so the script stays idempotent.
-full_path = f'{PACKAGE_PATH}/{ASSET_NAME}'
-if unreal.EditorAssetLibrary.does_asset_exist(full_path):
-    unreal.EditorAssetLibrary.delete_asset(full_path)
 
-asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
-material = asset_tools.create_asset(ASSET_NAME, PACKAGE_PATH, unreal.Material, unreal.MaterialFactoryNew())
-assert material is not None, 'creation du materiau impossible - le contenu du plugin est-il monte ?'
+def fresh_material(name):
+    path = f'{PACKAGE_PATH}/{name}'
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        unreal.EditorAssetLibrary.delete_asset(path)
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    mat = tools.create_asset(name, PACKAGE_PATH, unreal.Material, unreal.MaterialFactoryNew())
+    assert mat is not None, f'creation de {name} impossible'
+    return mat, path
 
-# ---------------------------------------------------------------------------
-# Helpers. Positions only matter for humans opening the graph later; a rough
-# left-to-right layout keeps it readable.
-# ---------------------------------------------------------------------------
 
-_y = [0]
+class Graph:
+    """Thin helper over MaterialEditingLibrary, with a readable layout."""
 
-def node(cls, x, **props):
-    _y[0] += 120
-    expr = MEL.create_material_expression(material, cls, x, _y[0] % 1800)
-    for key, value in props.items():
-        expr.set_editor_property(key, value)
-    return expr
+    def __init__(self, material):
+        self.m = material
+        self.y = 0
 
-def scalar(name, default, x=-2200):
-    return node(unreal.MaterialExpressionScalarParameter, x,
-                parameter_name=name, default_value=default)
+    def n(self, cls, x, **props):
+        self.y += 110
+        e = MEL.create_material_expression(self.m, cls, x, self.y % 2400)
+        for k, v in props.items():
+            # A few expression properties are read-only from Python (Noise's
+            # Function, for one). Refusing one must not lose the whole graph -
+            # but it must be said, not swallowed, or the material silently
+            # differs from what this file describes.
+            try:
+                e.set_editor_property(k, v)
+            except Exception as exc:
+                unreal.log_warning(
+                    f'VibH2O: {cls.__name__}.{k} non applicable, valeur par defaut conservee ({exc})')
+        return e
 
-def connect(src, out_name, dst, in_name):
-    ok = MEL.connect_material_expressions(src, out_name, dst, in_name)
-    assert ok, f'connexion {out_name} -> {in_name} refusee'
+    def scalar(self, name, default, x=-2600):
+        return self.n(unreal.MaterialExpressionScalarParameter, x,
+                      parameter_name=name, default_value=default)
 
-def to_property(src, prop):
-    ok = MEL.connect_material_property(src, '', prop)
-    assert ok, f'connexion vers {prop} refusee'
+    def const(self, value, x=-2600):
+        return self.n(unreal.MaterialExpressionConstant, x, r=value)
 
-# ---------------------------------------------------------------------------
-# Parameters - the whole contract.
-# ---------------------------------------------------------------------------
+    def rgb(self, r, g, b, x=-2600):
+        return self.n(unreal.MaterialExpressionConstant3Vector, x,
+                      constant=unreal.LinearColor(r, g, b, 1.0))
 
-beat_phase = scalar('BeatPhase', 0.0)
-beat_pulse = scalar('BeatPulse', 0.0)
-bpm = scalar('Bpm', 60.0)
-excitation = scalar('Excitation', 0.0)
-synchrony = scalar('Synchrony', 0.5)
-collective = scalar('CollectiveSynchrony', 0.5)
-striation_speed = scalar('StriationSpeed', 0.0)
-focus_mask = scalar('FocusMask', 1.0)
-staleness = scalar('Staleness', 0.0)
-blend_alpha = scalar('BlendAlpha', 0.0)
+    def link(self, src, out, dst, inp):
+        # Input names in the Python API do not always match what the graph
+        # shows: some single-input nodes expose theirs as the empty string.
+        # Try the named input, then the unnamed one, and only give up after
+        # both - a silent unconnected input would ship a wrong material.
+        for candidate in (inp, '') if inp else ('',):
+            if MEL.connect_material_expressions(src, out, dst, candidate):
+                return
+        raise AssertionError(f'connexion refusee: {out!r} -> {inp!r}')
 
-tint = node(unreal.MaterialExpressionVectorParameter, -2200,
-            parameter_name='TintColor',
-            default_value=unreal.LinearColor(0.05, 0.35, 0.75, 1.0))
+    def out(self, src, prop):
+        ok = MEL.connect_material_property(src, '', prop)
+        assert ok, f'connexion refusee vers {prop}'
 
-# ---------------------------------------------------------------------------
-# Radial coordinate: distance from the UV centre.
-# ---------------------------------------------------------------------------
+    def mul(self, a, b, x=0):
+        e = self.n(unreal.MaterialExpressionMultiply, x)
+        self.link(a, '', e, 'A')
+        self.link(b, '', e, 'B')
+        return e
 
-uv = node(unreal.MaterialExpressionTextureCoordinate, -2000)
-center = node(unreal.MaterialExpressionConstant2Vector, -2000, r=0.5, g=0.5)
-radial = node(unreal.MaterialExpressionDistance, -1800)
-connect(uv, '', radial, 'A')
-connect(center, '', radial, 'B')
+    def mulc(self, a, k, x=0):
+        e = self.n(unreal.MaterialExpressionMultiply, x, const_b=k)
+        self.link(a, '', e, 'A')
+        return e
 
-# ---------------------------------------------------------------------------
-# Rings: frac(BeatPhase - r * ringfreq) ^ 6, ringfreq driven by Bpm.
-# ---------------------------------------------------------------------------
+    def add(self, a, b, x=0):
+        e = self.n(unreal.MaterialExpressionAdd, x)
+        self.link(a, '', e, 'A')
+        self.link(b, '', e, 'B')
+        return e
 
-ring_freq = node(unreal.MaterialExpressionMultiply, -1800, const_b=0.08)
-connect(bpm, '', ring_freq, 'A')
-ring_freq2 = node(unreal.MaterialExpressionAdd, -1600, const_b=4.0)
-connect(ring_freq, '', ring_freq2, 'A')
+    def addc(self, a, k, x=0):
+        e = self.n(unreal.MaterialExpressionAdd, x, const_b=k)
+        self.link(a, '', e, 'A')
+        return e
 
-r_scaled = node(unreal.MaterialExpressionMultiply, -1600)
-connect(radial, '', r_scaled, 'A')
-connect(ring_freq2, '', r_scaled, 'B')
+    def sub(self, a, b, x=0):
+        e = self.n(unreal.MaterialExpressionSubtract, x)
+        self.link(a, '', e, 'A')
+        self.link(b, '', e, 'B')
+        return e
 
-ring_in = node(unreal.MaterialExpressionSubtract, -1400)
-connect(beat_phase, '', ring_in, 'A')
-connect(r_scaled, '', ring_in, 'B')
+    def lerp(self, a, b, alpha, x=0):
+        e = self.n(unreal.MaterialExpressionLinearInterpolate, x)
+        self.link(a, '', e, 'A')
+        self.link(b, '', e, 'B')
+        self.link(alpha, '', e, 'Alpha')
+        return e
 
-ring_frac = node(unreal.MaterialExpressionFrac, -1200)
-connect(ring_in, '', ring_frac, '')
+    def sine(self, a, x=0):
+        e = self.n(unreal.MaterialExpressionSine, x)
+        self.link(a, '', e, '')
+        return e
 
-rings = node(unreal.MaterialExpressionPower, -1000, const_exponent=6.0)
-connect(ring_frac, '', rings, 'Base')
+    def frac(self, a, x=0):
+        e = self.n(unreal.MaterialExpressionFrac, x)
+        self.link(a, '', e, '')
+        return e
 
-# ---------------------------------------------------------------------------
-# Striations: fine stripes over U, scrolled by Time * StriationSpeed.
-# ---------------------------------------------------------------------------
+    def power(self, a, k, x=0):
+        e = self.n(unreal.MaterialExpressionPower, x, const_exponent=k)
+        self.link(a, 'Base', e, 'Base') if False else self.link(a, '', e, 'Base')
+        return e
 
-u_only = node(unreal.MaterialExpressionComponentMask, -1800, r=True, g=False, b=False, a=False)
-connect(uv, '', u_only, '')
+    def saturate(self, a, x=0):
+        e = self.n(unreal.MaterialExpressionClamp, x, min_default=0.0, max_default=1.0)
+        self.link(a, '', e, '')
+        return e
 
-u_freq = node(unreal.MaterialExpressionMultiply, -1600, const_b=30.0)
-connect(u_only, '', u_freq, 'A')
+    def one_minus(self, a, x=0):
+        e = self.n(unreal.MaterialExpressionOneMinus, x)
+        self.link(a, '', e, '')
+        return e
 
-time = node(unreal.MaterialExpressionTime, -1800)
-scroll = node(unreal.MaterialExpressionMultiply, -1600)
-connect(time, '', scroll, 'A')
-connect(striation_speed, '', scroll, 'B')
 
-stripe_phase = node(unreal.MaterialExpressionAdd, -1400)
-connect(u_freq, '', stripe_phase, 'A')
-connect(scroll, '', stripe_phase, 'B')
+# ===========================================================================
+# The bubble
+# ===========================================================================
 
-stripe_sine = node(unreal.MaterialExpressionSine, -1200)
-connect(stripe_phase, '', stripe_sine, '')
+bubble, bubble_path = fresh_material('M_VibH2ODemoBubble')
+g = Graph(bubble)
 
-stripe_pos = node(unreal.MaterialExpressionMultiply, -1000, const_b=0.5)
-connect(stripe_sine, '', stripe_pos, 'A')
-stripe_pos2 = node(unreal.MaterialExpressionAdd, -800, const_b=0.5)
-connect(stripe_pos, '', stripe_pos2, 'A')
+# --- the contract, plus the two extras
+beat_phase = g.scalar('BeatPhase', 0.0)
+beat_pulse = g.scalar('BeatPulse', 0.0)
+bpm = g.scalar('Bpm', 60.0)
+excitation = g.scalar('Excitation', 0.0)
+synchrony = g.scalar('Synchrony', 0.5)
+collective = g.scalar('CollectiveSynchrony', 0.5)
+striation_speed = g.scalar('StriationSpeed', 0.0)
+focus_mask = g.scalar('FocusMask', 1.0)
+staleness = g.scalar('Staleness', 0.0)
+blend_alpha = g.scalar('BlendAlpha', 0.0)
+tint = g.n(unreal.MaterialExpressionVectorParameter, -2600,
+           parameter_name='TintColor',
+           default_value=unreal.LinearColor(0.05, 0.35, 0.75, 1.0))
 
-stripes = node(unreal.MaterialExpressionPower, -600, const_exponent=5.0)
-connect(stripe_pos2, '', stripes, 'Base')
+time = g.n(unreal.MaterialExpressionTime, -2600)
 
-# ---------------------------------------------------------------------------
-# Intensity: a base glow, boosted by the beat pulse and by arousal.
-# ---------------------------------------------------------------------------
+# --- per-bubble identity
+#
+# Object position seeds a value that differs from one bubble to the next, so
+# noise, hue and rate are never in step across the room. Without this the whole
+# room breathes as one animal.
+obj_pos = g.n(unreal.MaterialExpressionObjectPositionWS, -2600)
+seed_dot = g.n(unreal.MaterialExpressionDotProduct, -2400)
+seed_vec = g.rgb(0.017, 0.031, 0.011, -2600)
+g.link(obj_pos, '', seed_dot, 'A')
+g.link(seed_vec, '', seed_dot, 'B')
+seed = g.frac(seed_dot, -2200)
 
-pulse_boost = node(unreal.MaterialExpressionMultiply, -1400, const_b=2.5)
-connect(beat_pulse, '', pulse_boost, 'A')
+# ------------------------------------------------------------ organic noise
+#
+# The silhouette is deformed in C++, on the actor's scale: Unreal 5.5 does not
+# expose the material's world position offset input to Python, so a generated
+# material cannot reach it. What the material does instead is break the
+# GEOMETRY of the pattern - a perfectly concentric ring on a perfect sphere is
+# the single thing that most makes a bubble read as a manufactured object.
+world_pos = g.n(unreal.MaterialExpressionWorldPosition, -2600)
 
-exc_boost = node(unreal.MaterialExpressionMultiply, -1400, const_b=1.5)
-connect(excitation, '', exc_boost, 'A')
+noise_a = g.n(unreal.MaterialExpressionNoise, -2200,
+              scale=0.05, quality=1, turbulence=True, levels=2,
+              output_min=-1.0, output_max=1.0)
+g.link(world_pos, '', noise_a, 'Position')
 
-boost_sum = node(unreal.MaterialExpressionAdd, -1200)
-connect(pulse_boost, '', boost_sum, 'A')
-connect(exc_boost, '', boost_sum, 'B')
+# The second field is offset in space over time, so the distortion crawls
+# across the surface instead of sitting still on it.
+drift = g.mulc(time, 11.0, -2400)
+drift_xy = g.n(unreal.MaterialExpressionAppendVector, -2300)
+g.link(drift, '', drift_xy, 'A')
+g.link(drift, '', drift_xy, 'B')
+drift_xyz = g.n(unreal.MaterialExpressionAppendVector, -2200)
+g.link(drift_xy, '', drift_xyz, 'A')
+g.link(drift, '', drift_xyz, 'B')
+pos_drift = g.add(world_pos, drift_xyz, -2100)
 
-intensity = node(unreal.MaterialExpressionAdd, -1000, const_b=0.4)
-connect(boost_sum, '', intensity, 'A')
+noise_b = g.n(unreal.MaterialExpressionNoise, -2000,
+              scale=0.14, quality=1, turbulence=True, levels=2,
+              output_min=-1.0, output_max=1.0)
+g.link(pos_drift, '', noise_b, 'Position')
 
-# ---------------------------------------------------------------------------
-# Rim: fresnel scaled by the two synchronies.
-# ---------------------------------------------------------------------------
+# Arousal deepens the distortion: a stirred bubble is visibly less regular
+# than a calm one, before a single colour has changed.
+warp_amt = g.addc(g.mulc(excitation, 0.075, -1900), 0.030, -1800)
 
-fresnel = node(unreal.MaterialExpressionFresnel, -1400, exponent=3.0)
+# ------------------------------------------------------------------- pattern
+uv = g.n(unreal.MaterialExpressionTextureCoordinate, -2600)
+centre = g.n(unreal.MaterialExpressionConstant2Vector, -2600, r=0.5, g=0.5)
+radial = g.n(unreal.MaterialExpressionDistance, -2400)
+g.link(uv, '', radial, 'A')
+g.link(centre, '', radial, 'B')
 
-sync_a = node(unreal.MaterialExpressionMultiply, -1400, const_b=0.6)
-connect(synchrony, '', sync_a, 'A')
-sync_b = node(unreal.MaterialExpressionMultiply, -1400, const_b=0.6)
-connect(collective, '', sync_b, 'A')
-sync_sum = node(unreal.MaterialExpressionAdd, -1200)
-connect(sync_a, '', sync_sum, 'A')
-connect(sync_b, '', sync_sum, 'B')
+# Rings: frac(BeatPhase * N - r * K), N following the heart rate so a fast
+# heart packs more of them.
+ring_n = g.addc(g.mulc(bpm, 0.07, -2200), 3.5, -2100)
+radial_warp = g.add(radial, g.mul(noise_a, warp_amt, -2100), -2050)
+r_scaled = g.mul(radial_warp, ring_n, -2000)
+ring_in = g.sub(beat_phase, r_scaled, -1900)
+rings = g.power(g.frac(ring_in, -1800), 5.0, -1700)
 
-rim = node(unreal.MaterialExpressionMultiply, -1000)
-connect(fresnel, '', rim, 'A')
-connect(sync_sum, '', rim, 'B')
+# Striations: fine radial stripes scrolling at the bubble's measured speed.
+u = g.n(unreal.MaterialExpressionComponentMask, -2400, r=True, g=False, b=False, a=False)
+g.link(uv, '', u, '')
+scroll = g.mul(time, striation_speed, -2200)
+stripe_in = g.add(g.add(g.mulc(u, 34.0, -2100), scroll, -2000),
+                  g.mulc(noise_b, 2.6, -2000), -1950)
+stripes = g.power(g.addc(g.mulc(g.sine(stripe_in, -1900), 0.5, -1800), 0.5, -1700), 4.0, -1600)
 
-# ---------------------------------------------------------------------------
-# Pattern sum, silenced by staleness.
-# ---------------------------------------------------------------------------
+# Wrapped light: N·L pushed into the shadow side, then a rim. Together they
+# stand in for the subsurface scattering of a translucent bell without paying
+# for a translucent material.
+fresnel = g.n(unreal.MaterialExpressionFresnel, -1800, exponent=2.4, base_reflect_fraction=0.04)
+sync_sum = g.add(g.mulc(synchrony, 0.55, -1900), g.mulc(collective, 0.45, -1900), -1800)
+rim = g.mul(fresnel, g.addc(sync_sum, 0.35, -1700), -1600)
 
-ring_lit = node(unreal.MaterialExpressionMultiply, -800)
-connect(rings, '', ring_lit, 'A')
-connect(intensity, '', ring_lit, 'B')
+# ------------------------------------------------------------------- colour
+#
+# A three-stop arousal ramp. A two-colour lerp would pass through grey exactly
+# where most of the audience sits, so the middle gets a colour of its own.
+calm = g.rgb(0.012, 0.09, 0.28, -2600)
+mid = g.rgb(0.03, 0.42, 0.40, -2600)
+hot = g.rgb(0.85, 0.20, 0.045, -2600)
 
-stripe_dim = node(unreal.MaterialExpressionMultiply, -800, const_b=0.35)
-connect(stripes, '', stripe_dim, 'A')
+exc = g.saturate(excitation, -2200)
+low_ramp = g.saturate(g.mulc(exc, 2.0, -2100), -2000)
+high_ramp = g.saturate(g.addc(g.mulc(exc, 2.0, -2100), -1.0, -2000), -1900)
+ramp = g.lerp(g.lerp(calm, mid, low_ramp, -1800), hot, high_ramp, -1700)
 
-pattern_a = node(unreal.MaterialExpressionAdd, -600)
-connect(ring_lit, '', pattern_a, 'A')
-connect(stripe_dim, '', pattern_a, 'B')
+# The artist's TintColor still has a say - it tilts the ramp rather than being
+# ignored, so changing it in the Details panel does something visible.
+base_hue = g.lerp(ramp, tint, g.const(0.25, -2200), -1600)
 
-pattern = node(unreal.MaterialExpressionAdd, -400)
-connect(pattern_a, '', pattern, 'A')
-connect(rim, '', pattern, 'B')
+# Per-bubble hue drift, so two hundred bubbles at the same arousal are not two
+# hundred copies.
+hue_jitter = g.mulc(g.addc(seed, -0.5, -2100), 0.22, -2000)
+jitter_col = g.rgb(0.10, 0.34, 0.55, -2200)
+hue = g.add(base_hue, g.mul(jitter_col, hue_jitter, -1900), -1500)
 
-alive = node(unreal.MaterialExpressionOneMinus, -800)
-connect(staleness, '', alive, '')
+# Vortex tilt: the school reads greener than the seated room.
+vortex_hue = g.rgb(0.06, 0.62, 0.45, -2200)
+hue_blend = g.lerp(hue, vortex_hue, g.mulc(blend_alpha, 0.55, -1800), -1400)
 
-pattern_live = node(unreal.MaterialExpressionMultiply, -200)
-connect(pattern, '', pattern_live, 'A')
-connect(alive, '', pattern_live, 'B')
+# Quiet sensor: the colour drains out and the pattern dies with it.
+grey = g.rgb(0.16, 0.18, 0.20, -2200)
+colour = g.lerp(hue_blend, grey, staleness, -1300)
 
-# ---------------------------------------------------------------------------
-# Colour: tint, shifted toward green by the vortex blend, greyed by staleness.
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ assembly
+alive = g.one_minus(staleness, -1700)
 
-vortex_hue = node(unreal.MaterialExpressionConstant3Vector, -1400,
-                  constant=unreal.LinearColor(0.15, 0.95, 0.55, 1.0))
+# Kept deliberately low: a glow that blows out to white takes the arousal
+# ramp with it, and the colour is the whole point of the parameter.
+glow = g.addc(g.add(g.mulc(beat_pulse, 1.15, -1600), g.mulc(excitation, 0.85, -1600), -1500), 0.16, -1400)
+pattern = g.add(g.add(g.mul(rings, glow, -1300), g.mulc(stripes, 0.30, -1300), -1200), rim, -1100)
+pattern_live = g.mul(pattern, alive, -1000)
 
-blend_half = node(unreal.MaterialExpressionMultiply, -1400, const_b=0.6)
-connect(blend_alpha, '', blend_half, 'A')
+emissive = g.mul(g.mul(colour, pattern_live, -800), focus_mask, -600)
+base_colour = g.mul(g.mulc(colour, 0.85, -800), focus_mask, -600)
 
-tint_blend = node(unreal.MaterialExpressionLinearInterpolate, -1200)
-connect(tint, '', tint_blend, 'A')
-connect(vortex_hue, '', tint_blend, 'B')
-connect(blend_half, '', tint_blend, 'Alpha')
+# A wet, tight highlight; slightly rougher when the sensor has gone quiet, so
+# a dead bubble even reads as a duller material.
+roughness = g.lerp(g.const(0.18, -1200), g.const(0.55, -1200), staleness, -1000)
+specular = g.const(0.75, -1200)
 
-grey = node(unreal.MaterialExpressionConstant3Vector, -1200,
-            constant=unreal.LinearColor(0.25, 0.25, 0.27, 1.0))
+g.out(base_colour, unreal.MaterialProperty.MP_BASE_COLOR)
+g.out(emissive, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+g.out(roughness, unreal.MaterialProperty.MP_ROUGHNESS)
+g.out(specular, unreal.MaterialProperty.MP_SPECULAR)
 
-tint_final = node(unreal.MaterialExpressionLinearInterpolate, -1000)
-connect(tint_blend, '', tint_final, 'A')
-connect(grey, '', tint_final, 'B')
-connect(staleness, '', tint_final, 'Alpha')
+MEL.recompile_material(bubble)
+assert unreal.EditorAssetLibrary.save_asset(bubble_path), 'sauvegarde du materiau bulle impossible'
+unreal.log(f'VibH2O: materiau de bulle ecrit dans {bubble_path}')
 
-# ---------------------------------------------------------------------------
-# Outputs, both gated by the focus mask.
-# ---------------------------------------------------------------------------
 
-emissive_raw = node(unreal.MaterialExpressionMultiply, 0)
-connect(tint_final, '', emissive_raw, 'A')
-connect(pattern_live, '', emissive_raw, 'B')
+# ===========================================================================
+# The motes
+# ===========================================================================
 
-emissive = node(unreal.MaterialExpressionMultiply, 200)
-connect(emissive_raw, '', emissive, 'A')
-connect(focus_mask, '', emissive, 'B')
+mote, mote_path = fresh_material('M_VibH2OMote')
+# Left on the DEFAULT shading model and blend mode on purpose.
+#
+# Unlit and additive were both tried here and both came out as black specks -
+# measured on screen, not assumed. The bubble material renders correctly in
+# this same scene with the default lit/opaque setup, so the motes use exactly
+# that: copying the configuration known to work beats debugging the one that
+# should. Emissive carries the whole look either way.
 
-base_color = node(unreal.MaterialExpressionMultiply, 200)
-connect(tint_final, '', base_color, 'A')
-connect(focus_mask, '', base_color, 'B')
+m = Graph(mote)
+mtime = m.n(unreal.MaterialExpressionTime, -1400)
+mpos = m.n(unreal.MaterialExpressionObjectPositionWS, -1400)
 
-roughness = node(unreal.MaterialExpressionConstant, 200, r=0.35)
+# Each mote drifts on its own slow path. The seed comes from where it stands,
+# so a field of thousands never pulses in unison.
+# PerInstanceRandom is the only seed that actually differs from one instance
+# to the next: object position is the component's, shared by all 2600.
+mseed = m.n(unreal.MaterialExpressionPerInstanceRandom, -1200)
 
-to_property(base_color, unreal.MaterialProperty.MP_BASE_COLOR)
-to_property(emissive, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-to_property(roughness, unreal.MaterialProperty.MP_ROUGHNESS)
+# Motes do not move in the material: Unreal 5.5 keeps the world position
+# offset input out of Python's reach. The whole field drifts instead, as one
+# slow body, from AVibH2OWaterMotes - which is closer to how suspended silt
+# actually behaves in a current, and costs one transform rather than 2600.
+phase = m.add(m.mulc(mtime, 0.35, -1200), m.mulc(mseed, 6.283, -1200), -1000)
+twinkle = m.addc(m.mulc(m.sine(phase, -900), 0.25, -850), 0.75, -800)
 
-MEL.recompile_material(material)
-saved = unreal.EditorAssetLibrary.save_asset(full_path)
-assert saved, 'sauvegarde du materiau impossible'
+# Colour: pale blue-green, brightness varying per mote so the field has depth.
+mote_col = m.rgb(0.30, 0.72, 0.85, -1400)
+mfres = m.n(unreal.MaterialExpressionFresnel, -900, exponent=1.6)
+soft = m.addc(m.mulc(mfres, 0.65, -850), 0.35, -800)
+bright = m.mul(m.mul(m.addc(m.mulc(mseed, 0.9, -900), 0.25, -800), twinkle, -700), soft, -650)
+m.out(m.mul(mote_col, m.mulc(bright, 0.9, -620), -600), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+m.out(m.rgb(0.01, 0.02, 0.03, -600), unreal.MaterialProperty.MP_BASE_COLOR)
+m.out(m.const(0.9, -600), unreal.MaterialProperty.MP_ROUGHNESS)
 
-unreal.log(f'VibH2O: materiau de demonstration ecrit dans {full_path}')
+# Soft edges: a hard-edged speck reads as dirt on the lens. In additive mode
+# the falloff belongs in the emissive itself, there being no opacity to shape.
+
+
+MEL.recompile_material(mote)
+assert unreal.EditorAssetLibrary.save_asset(mote_path), 'sauvegarde du materiau de particule impossible'
+unreal.log(f'VibH2O: materiau de particule ecrit dans {mote_path}')
