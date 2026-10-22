@@ -233,6 +233,7 @@ rotation ne se voit pas.
 | `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
+| `VibH2O.EffectIsolation [rester]` | Coupe chaque effet à tour de rôle et mesure sept canaux : verdict `CONFORME` ou `ECART` par effet, plus une capture par étape dans `Saved/VibH2OIsolation/`. Arrête le simulateur et fige les horloges d'animation le temps de la mesure. `rester` empêche le moteur de quitter à la fin. Absente des builds Shipping. |
 
 ---
 

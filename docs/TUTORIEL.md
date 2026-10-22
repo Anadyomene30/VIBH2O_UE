@@ -259,6 +259,7 @@ secondes.
 | L'outillage réseau est sain | `python Tools/selftest_osc.py` |
 | Le plugin est correct | `Automation RunTests VibH2O` dans la console |
 | Voir la recette visuelle complète | `VibH2O.DemoSweep` — quatorze captures dans `Saved/VibH2OSweep/`, puis le moteur quitte |
+| Vérifier qu'un effet ne dérange que le sien | `VibH2O.EffectIsolation` — un verdict et une capture par effet, dans `Saved/VibH2OIsolation/` |
 
 ---
 

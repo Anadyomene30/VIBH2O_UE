@@ -168,7 +168,7 @@ python Tools/selftest_osc.py
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound -abslog="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Saved/Logs/AutomationRun.log"
 ```
 
 **Trois cibles, pas une.** L'éditeur ne suffit pas : c'est la cible **Game** qui tourne en
@@ -187,8 +187,19 @@ moteurs.
 
 > **Piège du build.** `Build.bat` renvoie parfois **0 alors que la compilation a échoué** :
 > l'exécuteur réussit, le compilateur non. Lis toujours la sortie, ne te fie pas au code de retour.
-> De même, les résultats d'automation ne vont pas sur la sortie standard : ils sont dans
-> `Saved/Logs/VIBH2O_UE.log`, sur les lignes `Test Completed. Result=`.
+> De même, les résultats d'automation ne vont pas sur la sortie standard : ils sont dans le
+> fichier de log, sur les lignes `Test Completed. Result=`.
+
+> **Piège du lancement — croire à un résultat qui n'existe pas.** Constaté le 9 septembre 2026,
+> et parfaitement silencieux : selon le shell, un `VIBH2O_UE.uproject` **relatif** ne se résout
+> pas. Le moteur écrit `Project file not found`, sort en trois lignes, et **n'écrit aucun log** —
+> le fichier de log précédent restant en place, on relit alors les résultats de l'avant-veille en
+> les prenant pour ceux du jour. Rien, dans la sortie, ne l'annonce.
+>
+> Donner donc **le chemin absolu du `.uproject`**, et **vérifier l'horodatage du log avant d'en
+> lire une ligne**. Avec le chemin absolu, le log par défaut s'écrit correctement ; `-abslog` vers
+> un fichier nommé reste plus sûr quand plusieurs lancements se suivent, chacun ayant alors son
+> propre fichier au lieu d'une rotation à démêler.
 
 La procédure de recette complète, et l'état de chaque étape, sont dans
 [`docs/ROADMAP.md`](docs/ROADMAP.md).

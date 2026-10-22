@@ -13,10 +13,11 @@ seule.
 
 ---
 
-## État — 5 septembre 2026
+## État — 9 septembre 2026
 
-Les étapes 0 à 10 sont **écrites et compilées**. Ce qui a été vérifié pour de bon, et par quel
-moyen :
+Les étapes 0 à 10 sont **écrites et compilées**, et la recette visuelle ne laisse plus que les
+deux points qu'aucune machine de ce dépôt ne peut trancher. Ce qui a été vérifié pour de bon, et
+par quel moyen :
 
 | # | Étape | État | Comment |
 |---|---|---|---|
@@ -32,6 +33,17 @@ moyen :
 | 9 | Tableaux et transition | ✅ | Morph capturé à 0, mi-course et 1 ; le cône se lit de profil, teinté par `BlendAlpha`. La logique de banc reste hors périmètre, comme prévu. |
 | 10 | Sequencer et finitions | ✅ | `LS_VibH2O_Recette` (générée par script) anime les trois paramètres ; **lecture vérifiée en jeu** : BlendAlpha passe de 0 à 0,22 sous le seul contrôle de la piste. |
 
+### Ce qui s'est ajouté depuis les étapes 0 à 10
+
+Trois apports qui ne figuraient pas dans le découpage initial, chacun compilé et mesuré :
+
+| Apport | État | Comment |
+|---|---|---|
+| **Simulateur intégré** (`AVibH2OSimulatorActor`) | ✅ | Joue le rôle de Max depuis le niveau. Play sur la carte de démo suffit — sans Python, sans terminal. |
+| **Prévisualisation animée en éditeur** | ✅ | `VibH2O.PreviewProbe` mesure `StageTime` sur trois secondes de tick éditeur : 0,000 → 1,311, hors Play. La documentation l'affirmait, la sonde le prouve. |
+| **Passe artistique** | ✅ | Silhouette organique, rampe de couleur à trois paliers, **vrais boids** pour le tableau 2, numéros de siège, particules, éclairage volumétrique. |
+| **Isolement des effets** (`VibH2O.EffectIsolation`) | ✅ | Le point 8 de la recette, devenu mesurable. Voir ci-dessous. |
+
 ### Rejouer les vérifications
 
 ```bash
@@ -43,7 +55,7 @@ python Tools/selftest_osc.py
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -ExecCmds="Automation RunTests VibH2O;Quit" -unattended -nullrhi -nosplash -NoSound -abslog="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Saved/Logs/AutomationRun.log"
 ```
 
 ```bash
@@ -65,15 +77,15 @@ La carte, le matériau et la séquence de démonstration se régénèrent à vol
 des assets à préserver :
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_map.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_map.py" -unattended -nosplash
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_material.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_material.py" -unattended -nosplash
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" VIBH2O_UE.uproject -run=pythonscript -script="Tools/make_demo_sequence.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_sequence.py" -unattended -nosplash
 ```
 
 ### La recette visuelle, en une commande
@@ -85,12 +97,57 @@ d'images par seconde — **une capture PNG étiquetée par phase** dans `Saved/V
 le moteur quitte.
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" VIBH2O_UE.uproject -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.DemoSweep" -NoSound -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.DemoSweep" -NoSound -unattended -nosplash
 ```
 
 Une fenêtre s'ouvre environ une minute. Le rendu hors écran (`-RenderOffscreen`) ne convient
 **pas** : la capture d'écran attend une présentation d'image qui n'y arrive jamais, et la frame
 se fige.
+
+> **Piège du lancement.** Donner le `.uproject` en chemin **absolu**. Avec un chemin relatif, et
+> selon le shell, le moteur écrit `Project file not found`, sort en trois lignes **sans écrire le
+> moindre log** — et celui de la veille reste en place, prêt à être relu comme s'il était du jour.
+> Vérifier l'horodatage du log avant d'en croire une ligne. `-abslog` n'est pas obligatoire, mais
+> donne à chaque lancement son fichier.
+
+### L'isolement des effets, en une commande
+
+`VibH2O.EffectIsolation` répond au point 8 de la recette : non pas « la bascule bascule-t-elle »,
+que les tests d'automation couvrent déjà, mais **« couper un effet ne dérange-t-il que ce qu'il
+prétend gouverner »**. Elle coupe les six effets un par un et mesure sept canaux à chaque fois —
+position, rotation, échelle, silhouette, teinte, focus, battement — puis rend un verdict par
+effet, plus une capture PNG par étape dans `Saved/VibH2OIsolation/`, toutes prises depuis la
+**même caméra fixe**, donc comparables à l'œil.
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.EffectIsolation" -NoSound -unattended -nosplash -abslog="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Saved/Logs/Isolation.log"
+```
+
+Sans les captures, en une trentaine de secondes et sans fenêtre, `-nullrhi` suffit : le verdict
+chiffré est le même.
+
+**Comment elle évite de se mentir**, car c'est là qu'était toute la difficulté :
+
+1. **Le simulateur intégré est arrêté.** Il tourne dans la carte de démo et injecterait ses
+   propres valeurs par-dessus celles de la mesure. Première version sans cet arrêt : bruit de
+   fond de 27 unités sur la position, tous les verdicts noyés.
+2. **Les horloges sont mises à zéro** — flottement, rotation de la dérive, déformation organique.
+   Aucune de leurs périodes ne divise une fenêtre de mesure, si bien que leur seul défilement
+   passait pour du mouvement. À vitesse nulle, chaque contribution garde l'offset que lui donne sa
+   graine : toujours non nulle, donc toujours mesurable quand on la coupe.
+3. **Une référence est intercalée entre chaque effet**, et chaque effet est comparé au milieu des
+   deux références qui l'encadrent — ce qui annule toute dérive lente.
+4. **L'instrument se mesure lui-même** : chaque référence intérieure est jugée contre ses deux
+   voisines par la formule exacte des effets. Le pire chiffre obtenu est le bruit de fond, et un
+   canal n'a bougé que s'il le dépasse au triple.
+
+Résultat du 9 septembre 2026, en rendu réel comme en `-nullrhi` : **six effets, six verdicts
+CONFORME**. Marge confortable — la position bouge de 14 à 26 unités quand on coupe le flottement
+ou la dérive, pour un bruit de fond de 0,04.
+
+Et parce qu'un harnais toujours vert ne prouve rien, il a été **saboté exprès** : en déclarant
+que la teinte devait déplacer les bulles, le verdict est passé à `ECART SANS EFFET sur position;
+FUITE sur teinte;`. Il sait donc échouer, dans les deux sens.
 
 ---
 
@@ -269,7 +326,7 @@ Avant de considérer la première livraison terminée :
 | 5 | ~176 sièges : le tout reste fluide | ✅ **517 images/s mesurées** en rendu réel, sweep phase 14 |
 | 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit | ✅ capture `08_acteur_deplace` — translation + 35° de yaw, tout suit |
 | 7 | Courbure balayée dans les deux sens, droite exacte à zéro | ✅ automatisé au bit près, **et** vu en plongée sur captures |
-| 8 | Chaque effet s'active et se désactive isolément | 🟡 bascules testées ; l'isolement visuel effet par effet reste à regarder |
+| 8 | Chaque effet s'active et se désactive isolément | ✅ `VibH2O.EffectIsolation` — **6 effets, 6 verdicts CONFORME**, sept canaux mesurés, plus une capture par effet depuis une caméra fixe |
 | 9 | Focus : assombrissement et cadrage justes sur salle courbée | ✅ assombrissement sur capture ; bornes testées numériquement |
 | 10 | Blend 0 → 1 → 0 sans à-coup, flottement persistant | ✅ captures à 0, ½ et 1, retour capturé ; flottement testé |
 | 11 | Trois paramètres animés dans Sequencer | ✅ séquence générée, **lecture en jeu vérifiée** (BlendAlpha 0 → 0,22 par la piste seule) |
@@ -277,15 +334,17 @@ Avant de considérer la première livraison terminée :
 | 13 | Dans le niveau sous-marin : ombres et caustiques reçues | 🟡 à faire |
 | 14 | Depuis le vrai patch Max : adresses confirmées ou réglages ajustés | 🟡 relevées sur les patchs, à confirmer en salle |
 
-Les lignes marquées ✅ se rejouent d'une commande — `VibH2O.DemoSweep` pour les visuelles.
-Les deux 🟡 restants demandent ce qu'aucune machine de ce dépôt ne possède : l'environnement
-`underwater_bp` de l'artiste (caustiques), et la salle avec le vrai patch Max.
+Les lignes marquées ✅ se rejouent d'une commande — `VibH2O.DemoSweep` pour les visuelles,
+`VibH2O.EffectIsolation` pour l'isolement des effets. Les deux 🟡 restants demandent ce
+qu'aucune machine de ce dépôt ne possède : l'environnement `underwater_bp` de l'artiste
+(caustiques), et la salle avec le vrai patch Max. **Ce sont les deux seuls points ouverts de la
+première livraison.**
 
 ---
 
 ## Après cette livraison
 
-- Le **comportement de banc** du tableau 2 : voisinage, séparation, alignement, cohésion.
+- ~~Le **comportement de banc** du tableau 2~~ — fait : vrais boids (séparation, alignement, cohésion, attracteur mouvant), pilote par défaut du tableau 2, la synchronie collective serrant ou dispersant le banc. Reste à le juger en salle.
 - La **direction artistique** des bulles : mesh, matériau subsurface, stries, anneaux.
 - Un éventuel **pilotage MIDI direct**, à brancher sur les fonctions existantes.
 - Les **tableaux suivants**, chacun étant une nouvelle classe de pilote de position.
