@@ -1,10 +1,11 @@
 """Builds the VibH2O demonstration map.
 
-Run from the repository root:
+Run with ABSOLUTE paths, <repo> being the repository root - a relative
+-script resolves against the engine binaries folder and silently loads nothing:
 
     "C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" ^
-        VIBH2O_UE.uproject -run=pythonscript ^
-        -script="Tools/make_demo_map.py" -unattended -nosplash
+        "<repo>/VIBH2O_UE.uproject" -run=pythonscript ^
+        -script="<repo>/Tools/make_demo_map.py" -unattended -nosplash
 
 This is a *generator*, not a hand-made asset. The map it produces is disposable:
 delete Content/Maps and run it again. That keeps the repository free of binary
@@ -18,6 +19,15 @@ MAP_PACKAGE = '/Game/Maps/VibH2O_Demo'
 
 editor_subsystem = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+
+# Check the materials BEFORE the old map is deleted: a missing one must stop
+# the run while the previous map is still whole. load_asset, not
+# does_asset_exist: in a commandlet the asset registry has not necessarily
+# scanned the plugin's content, and a material written a moment earlier by
+# make_demo_material.py goes unseen - the map was left half-built that way.
+for path in ('/VibH2O/M_VibH2OCaustics', '/VibH2O/M_VibH2OSeabed', '/VibH2O/M_VibH2OMote'):
+    assert unreal.load_asset(path) is not None, \
+        f'{path} introuvable - lancer make_demo_material.py avant'
 
 # new_level over an EXISTING package leaves save_current_level failing: the
 # regenerate path must delete the old asset first, like the material and
@@ -44,9 +54,6 @@ assert created, 'creation du niveau impossible'
 #
 # The bubble material is lit, not emissive: it is these lights that give it
 # its highlight, its rim and its glow from within.
-for path in ('/VibH2O/M_VibH2OCaustics', '/VibH2O/M_VibH2OSeabed'):
-    assert unreal.EditorAssetLibrary.does_asset_exist(path), \
-        f'{path} introuvable - lancer make_demo_material.py avant'
 
 # unreal.Rotator takes (roll, pitch, yaw) positionally - NOT the (pitch, yaw,
 # roll) order of C++. Keywords, so the sun points down into the water: an
@@ -195,11 +202,11 @@ motes.set_editor_property('count', 320)
 motes.set_editor_property('radius', 2400.0)
 motes.set_editor_property('height', 2000.0)
 
-# Assign the mote material here rather than trusting the actor constructor:
-# ConstructorHelpers resolves once, when the class default object is built, so
-# an actor placed before the material existed keeps a null and renders with the
-# default lit material - which, in water this dark, reads as black specks.
-assert unreal.EditorAssetLibrary.does_asset_exist('/VibH2O/M_VibH2OMote'),     'M_VibH2OMote introuvable - lancer make_demo_material.py avant'
+# The mote material comes from the actor constructor. ConstructorHelpers
+# resolves once, when the class default object is built, so the material must
+# exist before this process starts - which the check at the top guarantees;
+# without it the motes render with the default lit material, black specks in
+# water this dark.
 
 # --- Post process: the grade, the bloom the emissive bubbles need, and the
 # volumetric fog that turns the directional light into shafts through water.

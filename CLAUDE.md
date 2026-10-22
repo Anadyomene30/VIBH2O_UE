@@ -9,7 +9,7 @@ Ce dépôt sert à construire **un plugin Unreal Engine** qui reçoit en **OSC/U
 cardiaques de spectateurs équipés de capteurs, et les donne à voir sous forme de **bulles**
 disposées comme le plan de la salle.
 
-Le plugin **existe** : il compile sous UE 5.5 et ses 14 tests d'automation passent. Ce qui reste
+Le plugin **existe** : il compile sous UE 5.5 et ses 15 tests d'automation passent. Ce qui reste
 est listé dans [`docs/ROADMAP.md`](docs/ROADMAP.md), et tient à ce qu'un test ne remplace pas — un
 œil, un matériau, une vraie salle. Lis, dans l'ordre :
 
@@ -182,7 +182,7 @@ représentation, et elle compile sans l'éditeur. Une API `WITH_EDITOR` — `Set
 
 **La contrainte 5.5 / 5.8 se vérifie, elle aussi.** Copier le projet dans un dossier au chemin
 **court** — au-delà de 260 caractères UnrealBuildTool refuse de compiler — et lancer le `Build.bat`
-de 5.8 dessus. Fait le 5 septembre 2026 : compilation propre, 14 tests au vert sous les deux
+de 5.8 dessus. Fait le 22 octobre 2026 : compilation propre, 15 tests au vert sous les deux
 moteurs.
 
 > **Piège du build.** `Build.bat` renvoie parfois **0 alors que la compilation a échoué** :

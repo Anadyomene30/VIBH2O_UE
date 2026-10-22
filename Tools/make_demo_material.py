@@ -1,8 +1,8 @@
 """Builds the VibH2O demonstration materials, into the plugin's own content.
 
     "C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" ^
-        VIBH2O_UE.uproject -run=pythonscript ^
-        -script="Tools/make_demo_material.py" -unattended -nosplash
+        "<repo>/VIBH2O_UE.uproject" -run=pythonscript ^
+        -script="<repo>/Tools/make_demo_material.py" -unattended -nosplash
 
 Four materials, all disposable and regenerable:
 

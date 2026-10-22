@@ -1,10 +1,11 @@
 """Builds the VibH2O demonstration Level Sequence, and drops a player into the map.
 
-Run from the repository root:
+Run with ABSOLUTE paths, <repo> being the repository root - a relative
+-script resolves against the engine binaries folder and silently loads nothing:
 
     "C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" ^
-        VIBH2O_UE.uproject -run=pythonscript ^
-        -script="Tools/make_demo_sequence.py" -unattended -nosplash
+        "<repo>/VIBH2O_UE.uproject" -run=pythonscript ^
+        -script="<repo>/Tools/make_demo_sequence.py" -unattended -nosplash
 
 The sequence animates the three parameters the roadmap names for the Sequencer
 check - BlendAlpha, CurvatureAngle, FocusAmount - over ten seconds at 30 fps.

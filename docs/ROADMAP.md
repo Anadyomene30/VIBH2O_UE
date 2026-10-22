@@ -13,7 +13,7 @@ seule.
 
 ---
 
-## État — 9 septembre 2026
+## État — 22 octobre 2026
 
 Les étapes 0 à 10 sont **écrites et compilées**, et la recette visuelle ne laisse plus que les
 deux points qu'aucune machine de ce dépôt ne peut trancher. Ce qui a été vérifié pour de bon, et
@@ -21,7 +21,7 @@ par quel moyen :
 
 | # | Étape | État | Comment |
 |---|---|---|---|
-| 0 | Squelette | ✅ | Compile et se lie sous **UE 5.5 et UE 5.8**, cibles Editor, Game et Shipping, sans avertissement. Les 14 tests passent sous les deux moteurs. |
+| 0 | Squelette | ✅ | Compile et se lie sous **UE 5.5 et UE 5.8**, cibles Editor, Game et Shipping, sans avertissement. Les 15 tests passent sous les deux moteurs. |
 | 1 | Parseur OSC | ✅ | 5 tests d'automation, dont une trame de référence écrite à la main et 2 000 trames aléatoires. |
 | 2 | Simulateur | ✅ | `Tools/selftest_osc.py` au vert, boucle UDP comprise. |
 | 3 | Socle réseau et état | ✅ | 2 tests d'intégration + un essai live à 2 500 msg/s. |
@@ -44,9 +44,9 @@ Trois apports qui ne figuraient pas dans le découpage initial, chacun compilé 
 | **Passe artistique** | ✅ | Silhouette organique, rampe de couleur à trois paliers, **vrais boids** pour le tableau 2, numéros de siège, particules, éclairage volumétrique. |
 | **Isolement des effets** (`VibH2O.EffectIsolation`) | ✅ | Le point 8 de la recette, devenu mesurable. Voir ci-dessous. |
 
-### Passe du 22 octobre 2026 — réalisme, lumière, éditeur — **écrite, PAS encore compilée**
+### Passe du 22 octobre 2026 — réalisme, lumière, éditeur — **compilée et testée, reste à juger à l'œil**
 
-Écrite en session distante, sans moteur. Rien de ce qui suit n'a été compilé ni regardé :
+Écrite en session distante, sans moteur, puis vérifiée le même jour sur la machine :
 
 | Demande | Réponse |
 |---|---|
@@ -56,19 +56,29 @@ Trois apports qui ne figuraient pas dans le découpage initial, chacun compilé 
 | L'éclairage doit s'adapter au nombre de bulles | `AVibH2OLightRig` : cadrage, recul et puissance recalculés à chaque image depuis les bulles affichées, lissés. |
 | Voir sans être en Play | Doublure de subsystem propre au monde éditeur ; simulateur et scène y tournent, avec les **vraies bulles**. |
 
-À faire sur la machine, dans l'ordre :
+Vérifié le 22 octobre 2026 :
 
-1. Compiler l'éditeur **et** la cible Game (les commandes sont plus bas). Le code nouveau touche à
-   `WITH_EDITOR`, c'est exactement là qu'une cible casse et pas l'autre.
-2. Lancer les tests. Ils doivent être **15**, dont le nouveau
-   `VibH2O.Integration.PrevisualisationEditeur`.
-3. Régénérer les matériaux (`make_demo_material.py`), **puis** la carte (`make_demo_map.py`). La
-   carte a besoin des nouveaux matériaux.
-4. Ouvrir la carte, viewport en temps réel (`Ctrl + R`) : la salle doit vivre sans Play.
-5. Juger à l'œil, puis régler : exposition (`PostProcess`), niveaux du rig, taille des caustiques
-   (`ridge_of` dans `make_demo_material.py`).
-6. Remesurer les images par seconde (sweep, phase 14). Lumen et les ombres des projecteurs
-   coûtent plus que l'ancien éclairage. Les 517 images/s du tableau ci-dessus datent d'avant.
+| Vérification | Résultat |
+|---|---|
+| Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
+| Compilation UE 5.8, Editor (copie au chemin court) | ✅ propre |
+| Tests d'automation | ✅ **15 / 15** sous 5.5 **et** sous 5.8, dont `VibH2O.Integration.PrevisualisationEditeur` |
+| `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — la déformation réduite reste mesurable |
+| Matériaux, carte et séquence régénérés | ✅ après correction de `make_demo_map.py` (voir ci-dessous) |
+| Images par seconde, salle de 176 | ✅ **303 images/s** (517 avant Lumen et les projecteurs) — large marge |
+| Captures du sweep | ✅ bulles éclairées par la scène, caustiques et ombres visibles sur le fond |
+
+`make_demo_map.py` ne passait pas : il vérifiait les nouveaux matériaux par `does_asset_exist`,
+qui, dans un commandlet, ne voit pas un asset de plugin écrit juste avant — et il le faisait
+**après** avoir supprimé l'ancienne carte, laissant une carte à moitié construite. Le contrôle
+passe en tête du script, par `load_asset`.
+
+Reste à faire, à l'œil :
+
+1. Ouvrir la carte, viewport en temps réel (`Ctrl + R`) : la salle doit vivre sans Play.
+2. Juger, puis régler : exposition (`PostProcess`), niveaux du rig, taille des caustiques
+   (`ridge_of` dans `make_demo_material.py`). Sur les captures, les bulles se lisent plutôt comme
+   des **perles** que comme des bulles : la transparence feinte par Fresnel reste discrète.
 
 ### Rejouer les vérifications
 
@@ -90,7 +100,7 @@ python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
 
 Pour la contrainte « un seul code source pour 5.5 et 5.8 », copier le projet dans un dossier au
 chemin **court** — au-dela de 260 caracteres, UnrealBuildTool refuse de compiler — puis pointer le
-`Build.bat` de 5.8 dessus. La verification a ete faite ainsi : compilation propre, 14 tests au
+`Build.bat` de 5.8 dessus. La verification a ete faite ainsi : compilation propre, 15 tests au
 vert.
 
 Et la cible qui compte vraiment pour la representation n'est pas l'editeur :
@@ -100,19 +110,24 @@ Et la cible qui compte vraiment pour la representation n'est pas l'editeur :
 ```
 
 La carte, le matériau et la séquence de démonstration se régénèrent à volonté — ce ne sont pas
-des assets à préserver :
+des assets à préserver. **Dans cet ordre** — la carte a besoin des matériaux, la séquence de la
+carte :
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_map.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Tools/make_demo_material.py" -unattended -nosplash
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_material.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Tools/make_demo_map.py" -unattended -nosplash
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="Tools/make_demo_sequence.py" -unattended -nosplash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -run=pythonscript -script="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Tools/make_demo_sequence.py" -unattended -nosplash
 ```
+
+> **`-script` aussi en absolu.** Un chemin relatif se résout depuis `Engine/Binaries/Win64` du
+> moteur, pas depuis le dépôt : `Could not load Python file`, et rien n'est régénéré. Le commandlet
+> le dit dans son log, mais pas sur la sortie standard.
 
 ### La recette visuelle, en une commande
 
@@ -349,7 +364,7 @@ Avant de considérer la première livraison terminée :
 | 2 | Salle 5 × 5 : 25 bulles, chacune à son tempo | ✅ anneaux par bulle sur captures, à son BPM propre (fréquence des anneaux) |
 | 3 | Salle 7 × 3 : **orientation confirmée**, valeur notée dans `OSC_PROTOCOL.md` | ✅ notée, et vérifiée sur le plan d'Alès |
 | 4 | Sièges à 0 : aucune bulle, moyennes non faussées | ✅ automatisé |
-| 5 | ~176 sièges : le tout reste fluide | ✅ **517 images/s mesurées** en rendu réel, sweep phase 14 |
+| 5 | ~176 sièges : le tout reste fluide | ✅ **303 images/s mesurées** en rendu réel avec Lumen et le rig de projecteurs (517 avant), sweep phase 14 |
 | 6 | Acteur de scène déplacé, tourné, redimensionné : tout suit | ✅ capture `08_acteur_deplace` — translation + 35° de yaw, tout suit |
 | 7 | Courbure balayée dans les deux sens, droite exacte à zéro | ✅ automatisé au bit près, **et** vu en plongée sur captures |
 | 8 | Chaque effet s'active et se désactive isolément | ✅ `VibH2O.EffectIsolation` — **6 effets, 6 verdicts CONFORME**, sept canaux mesurés, plus une capture par effet depuis une caméra fixe |
