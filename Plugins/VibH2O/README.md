@@ -73,6 +73,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `AVibH2OSimulatorActor` | Le Max de poche : simule plan et données par le chemin d'injection, et s'efface dès que le vrai réseau parle. |
 | `UVibH2OFlockDriver` | Tableau 2 — vrais boids : séparation, alignement, cohésion, attracteur mouvant. Pilote par défaut. |
 | `AVibH2OWaterMotes` | Les particules en suspension dans l'eau. |
+| `AVibH2OLightRig` | Trois projecteurs (face, contre-jour, débouchage) qui suivent les bulles réellement affichées : recul et puissance recalculés à chaque image, quelle que soit la taille de la salle. Éclairage de démonstration, entièrement réglable ou supprimable. |
 | `UVibH2OPositionDriver` | Un tableau : une fonction qui dit où va chaque bulle. |
 | `UVibH2OGridDriver` | Tableau 1 — le plan de salle. |
 | `UVibH2OVortexDriver` | Tableau 2 — le vortex, amorce. |
@@ -208,7 +209,30 @@ n'éteint rien en silence.
 
 ## Prévisualisation dans l'éditeur
 
-`bPreviewInEditor` dessine la grille dans le viewport **sans instancier la moindre bulle** : le
+### Les vraies bulles, sans Play
+
+Dans le monde de l'éditeur, il n'y a pas de *game instance*, donc pas de subsystem.
+`UVibH2OSubsystem::Get` y renvoie une **doublure** propre à ce monde
+(`UVibH2OSubsystem::GetEditorPreview`). C'est un subsystem complet : rafale et silence, battements,
+lissage, capteurs muets, moyennes. Il lui manque seulement la socket, et il n'écoute jamais : Play
+garde le port pour lui, et Max l'atteint normalement.
+
+- `AVibH2OSimulatorActor` (`bSimulateInEditor`, coché par défaut) démarre seul dans l'éditeur et
+  alimente cette doublure par `InjectOscMessage`, le chemin de Play.
+- `AVibH2OStageActor` (`bLiveInEditor`, coché par défaut) s'y abonne et crée ses vraies bulles.
+  Elles sont *temporary editor actors*, transitoires : rien n'est enregistré dans le niveau, rien
+  n'apparaît dans l'Outliner, et elles ne sont pas sélectionnables.
+- Le moteur ne fait jamais ticker la doublure : ce sont la scène et le simulateur qui la font
+  avancer, une fois par image au plus (`TickEditorPreview`).
+- Le test `VibH2O.Integration.PrevisualisationEditeur` vérifie trois choses : la doublure
+  n'écoute pas le réseau, elle construit une salle sans Play, et seul un monde éditeur en obtient
+  une.
+
+Le viewport doit être en temps réel (`Ctrl + R`).
+
+### L'aperçu de débogage
+
+Quand aucune donnée n'arrive (pas de simulateur), `bPreviewInEditor` dessine la grille dans le viewport **sans instancier la moindre bulle** : le
 niveau reste propre. `bPreviewAnimate` y ajoute le flottement et un battement de convenance, pour
 que la salle respire pendant qu'on règle la géométrie — l'éditeur n'a aucune donnée, ce battement
 n'est donc qu'un artifice de lisibilité.
@@ -242,12 +266,17 @@ Ce que la carte montre, et où le régler :
 
 | Effet | Où |
 |---|---|
-| **Silhouette organique** | `VibH2O_Stage` → `Organic Deform` / `Organic Speed`. Trois axes, trois cadences, une phase par bulle : aucune n'est une sphère, aucune ne se déforme comme sa voisine, et l'excitation accentue l'irrégularité. |
+| **Silhouette organique** | `VibH2O_Stage` → `Organic Deform` / `Organic Speed`. Trois axes, trois cadences, une phase par bulle : aucune n'est une sphère, aucune ne se déforme comme sa voisine, et l'excitation accentue l'irrégularité. Défaut **0,035** : réaliste. L'ancien 0,16 étirait les bulles comme du caoutchouc. |
+| **Bulle sensible à la lumière** | `M_VibH2ODemoBubble` est en **Subsurface** opaque, non plus émissive. La face sombre et le bord clair simulent la transparence, la diffusion la fait luire en contre-jour, et la rugosité basse donne un reflet mouillé. Le battement reste visible, en pulsation interne discrète. |
+| **Éclairage qui suit la salle** | Acteur `VibH2O_Lumieres` (`AVibH2OLightRig`) : face, contre-jour et débouchage, recadrés et redosés à chaque image selon les bulles affichées. |
+| **Caustiques** | `M_VibH2OCaustics`, *light function* du soleil : deux réseaux de crêtes de bruit qui se croisent et se déforment sur place. |
+| **Fond marin** | `Seabed` + `M_VibH2OSeabed` : il reçoit les caustiques et les ombres des bulles, ce qui donne l'échelle et la profondeur. |
+| **Reflets** | `Reflets` (capture sphérique) + **Lumen** activé dans `Config/DefaultEngine.ini`. |
 | **Couleur selon l'excitation** | Rampe à **trois** paliers dans `M_VibH2ODemoBubble` — bleu profond, sarcelle, ambre. Un dégradé à deux couleurs passerait par un gris mort au milieu, là où se tient la majorité du public. |
 | **Numéros sur les bulles** | `VibH2O_Stage` → `Show Seat Numbers`. Tournés vers la caméra à chaque frame. |
 | **Banc de poissons** | `VibH2O_Stage` → `Flock Driver`, catégorie `Banc`. La synchronie collective serre ou disperse le banc. |
 | **Particules dans l'eau** | Acteur `VibH2O_Particules`. Le champ entier dérive comme un corps, pas mote par mote. |
-| **Éclairage** | Brouillard **volumétrique** + soleil diffusant + `PostProcess` (bloom, vignette, étalonnage froid). |
+| **Ambiance** | Brouillard **volumétrique**, soleil diffusant (tombant enfin d'en haut : il était tourné vers le haut, voir `make_demo_map.py`) et `PostProcess` (bloom, vignette, étalonnage froid). |
 
 > **Trois limites de l'API Python d'Unreal 5.5, rencontrées et contournées.** Le *world position
 > offset* d'un matériau n'est pas atteignable depuis Python : la déformation de silhouette se fait

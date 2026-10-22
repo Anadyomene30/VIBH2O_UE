@@ -94,6 +94,15 @@ public:
 
 	virtual void BeginPlay() override;
 
+#if WITH_EDITOR
+	/**
+	 * Live bubbles in the editor world are not selectable: they are rebuilt
+	 * from data at any moment, so a click must not grab one - and moving one
+	 * by hand would be overwritten the next frame anyway.
+	 */
+	virtual bool IsSelectable() const override;
+#endif
+
 	// ------------------------------------------------------------- Identity
 
 	/** OSC index of the occupied seat, 1-based. */

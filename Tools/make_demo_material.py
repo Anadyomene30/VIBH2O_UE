@@ -4,19 +4,23 @@
         VIBH2O_UE.uproject -run=pythonscript ^
         -script="Tools/make_demo_material.py" -unattended -nosplash
 
-Two materials, both disposable and regenerable:
+Four materials, all disposable and regenerable:
 
   M_VibH2ODemoBubble   the bubble
   M_VibH2OMote         the specks suspended in the water
+  M_VibH2OCaustics     light function: the rippling net of light under water
+  M_VibH2OSeabed       the floor that catches the caustics and the shadows
 
 The bubble aims at ORGANIC, not geometric. Three things do that work:
 
   * the silhouette breathes. World position offset swells the mesh along its
     normal with two out-of-phase noise waves plus the heartbeat, so no bubble
     is ever a clean sphere and no two are deformed alike.
-  * the light wraps. A jellyfish bell is translucent, so its rim glows where
-    light passes through it; a hard Lambert edge is the single thing that most
-    makes a sphere read as plastic.
+  * the light passes through. The bubble is a SUBSURFACE material: lights
+    from behind make it glow from within, lights from the front give it a wet,
+    tight highlight. It is lit by the scene rather than lit from inside, so the
+    rig's lights and the caustics actually show on it - an emissive bubble
+    looks the same in any light, which is what made it read as a sticker.
   * nothing is uniform. Every bubble gets a hue and a rate of its own, drawn
     from its position, so a room of two hundred never looks stamped.
 
@@ -25,8 +29,10 @@ when calm, teal through the middle, hot amber when excited. A straight lerp
 between two ends passes through a dead grey in the middle, which is exactly
 where most of the audience sits.
 
-The material is Opaque / DefaultLit, per the spec: a translucent material
-would receive neither shadows nor caustics properly.
+The material is Opaque / Subsurface, per the spec: a translucent material
+would receive neither shadows nor caustics properly. Transparency is feigned:
+the face turned to the viewer is darker - deep water seen through the bubble -
+and the grazing edge brighter, as on a real wet membrane.
 """
 
 import unreal
@@ -158,6 +164,8 @@ class Graph:
 # ===========================================================================
 
 bubble, bubble_path = fresh_material('M_VibH2ODemoBubble')
+# Subsurface, opaque: lit by the scene, glowing where light passes through.
+bubble.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_SUBSURFACE)
 g = Graph(bubble)
 
 # --- the contract, plus the two extras
@@ -246,10 +254,9 @@ stripe_in = g.add(g.add(g.mulc(u, 34.0, -2100), scroll, -2000),
                   g.mulc(noise_b, 2.6, -2000), -1950)
 stripes = g.power(g.addc(g.mulc(g.sine(stripe_in, -1900), 0.5, -1800), 0.5, -1700), 4.0, -1600)
 
-# Wrapped light: N·L pushed into the shadow side, then a rim. Together they
-# stand in for the subsurface scattering of a translucent bell without paying
-# for a translucent material.
-fresnel = g.n(unreal.MaterialExpressionFresnel, -1800, exponent=2.4, base_reflect_fraction=0.04)
+# Fresnel: the grazing edge. It sets the feigned transparency - dim where the
+# eye looks straight through, bright at the rim - and carries the synchrony.
+fresnel = g.n(unreal.MaterialExpressionFresnel, -1800, exponent=3.2, base_reflect_fraction=0.04)
 sync_sum = g.add(g.mulc(synchrony, 0.55, -1900), g.mulc(collective, 0.45, -1900), -1800)
 rim = g.mul(fresnel, g.addc(sync_sum, 0.35, -1700), -1600)
 
@@ -287,21 +294,35 @@ colour = g.lerp(hue_blend, grey, staleness, -1300)
 # ------------------------------------------------------------------ assembly
 alive = g.one_minus(staleness, -1700)
 
-# Kept deliberately low: a glow that blows out to white takes the arousal
-# ramp with it, and the colour is the whole point of the parameter.
-glow = g.addc(g.add(g.mulc(beat_pulse, 1.15, -1600), g.mulc(excitation, 0.85, -1600), -1500), 0.16, -1400)
-pattern = g.add(g.add(g.mul(rings, glow, -1300), g.mulc(stripes, 0.30, -1300), -1200), rim, -1100)
-pattern_live = g.mul(pattern, alive, -1000)
+# Feigned transparency: the face is the deep water seen through the bubble,
+# the edge is the membrane seen edge-on. This is what makes an opaque sphere
+# read as a body you could see into.
+body_shade = g.lerp(g.const(0.22, -1300), g.const(0.75, -1300), fresnel, -1200)
+base_colour = g.mul(g.mul(colour, body_shade, -900), focus_mask, -600)
 
+# Subsurface: the colour light takes on its way through. Brighter and a touch
+# more saturated than the surface, so a back-lit bubble glows in its own hue.
+sss_colour = g.mul(g.mulc(colour, 1.6, -900), focus_mask, -600)
+# Opacity drives the scattering of a subsurface material: a little more when
+# aroused, so an excited bubble lets more light through and "warms up".
+sss_amount = g.addc(g.mulc(excitation, 0.25, -1000), 0.45, -900)
+
+# The heartbeat stays readable, but as a soft inner pulse rather than a lamp:
+# emissive is kept low so the scene's light, not the material, does the work.
+glow = g.addc(g.add(g.mulc(beat_pulse, 0.9, -1600), g.mulc(excitation, 0.25, -1600), -1500), 0.05, -1400)
+pattern = g.add(g.add(g.mul(rings, glow, -1300), g.mulc(stripes, 0.06, -1300), -1200),
+                g.mulc(rim, 0.12, -1200), -1100)
+pattern_live = g.mul(g.mulc(pattern, 0.35, -1050), alive, -1000)
 emissive = g.mul(g.mul(colour, pattern_live, -800), focus_mask, -600)
-base_colour = g.mul(g.mulc(colour, 0.85, -800), focus_mask, -600)
 
-# A wet, tight highlight; slightly rougher when the sensor has gone quiet, so
-# a dead bubble even reads as a duller material.
-roughness = g.lerp(g.const(0.18, -1200), g.const(0.55, -1200), staleness, -1000)
-specular = g.const(0.75, -1200)
+# Wet and tight: low roughness gives the small sharp highlight that says
+# "liquid". A quiet sensor goes matt, so a dead bubble even reads as duller.
+roughness = g.lerp(g.const(0.08, -1200), g.const(0.45, -1200), staleness, -1000)
+specular = g.const(0.65, -1200)
 
 g.out(base_colour, unreal.MaterialProperty.MP_BASE_COLOR)
+g.out(sss_colour, unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+g.out(sss_amount, unreal.MaterialProperty.MP_OPACITY)
 g.out(emissive, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 g.out(roughness, unreal.MaterialProperty.MP_ROUGHNESS)
 g.out(specular, unreal.MaterialProperty.MP_SPECULAR)
@@ -357,3 +378,94 @@ m.out(m.const(0.9, -600), unreal.MaterialProperty.MP_ROUGHNESS)
 MEL.recompile_material(mote)
 assert unreal.EditorAssetLibrary.save_asset(mote_path), 'sauvegarde du materiau de particule impossible'
 unreal.log(f'VibH2O: materiau de particule ecrit dans {mote_path}')
+
+
+# ===========================================================================
+# The caustics
+# ===========================================================================
+#
+# A light function on the sun: the net of light that the surface ripples throw
+# on everything below. It is what most immediately says "under water", and it
+# lands on the bubbles and the seabed alike - which is the whole reason the
+# bubble is lit rather than emissive.
+#
+# The Noise node's Voronoi function is out of Python's reach in 5.5 (its
+# Function property is refused), so the net is built from gradient noise
+# instead: 1 - |noise| makes thin bright ridges where the noise crosses zero,
+# and two layers drifting apart cross into the familiar cells. The third noise
+# coordinate is time, so the net morphs in place like real caustics rather
+# than sliding across the floor like a projected slide.
+
+caustics, caustics_path = fresh_material('M_VibH2OCaustics')
+caustics.set_editor_property('material_domain', unreal.MaterialDomain.MD_LIGHT_FUNCTION)
+c = Graph(caustics)
+
+c_pos = c.n(unreal.MaterialExpressionWorldPosition, -1800)
+c_xy = c.n(unreal.MaterialExpressionComponentMask, -1700, r=True, g=True, b=False, a=False)
+c.link(c_pos, '', c_xy, '')
+c_time = c.n(unreal.MaterialExpressionTime, -1800)
+
+
+def ridge_of(scale, speed, offset, x):
+    """One layer of ridges: |noise| inverted and sharpened into thin lines."""
+    z = c.addc(c.mulc(c_time, speed, x - 300), offset, x - 250)
+    pos = c.n(unreal.MaterialExpressionAppendVector, x - 200)
+    c.link(c_xy, '', pos, 'A')
+    c.link(z, '', pos, 'B')
+    noise = c.n(unreal.MaterialExpressionNoise, x - 100,
+                scale=scale, quality=1, turbulence=False, levels=1,
+                output_min=-1.0, output_max=1.0)
+    c.link(pos, '', noise, 'Position')
+    absn = c.n(unreal.MaterialExpressionAbs, x)
+    c.link(noise, '', absn, '')
+    return c.power(c.one_minus(absn, x + 50), 7.0, x + 100)
+
+
+# Cells of roughly half a metre to a metre: a few per bubble spacing, so the
+# net reads on a single bubble as well as across the floor.
+ridge_a = ridge_of(0.011, 18.0, 0.0, -1200)
+ridge_b = ridge_of(0.017, -13.0, 517.0, -800)
+
+# Never fully dark between the ridges: real caustics sit on an even wash of
+# light, they do not cut the sun into lines.
+net = c.add(c.mulc(c.add(ridge_a, ridge_b, -300), 1.6, -200), c.const(0.35, -300), -100)
+c.out(net, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+
+MEL.recompile_material(caustics)
+assert unreal.EditorAssetLibrary.save_asset(caustics_path), 'sauvegarde du materiau de caustiques impossible'
+unreal.log(f'VibH2O: caustiques ecrites dans {caustics_path}')
+
+
+# ===========================================================================
+# The seabed
+# ===========================================================================
+#
+# Something for the light to land on. Without a floor the caustics and the
+# bubbles' shadows have nowhere to show, and the room floats in a void; with
+# one, the eye reads depth and scale at once.
+
+seabed, seabed_path = fresh_material('M_VibH2OSeabed')
+b = Graph(seabed)
+
+b_pos = b.n(unreal.MaterialExpressionWorldPosition, -1400)
+b_noise = b.n(unreal.MaterialExpressionNoise, -1200,
+              scale=0.004, quality=1, turbulence=True, levels=4,
+              output_min=0.0, output_max=1.0)
+b.link(b_pos, '', b_noise, 'Position')
+b_fine = b.n(unreal.MaterialExpressionNoise, -1200,
+             scale=0.05, quality=1, turbulence=True, levels=2,
+             output_min=0.0, output_max=1.0)
+b.link(b_pos, '', b_fine, 'Position')
+
+# Dark wet sand, mottled at two scales: large patches and fine grain. Kept dark
+# so the caustics, not the floor, are what catches the eye.
+sand_dark = b.rgb(0.035, 0.040, 0.038, -1200)
+sand_light = b.rgb(0.11, 0.115, 0.095, -1200)
+mottle = b.add(b.mulc(b_noise, 0.75, -1000), b.mulc(b_fine, 0.25, -1000), -900)
+b.out(b.lerp(sand_dark, sand_light, mottle, -700), unreal.MaterialProperty.MP_BASE_COLOR)
+b.out(b.addc(b.mulc(b_fine, 0.15, -800), 0.8, -700), unreal.MaterialProperty.MP_ROUGHNESS)
+b.out(b.const(0.3, -700), unreal.MaterialProperty.MP_SPECULAR)
+
+MEL.recompile_material(seabed)
+assert unreal.EditorAssetLibrary.save_asset(seabed_path), 'sauvegarde du materiau de fond impossible'
+unreal.log(f'VibH2O: fond marin ecrit dans {seabed_path}')

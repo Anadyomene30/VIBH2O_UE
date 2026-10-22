@@ -32,16 +32,32 @@ if unreal.EditorAssetLibrary.does_asset_exist(MAP_PACKAGE):
 created = editor_subsystem.new_level(MAP_PACKAGE)
 assert created, 'creation du niveau impossible'
 
-# --- Lighting. Nothing elaborate: the artistic environment is underwater_bp,
-# which lives outside this plugin. This is just enough to see the bubbles - and
-# to not see a black void, which is what you get when a SkyAtmosphere has no
-# sun declared.
+# --- Lighting.
+#
+# Three layers, from the broadest to the closest:
+#
+#   1. the sun, high overhead, carrying the caustics - the light of the
+#      surface, falling through the water onto everything;
+#   2. the VibH2O light rig, three spots that follow the room whatever its
+#      size and keep the bubbles lit and back-lit (see below);
+#   3. sky light and fog, the ambient water itself.
+#
+# The bubble material is lit, not emissive: it is these lights that give it
+# its highlight, its rim and its glow from within.
+for path in ('/VibH2O/M_VibH2OCaustics', '/VibH2O/M_VibH2OSeabed'):
+    assert unreal.EditorAssetLibrary.does_asset_exist(path), \
+        f'{path} introuvable - lancer make_demo_material.py avant'
+
+# unreal.Rotator takes (roll, pitch, yaw) positionally - NOT the (pitch, yaw,
+# roll) order of C++. Keywords, so the sun points down into the water: an
+# earlier version passed (-42, 25, 0) and got a sun ROLLED by -42 and pitched
+# 25 degrees UP, lighting the room from below.
 sun = actor_subsystem.spawn_actor_from_class(
-    unreal.DirectionalLight, unreal.Vector(0, 0, 900), unreal.Rotator(-42, 25, 0))
+    unreal.DirectionalLight, unreal.Vector(0, 0, 900), unreal.Rotator(roll=0.0, pitch=-68.0, yaw=25.0))
 sun.set_actor_label('Sun')
-# Deliberately dim: the bubbles are emissive, so a darker world makes them
-# read, and deep water is not a bright sky.
-sun.light_component.set_editor_property('intensity', 0.8)
+# Dim on purpose: deep water is not a bright sky, and the rig does the
+# modelling. The sun is here for the caustics and the shafts.
+sun.light_component.set_editor_property('intensity', 1.6)
 # Without this the SkyAtmosphere has nothing to scatter and renders pure black.
 sun.light_component.set_editor_property('atmosphere_sun_light', True)
 # Shafts need the light to take part in the volume, and to cast the shadows
@@ -52,6 +68,10 @@ sun.light_component.set_editor_property('cast_volumetric_shadow', True)
 sun.light_component.set_editor_property('enable_light_shaft_bloom', True)
 sun.light_component.set_editor_property('enable_light_shaft_occlusion', True)
 sun.light_component.set_editor_property('light_color', unreal.Color(196, 226, 235, 255))
+# The caustics ride on the sun as a light function: every surface it reaches -
+# bubbles and seabed alike - gets the moving net of light.
+sun.light_component.set_editor_property(
+    'light_function_material', unreal.load_asset('/VibH2O/M_VibH2OCaustics'))
 
 sky_light = actor_subsystem.spawn_actor_from_class(
     unreal.SkyLight, unreal.Vector(0, 0, 900))
@@ -79,6 +99,18 @@ if fog_component is not None:
     fog_component.set_editor_property('volumetric_fog_extinction_scale', 2.5)
     fog_component.set_editor_property('volumetric_fog_albedo', unreal.Color(120, 190, 210, 255))
     fog_component.set_editor_property('volumetric_fog_scattering_distribution', 0.55)
+
+# --- The seabed: somewhere for the caustics and the bubbles' shadows to land.
+# Without it the room floats in a void and the eye has no scale to hold on to.
+seabed = actor_subsystem.spawn_actor_from_class(
+    unreal.StaticMeshActor, unreal.Vector(400.0, -250.0, -60.0))
+seabed.set_actor_label('Seabed')
+seabed_mesh = seabed.static_mesh_component
+seabed_mesh.set_static_mesh(unreal.load_asset('/Engine/BasicShapes/Plane'))
+# The engine plane is 1 m square: 120 m of floor, out past where the fog
+# swallows it, so no edge ever shows.
+seabed.set_actor_scale3d(unreal.Vector(120.0, 120.0, 1.0))
+seabed_mesh.set_material(0, unreal.load_asset('/VibH2O/M_VibH2OSeabed'))
 
 # --- The installation itself.
 #
@@ -114,11 +146,12 @@ group.set_editor_property('row_min', 0)
 group.set_editor_property('row_max', 1)
 stage.set_editor_property('focus_groups', [group])
 
-# --- The built-in simulator: press Play, the room lives, nothing to wire up.
+# --- The built-in simulator: the room lives, nothing to wire up.
 #
-# It auto-starts, and steps aside on its own the moment real OSC traffic
-# arrives from Max - so this same map serves both the zero-wiring demo and the
-# real rehearsal.
+# It runs in the editor as soon as the map opens - no Play needed, the
+# viewport only has to be in real time - and again in Play, where it steps
+# aside on its own the moment real OSC traffic arrives from Max. This same map
+# therefore serves the lighting work, the zero-wiring demo and the rehearsal.
 simulator = actor_subsystem.spawn_actor_from_class(
     unreal.VibH2OSimulatorActor, unreal.Vector(0.0, 0.0, 100.0))
 simulator.set_actor_label('VibH2O_Simulateur')
@@ -127,6 +160,26 @@ simulator.set_editor_property('rows', 3)
 # A travelling wave rather than the calm room: it sweeps arousal across the
 # whole range, so the colour ramp is visible the moment Play is pressed.
 simulator.set_editor_property('scenario', unreal.VibH2OSimulatorScenario.WAVE)
+simulator.set_editor_property('simulate_in_editor', True)
+
+# --- The light rig: lighting that follows the room.
+#
+# It reads where the bubbles really are every frame - after a resize, a curve,
+# a moved stage or the morph into the school - and re-aims its three spots,
+# backing them off until their cones hold the whole room and raising their
+# power to match, so a bubble is lit the same in a room of 20 as of 200. It
+# finds the stage on its own; its defaults are the key, back and fill below.
+rig = actor_subsystem.spawn_actor_from_class(
+    unreal.VibH2OLightRig, unreal.Vector(400.0, -250.0, 600.0))
+rig.set_actor_label('VibH2O_Lumieres')
+rig.set_editor_property('stage', stage)
+
+# Reflections: a wet, glossy bubble is mostly what it reflects. One capture
+# round the room gives it the water, the floor and its neighbours to mirror.
+capture = actor_subsystem.spawn_actor_from_class(
+    unreal.SphereReflectionCapture, unreal.Vector(400.0, -250.0, 300.0))
+capture.set_actor_label('Reflets')
+capture.capture_component.set_editor_property('influence_radius', 4000.0)
 
 # --- Where to stand.
 #
@@ -157,11 +210,15 @@ ppv.set_editor_property('unbound', True)
 
 settings = ppv.get_editor_property('settings')
 settings.set_editor_property('override_bloom_intensity', True)
-settings.set_editor_property('bloom_intensity', 1.4)
+# Lower than when the bubbles were emissive: bloom now only has to lift the
+# specular highlights and the back-lit rims, not hold up the whole image.
+settings.set_editor_property('bloom_intensity', 0.8)
 settings.set_editor_property('override_auto_exposure_method', True)
 settings.set_editor_property('auto_exposure_method', unreal.AutoExposureMethod.AEM_MANUAL)
 settings.set_editor_property('override_auto_exposure_bias', True)
-settings.set_editor_property('auto_exposure_bias', 11.0)
+# The rig adds a few lux on top of the sun: one stop less than before keeps
+# the highlights from clipping. Tune by eye - it is the one global knob.
+settings.set_editor_property('auto_exposure_bias', 10.0)
 # A cool, slightly desaturated grade: water eats warm light with distance, and
 # the arousal ramp reads better against a cold ground.
 settings.set_editor_property('override_color_saturation', True)

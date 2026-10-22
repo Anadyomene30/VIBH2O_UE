@@ -32,6 +32,32 @@ moyen :
 | 9 | Tableaux et transition | ✅ | Morph capturé à 0, mi-course et 1 ; le cône se lit de profil, teinté par `BlendAlpha`. La logique de banc reste hors périmètre, comme prévu. |
 | 10 | Sequencer et finitions | ✅ | `LS_VibH2O_Recette` (générée par script) anime les trois paramètres ; **lecture vérifiée en jeu** : BlendAlpha passe de 0 à 0,22 sous le seul contrôle de la piste. |
 
+### Passe du 22 octobre 2026 — réalisme, lumière, éditeur — **écrite, PAS encore compilée**
+
+Écrite en session distante, sans moteur. Rien de ce qui suit n'a été compilé ni regardé :
+
+| Demande | Réponse |
+|---|---|
+| Déformation trop forte, pas réaliste | `OrganicDeform` 0,16 → **0,035**, `BeatPopAmount` 0,18 → **0,10**, part de l'excitation réduite. |
+| Bulles sensibles à la lumière | `M_VibH2ODemoBubble` passe d'émissif à **Subsurface** opaque : simulation de transparence par Fresnel, diffusion en contre-jour, reflet mouillé. Battement gardé en pulsation interne discrète. |
+| De belles lumières | Soleil remis **vers le bas**. Il était tourné vers le haut : `unreal.Rotator` prend (roll, pitch, yaw). Caustiques en *light function*, fond marin, capture de reflets, Lumen, rig de trois projecteurs. |
+| L'éclairage doit s'adapter au nombre de bulles | `AVibH2OLightRig` : cadrage, recul et puissance recalculés à chaque image depuis les bulles affichées, lissés. |
+| Voir sans être en Play | Doublure de subsystem propre au monde éditeur ; simulateur et scène y tournent, avec les **vraies bulles**. |
+
+À faire sur la machine, dans l'ordre :
+
+1. Compiler l'éditeur **et** la cible Game (les commandes sont plus bas). Le code nouveau touche à
+   `WITH_EDITOR`, c'est exactement là qu'une cible casse et pas l'autre.
+2. Lancer les tests. Ils doivent être **15**, dont le nouveau
+   `VibH2O.Integration.PrevisualisationEditeur`.
+3. Régénérer les matériaux (`make_demo_material.py`), **puis** la carte (`make_demo_map.py`). La
+   carte a besoin des nouveaux matériaux.
+4. Ouvrir la carte, viewport en temps réel (`Ctrl + R`) : la salle doit vivre sans Play.
+5. Juger à l'œil, puis régler : exposition (`PostProcess`), niveaux du rig, taille des caustiques
+   (`ridge_of` dans `make_demo_material.py`).
+6. Remesurer les images par seconde (sweep, phase 14). Lumen et les ombres des projecteurs
+   coûtent plus que l'ancien éclairage. Les 517 images/s du tableau ci-dessus datent d'avant.
+
 ### Rejouer les vérifications
 
 ```bash

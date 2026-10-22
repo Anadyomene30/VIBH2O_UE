@@ -30,9 +30,27 @@ immédiatement, sans être enfermé dans la caméra du jeu.
 
 ### Et sans rien lancer du tout
 
-L'acteur de scène se dessine aussi **dans le viewport de l'éditeur**, sans Play ni Simulate : une
-sphère par siège, avec une flèche d'orientation. Pratique pour régler la forme de la salle. Ce sont
-des repères de débogage, pas des bulles — pas de matériau, pas de vraies données.
+**Ouvrez la carte : la salle vit déjà dans l'éditeur.** Sans Play ni Simulate, le simulateur
+alimente une doublure du subsystem propre à l'éditeur, et l'acteur de scène y crée ses **vraies
+bulles** — matériau, battement, couleurs, éclairage, données simulées. C'est le mode pour régler
+les lumières et l'aspect : on voit le résultat final en tournant autour.
+
+Une seule condition : le viewport doit être **en temps réel** (`Ctrl + R`, ou le menu ☰ du
+viewport → *Realtime*). Sinon rien ne bouge.
+
+Ces bulles d'éditeur sont provisoires : jamais enregistrées dans le niveau, absentes de l'Outliner,
+et **non sélectionnables** — un clic dans la salle ne les attrape pas. Pour régler la salle,
+sélectionner `VibH2O_Stage` dans l'Outliner.
+
+- Couper : décocher `Simuler dans l'editeur` sur le simulateur (la salle se vide), ou
+  `Bulles vivantes dans l'editeur` sur la scène.
+- Changer de scénario, de nombre de colonnes ou de rangées sur le simulateur : la salle suit
+  immédiatement, toujours sans Play.
+- La doublure n'ouvre **jamais** le port réseau : Play démarre toujours un vrai subsystem, et Max
+  l'atteint normalement.
+
+Sans simulateur dans le niveau, l'acteur de scène retombe sur l'ancien aperçu : une sphère de
+débogage par siège, avec une flèche d'orientation.
 
 ---
 
@@ -69,6 +87,39 @@ une bulle s'écarte de sa place. **Elle ne peut mathématiquement pas atteindre 
 battement. `Organic Deform` et `Organic Speed` règlent la respiration de la silhouette : chaque
 bulle se déforme sur trois axes à des cadences légèrement différentes, avec une phase qui lui est
 propre — aucune n'est jamais une sphère.
+
+**Pour un rendu réaliste, rester bas** : `Organic Deform` vaut 0,035 par défaut (3,5 %). Au-delà de
+0,1, la bulle s'étire comme du caoutchouc. `Beat Pop Amount` vaut 0,10 : un gonflement au pouls,
+pas un rebond de dessin animé.
+
+### `VibH2O_Lumieres` — l'éclairage qui suit la salle
+
+L'acteur **`VibH2O — Rig de lumieres`** porte trois projecteurs :
+- la **face** (`Key`), légèrement chaude, de devant et d'en haut ;
+- le **contre-jour** (`Back`), froid et fort, de derrière : c'est lui qui fait briller les bulles
+  de l'intérieur et dessine leur liseré ;
+- le **débouchage** (`Fill`), bas, bleu profond, pour que les ombres ne tombent pas au noir.
+
+**Il s'adapte au nombre de bulles affichées.** À chaque image, il lit où sont réellement les
+bulles et recule chaque projecteur jusqu'à ce que son cône couvre toute la salle. Il compense
+aussi la distance (loi en carré inverse) : une bulle reçoit la même lumière dans une salle de 20
+places que de 200. La salle passe de 7 × 3 aux 23 × 4 d'Alès, se courbe, se déplace ou se morphe
+en banc : les lumières suivent en glissant, sans à-coup.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| `Azimuth` / `Elevation` | D'où vient la lumière, **par rapport à la scène** : tourner l'installation tourne l'éclairage avec. |
+| `Illuminance` | La lumière **reçue par les bulles**, en lux — pas la puissance de la lampe, que le rig calcule. |
+| `Cone Angle` | Ouverture du faisceau. Plus large = plus proche et plus doux. |
+| `Volumetric Scattering` | Combien le faisceau se voit dans le brouillard. |
+| `Master Intensity` | Niveau général des trois — à animer dans Sequencer pour un fondu. |
+| `Follow Focus` | Coché : les lumières se resserrent sur le groupe de focus actif, comme une poursuite. |
+| `Follow Speed` | Vitesse à laquelle les lumières suivent un changement de salle. 0 = immédiat. |
+
+Le soleil, lui, porte les **caustiques** : le filet de lumière ondulant que la surface projette
+sous l'eau. Il tombe sur les bulles et sur le fond marin. Le réglage d'exposition global est dans
+`PostProcess` → `Exposure Compensation`.
+
 
 **`Show Seat Numbers`** écrit le numéro de chaque personne au-dessus de sa bulle. C'est ainsi qu'on
 vérifie un plan de salle d'un coup d'œil.

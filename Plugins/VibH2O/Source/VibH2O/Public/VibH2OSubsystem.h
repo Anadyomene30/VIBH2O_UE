@@ -80,9 +80,39 @@ public:
 	virtual bool IsTickable() const override;
 	virtual ETickableTickType GetTickableTickType() const override;
 
-	/** Shortcut from any world context. */
+	/**
+	 * Shortcut from any world context.
+	 *
+	 * In the editor world, outside Play, there is no game instance and so no
+	 * real subsystem: this returns the editor stand-in instead (see
+	 * GetEditorPreview), so the stage actor and the simulator run the very
+	 * same code with nothing pressed.
+	 */
 	UFUNCTION(BlueprintPure, Category = "VibH2O", meta = (WorldContext = "WorldContextObject"))
 	static UVibH2OSubsystem* Get(const UObject* WorldContextObject);
+
+#if WITH_EDITOR
+	/**
+	 * The stand-in subsystem of an editor world, created on first request.
+	 *
+	 * It is a full subsystem - burst settling, beats, smoothing, staleness,
+	 * averages - minus the socket: it never listens, so it cannot steal the
+	 * port from a Play session started in the same editor. Data reaches it
+	 * only through InjectOscMessage, which is what the simulator uses.
+	 * Returns nullptr for any world that is not a plain editor world.
+	 */
+	static UVibH2OSubsystem* GetEditorPreview(UWorld* World);
+
+	/**
+	 * Advances the editor stand-in. The engine never ticks it: the actors that
+	 * use it do, and this guard keeps two of them from ticking it twice in
+	 * the same frame.
+	 */
+	void TickEditorPreview(float DeltaTime);
+#endif
+
+	/** True for the editor stand-in, false for the real subsystem. */
+	bool IsEditorPreview() const { return bEditorPreview; }
 
 	// --------------------------------------------------------------- Network
 
@@ -242,6 +272,9 @@ public:
 	bool bShowDebugOverlay = false;
 
 private:
+	/** The built-in effects, all enabled. Shared by both kinds of subsystem. */
+	void RegisterBuiltInEffects();
+
 	void DrainQueue();
 	void HandleMessage(const FVibH2OOscMessage& Message);
 
@@ -319,4 +352,9 @@ private:
 
 	/** Beat messages received on the wired-but-unused input. */
 	int32 ExternalBeatCount = 0;
+
+	bool bEditorPreview = false;
+
+	/** Engine frame of the last editor-preview tick, against double ticking. */
+	uint64 LastPreviewTickFrame = 0;
 };

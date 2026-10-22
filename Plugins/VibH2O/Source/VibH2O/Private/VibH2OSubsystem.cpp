@@ -5,6 +5,8 @@
 #include "Engine/World.h"
 #include "Layout/VibH2OLayoutMath.h"
 #include "Osc/VibH2OOscReceiver.h"
+#include "UObject/ObjectKey.h"
+#include "UObject/Package.h"
 #include "VibH2OModule.h"
 #include "VibH2OSettings.h"
 
@@ -97,6 +99,16 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
+	RegisterBuiltInEffects();
+
+	if (UVibH2OSettings::Get()->bAutoStartReceiver)
+	{
+		StartListening();
+	}
+}
+
+void UVibH2OSubsystem::RegisterBuiltInEffects()
+{
 	// The built-in effects exist from the start, enabled. An unknown effect
 	// queried later is considered enabled too: a misspelt name must not
 	// silently switch something off.
@@ -106,11 +118,6 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	EffectStates.Add(VibH2OEffects::Tint, true);
 	EffectStates.Add(VibH2OEffects::Focus, true);
 	EffectStates.Add(VibH2OEffects::Scale, true);
-
-	if (UVibH2OSettings::Get()->bAutoStartReceiver)
-	{
-		StartListening();
-	}
 }
 
 void UVibH2OSubsystem::Deinitialize()
@@ -127,14 +134,119 @@ UVibH2OSubsystem* UVibH2OSubsystem::Get(const UObject* WorldContextObject)
 	{
 		return nullptr;
 	}
-	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
 	if (World == nullptr)
 	{
 		return nullptr;
 	}
-	UGameInstance* GameInstance = World->GetGameInstance();
-	return GameInstance ? GameInstance->GetSubsystem<UVibH2OSubsystem>() : nullptr;
+	if (UGameInstance* GameInstance = World->GetGameInstance())
+	{
+		return GameInstance->GetSubsystem<UVibH2OSubsystem>();
+	}
+#if WITH_EDITOR
+	return GetEditorPreview(World);
+#else
+	return nullptr;
+#endif
 }
+
+#if WITH_EDITOR
+namespace VibH2OEditorPreviewInternal
+{
+	/**
+	 * One stand-in per editor world. Weak pointers plus rooting rather than
+	 * TStrongObjectPtr: a static holding strong pointers would be destroyed
+	 * after the object system at exit, which is a crash on quit.
+	 */
+	struct FEntry
+	{
+		TWeakObjectPtr<UGameInstance> Outer;
+		TWeakObjectPtr<UVibH2OSubsystem> Subsystem;
+	};
+
+	static TMap<TObjectKey<UWorld>, FEntry> Entries;
+	static FDelegateHandle CleanupHandle;
+
+	static void Release(FEntry& Entry)
+	{
+		if (UVibH2OSubsystem* Subsystem = Entry.Subsystem.Get())
+		{
+			Subsystem->RemoveFromRoot();
+		}
+		if (UGameInstance* Outer = Entry.Outer.Get())
+		{
+			Outer->RemoveFromRoot();
+		}
+	}
+}
+
+UVibH2OSubsystem* UVibH2OSubsystem::GetEditorPreview(UWorld* World)
+{
+	using namespace VibH2OEditorPreviewInternal;
+
+	// Plain editor worlds only: the Blueprint editor's preview worlds and the
+	// like have no business simulating an audience.
+	if (World == nullptr || World->WorldType != EWorldType::Editor)
+	{
+		return nullptr;
+	}
+
+	if (FEntry* Found = Entries.Find(TObjectKey<UWorld>(World)))
+	{
+		if (UVibH2OSubsystem* Existing = Found->Subsystem.Get())
+		{
+			return Existing;
+		}
+		Release(*Found);
+		Entries.Remove(TObjectKey<UWorld>(World));
+	}
+
+	if (!CleanupHandle.IsValid())
+	{
+		// Loading another map tears the old world down: its stand-in goes with
+		// it, room and individuals included.
+		CleanupHandle = FWorldDelegates::OnWorldCleanup.AddLambda(
+			[](UWorld* CleanedWorld, bool /*bSessionEnded*/, bool /*bCleanupResources*/)
+			{
+				if (FEntry* Entry = Entries.Find(TObjectKey<UWorld>(CleanedWorld)))
+				{
+					Release(*Entry);
+					Entries.Remove(TObjectKey<UWorld>(CleanedWorld));
+				}
+			});
+	}
+
+	// A game-instance subsystem must live inside a game instance. A bare,
+	// never-initialised one is enough - the subsystem never uses it, which is
+	// also how the integration tests build theirs.
+	UGameInstance* Outer = NewObject<UGameInstance>(GetTransientPackage(), NAME_None, RF_Transient);
+	UVibH2OSubsystem* Subsystem = NewObject<UVibH2OSubsystem>(Outer, NAME_None, RF_Transient);
+	Outer->AddToRoot();
+	Subsystem->AddToRoot();
+
+	// No Initialize(): that would start the receiver. Effects only.
+	Subsystem->bEditorPreview = true;
+	Subsystem->RegisterBuiltInEffects();
+
+	FEntry Entry;
+	Entry.Outer = Outer;
+	Entry.Subsystem = Subsystem;
+	Entries.Add(TObjectKey<UWorld>(World), Entry);
+
+	UE_LOG(LogVibH2O, Display, TEXT("VibH2O: subsystem de previsualisation cree pour l'editeur (aucune ecoute reseau)."));
+	return Subsystem;
+}
+
+void UVibH2OSubsystem::TickEditorPreview(float DeltaTime)
+{
+	if (!bEditorPreview || LastPreviewTickFrame == GFrameCounter)
+	{
+		return;
+	}
+	LastPreviewTickFrame = GFrameCounter;
+	Tick(DeltaTime);
+}
+#endif
 
 // ----------------------------------------------------------------- Network
 
@@ -195,7 +307,9 @@ TStatId UVibH2OSubsystem::GetStatId() const
 
 bool UVibH2OSubsystem::IsTickable() const
 {
-	return !IsTemplate();
+	// The editor stand-in is ticked by the actors that use it, never by the
+	// engine.
+	return !IsTemplate() && !bEditorPreview;
 }
 
 ETickableTickType UVibH2OSubsystem::GetTickableTickType() const
