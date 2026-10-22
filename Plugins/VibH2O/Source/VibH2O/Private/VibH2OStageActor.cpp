@@ -43,17 +43,7 @@ void AVibH2OStageActor::BeginPlay()
 
 	if (UVibH2OSubsystem* Subsystem = GetSubsystem())
 	{
-		Subsystem->OnRoomChanged.AddDynamic(this, &AVibH2OStageActor::HandleRoomChanged);
-		Subsystem->OnOscBlendAlphaChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
-		Subsystem->OnOscFocusAmountChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
-		Subsystem->OnOscFocusGroupChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
-		bBoundToSubsystem = true;
-
-		// A room may have arrived before this actor started up.
-		if (Subsystem->HasRoom())
-		{
-			HandleRoomChanged(Subsystem->GetRoomRef());
-		}
+		BindToSubsystem(Subsystem);
 	}
 	else
 	{
@@ -63,18 +53,55 @@ void AVibH2OStageActor::BeginPlay()
 
 void AVibH2OStageActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (bBoundToSubsystem)
-	{
-		if (UVibH2OSubsystem* Subsystem = GetSubsystem())
-		{
-			Subsystem->OnRoomChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleRoomChanged);
-			Subsystem->OnOscBlendAlphaChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
-			Subsystem->OnOscFocusAmountChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
-			Subsystem->OnOscFocusGroupChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
-		}
-		bBoundToSubsystem = false;
-	}
+	UnbindFromSubsystem();
+	DestroyBubbles();
+	Super::EndPlay(EndPlayReason);
+}
 
+void AVibH2OStageActor::Destroyed()
+{
+	// Deleting the stage in the editor: its live bubbles go with it, rather
+	// than being left floating, ownerless, until the map is reloaded.
+	UnbindFromSubsystem();
+	DestroyBubbles();
+	Super::Destroyed();
+}
+
+void AVibH2OStageActor::BindToSubsystem(UVibH2OSubsystem* Subsystem)
+{
+	if (Subsystem == nullptr || BoundSubsystem.Get() == Subsystem)
+	{
+		return;
+	}
+	UnbindFromSubsystem();
+
+	Subsystem->OnRoomChanged.AddDynamic(this, &AVibH2OStageActor::HandleRoomChanged);
+	Subsystem->OnOscBlendAlphaChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
+	Subsystem->OnOscFocusAmountChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
+	Subsystem->OnOscFocusGroupChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
+	BoundSubsystem = Subsystem;
+
+	// A room may have arrived before this actor started up.
+	if (Subsystem->HasRoom())
+	{
+		HandleRoomChanged(Subsystem->GetRoomRef());
+	}
+}
+
+void AVibH2OStageActor::UnbindFromSubsystem()
+{
+	if (UVibH2OSubsystem* Subsystem = BoundSubsystem.Get())
+	{
+		Subsystem->OnRoomChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleRoomChanged);
+		Subsystem->OnOscBlendAlphaChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
+		Subsystem->OnOscFocusAmountChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
+		Subsystem->OnOscFocusGroupChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
+	}
+	BoundSubsystem.Reset();
+}
+
+void AVibH2OStageActor::DestroyBubbles()
+{
 	for (const TPair<int32, TObjectPtr<AVibH2OBubbleActor>>& Entry : Bubbles)
 	{
 		if (IsValid(Entry.Value))
@@ -83,15 +110,13 @@ void AVibH2OStageActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 	Bubbles.Reset();
-
-	Super::EndPlay(EndPlayReason);
 }
 
 bool AVibH2OStageActor::ShouldTickIfViewportsOnly() const
 {
-	// Ticking in the editor serves only to draw the preview: no bubble is
-	// instanced there.
-	return bPreviewInEditor;
+	// Ticking in the editor drives the live bubbles, or failing that draws the
+	// debug preview.
+	return bPreviewInEditor || bLiveInEditor;
 }
 
 #if WITH_EDITOR
@@ -103,6 +128,15 @@ void AVibH2OStageActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(AVibH2OStageActor, ActiveFocusGroup))
 	{
 		OnFocusGroupChanged.Broadcast(ActiveFocusGroup);
+	}
+	else if (PropertyName == GET_MEMBER_NAME_CHECKED(AVibH2OStageActor, bLiveInEditor) && !bLiveInEditor)
+	{
+		const UWorld* World = GetWorld();
+		if (World != nullptr && !World->IsGameWorld())
+		{
+			UnbindFromSubsystem();
+			DestroyBubbles();
+		}
 	}
 }
 #endif
@@ -148,14 +182,7 @@ void AVibH2OStageActor::RebuildNow()
 	{
 		// A forced rebuild destroys everything, then reconciles against an
 		// empty map: that is exactly the creation path.
-		for (const TPair<int32, TObjectPtr<AVibH2OBubbleActor>>& Entry : Bubbles)
-		{
-			if (IsValid(Entry.Value))
-			{
-				Entry.Value->Destroy();
-			}
-		}
-		Bubbles.Reset();
+		DestroyBubbles();
 		ReconcileBubbles(Subsystem->GetRoomRef());
 	}
 }
@@ -209,6 +236,16 @@ void AVibH2OStageActor::ReconcileBubbles(const FVibH2ORoomSnapshot& NewRoom)
 		SpawnParams.Owner = this;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnParams.ObjectFlags |= RF_Transient;
+#if WITH_EDITOR
+		if (!World->IsGameWorld())
+		{
+			// Editor bubbles are scaffolding: no transaction, no dirty level,
+			// no outliner entry, and never written into an actor package.
+			SpawnParams.bTemporaryEditorActor = true;
+			SpawnParams.bHideFromSceneOutliner = true;
+			SpawnParams.bCreateActorPackage = false;
+		}
+#endif
 
 		AVibH2OBubbleActor* Bubble = World->SpawnActor<AVibH2OBubbleActor>(
 			const_cast<UClass*>(SpawnClass), GetActorTransform(), SpawnParams);
@@ -259,15 +296,49 @@ void AVibH2OStageActor::Tick(float DeltaSeconds)
 
 	StageTime += DeltaSeconds;
 
-	if (GetWorld() != nullptr && GetWorld()->IsGameWorld())
+	const UWorld* World = GetWorld();
+	if (World != nullptr && World->IsGameWorld())
 	{
 		UpdateBubbles(DeltaSeconds);
+		return;
 	}
+
 #if WITH_EDITOR
-	else if (bPreviewInEditor)
+	if (bLiveInEditor && TickEditorLive(DeltaSeconds))
+	{
+		return;
+	}
+	if (bPreviewInEditor)
 	{
 		DrawEditorPreview();
 	}
+#endif
+}
+
+bool AVibH2OStageActor::TickEditorLive(float DeltaSeconds)
+{
+#if WITH_EDITOR
+	// GetSubsystem() hands back the editor stand-in here, and nullptr for
+	// worlds that should not simulate (Blueprint editor previews).
+	UVibH2OSubsystem* Subsystem = GetSubsystem();
+	if (Subsystem == nullptr || !Subsystem->IsEditorPreview())
+	{
+		return false;
+	}
+
+	// Ticking it settles a pending room plan, which raises OnRoomChanged and
+	// creates the bubbles through the very path Play uses.
+	BindToSubsystem(Subsystem);
+	Subsystem->TickEditorPreview(DeltaSeconds);
+
+	if (Bubbles.Num() == 0)
+	{
+		return false;
+	}
+	UpdateBubbles(DeltaSeconds);
+	return true;
+#else
+	return false;
 #endif
 }
 
@@ -339,6 +410,11 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		{
 			FRotator ViewRotation = FRotator::ZeroRotator;
 			PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+		}
+		else if (GetWorld()->ViewLocationsRenderedLastFrame.Num() > 0)
+		{
+			// No player in the editor: the viewport camera stands in for one.
+			ViewLocation = GetWorld()->ViewLocationsRenderedLastFrame[0];
 		}
 	}
 
@@ -438,7 +514,9 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		FVector ScaleVector(Scale);
 		if (bScaleEnabled && OrganicDeform > 0.0f)
 		{
-			const float Amount = OrganicDeform * (0.6f + State.Excitation * 0.9f);
+			// Arousal adds to the restlessness without doubling it: excited is
+			// livelier, not a different material.
+			const float Amount = OrganicDeform * (0.7f + State.Excitation * 0.6f);
 			const float W = StageTime * OrganicSpeed * 2.0f * PI;
 			const float P0 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 1) * 2.0f * PI;
 			const float P1 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 2) * 2.0f * PI;
@@ -556,9 +634,17 @@ float AVibH2OStageActor::ComputeFocusMask(const FVibH2OSeat& Seat) const
 
 FBox AVibH2OStageActor::GetFocusBounds() const
 {
-	FBox Bounds(ForceInit);
+	return ComputeBubbleBounds(FindFocusGroup(ActiveFocusGroup));
+}
 
-	const FVibH2OFocusGroup* Group = FindFocusGroup(ActiveFocusGroup);
+FBox AVibH2OStageActor::GetRoomBounds() const
+{
+	return ComputeBubbleBounds(nullptr);
+}
+
+FBox AVibH2OStageActor::ComputeBubbleBounds(const FVibH2OFocusGroup* Group) const
+{
+	FBox Bounds(ForceInit);
 
 	for (const FVibH2OSeat& Seat : Room.Seats)
 	{

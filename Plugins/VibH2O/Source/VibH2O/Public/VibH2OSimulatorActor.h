@@ -58,6 +58,8 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual bool ShouldTickIfViewportsOnly() const override;
+	virtual void Destroyed() override;
 
 	// ================================================== Room plan
 
@@ -122,6 +124,17 @@ public:
 	bool bSimulateOnBeginPlay = true;
 
 	/**
+	 * Simulate in the editor too, with no Play: the room lives in the
+	 * viewport while it is being lit and dressed.
+	 *
+	 * The data goes to the editor's own stand-in subsystem, which never opens
+	 * the network port - so pressing Play still gets a clean, real subsystem,
+	 * and Max still reaches it. Untick to freeze the editor room and clear it.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler dans l'editeur"))
+	bool bSimulateInEditor = true;
+
+	/**
 	 * Step aside when real network data arrives.
 	 *
 	 * The whole point of this actor is to be replaced by the real Max patch
@@ -165,6 +178,11 @@ public:
 #endif
 
 private:
+#if WITH_EDITOR
+	/** Stops feeding the editor stand-in and empties its room. */
+	void StopEditorSimulation();
+#endif
+
 	UVibH2OSubsystem* GetSubsystem() const;
 
 	void FeedData();

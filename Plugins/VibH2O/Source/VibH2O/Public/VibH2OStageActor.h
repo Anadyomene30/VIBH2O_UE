@@ -37,6 +37,7 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual bool ShouldTickIfViewportsOnly() const override;
+	virtual void Destroyed() override;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -56,9 +57,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float ScalePerExcitation = 0.35f;
 
-	/** Amplitude of the "pop" on each beat. */
+	/**
+	 * Amplitude of the "pop" on each beat. Kept small: a living thing swells
+	 * with its pulse, it does not bounce like a cartoon.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
-	float BeatPopAmount = 0.18f;
+	float BeatPopAmount = 0.10f;
 
 	/** Colour at rest, when no gradient is supplied. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles")
@@ -80,12 +84,16 @@ public:
 	 * rates, with a phase of its own, so no two are the same shape at the same
 	 * instant - and arousal deepens it.
 	 *
+	 * Realism lives in the low values. A few percent reads as a soft body held
+	 * by water; past ten the bubble visibly stretches like rubber, which is
+	 * what the earlier default of 0.16 did.
+	 *
 	 * This lives here rather than in the material because Unreal 5.5 does not
 	 * expose the world position offset input to Python, so a generated material
 	 * cannot reach it.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.6"))
-	float OrganicDeform = 0.16f;
+	float OrganicDeform = 0.035f;
 
 	/** How fast that deformation breathes, in cycles per second. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
@@ -301,6 +309,17 @@ public:
 	FVector GetFocusCenter() const;
 
 	/**
+	 * Bounds of every bubble, in WORLD space, focus or not.
+	 *
+	 * Taken from where the bubbles actually are this frame, so it follows a
+	 * resize, a curvature, a moved stage and the morph into the school alike -
+	 * which is what lets a light rig keep the whole room framed. Falls back to
+	 * a small box round the stage when there is no bubble.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O")
+	FBox GetRoomBounds() const;
+
+	/**
 	 * Distance at which a camera of the given horizontal field of view frames
 	 * the whole group.
 	 *
@@ -342,6 +361,21 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation")
 	bool bPreviewInEditor = true;
+
+	/**
+	 * Real bubbles in the editor, no Play needed.
+	 *
+	 * As soon as something feeds the editor's stand-in subsystem - the
+	 * simulator actor does, out of the box - the stage creates its real
+	 * bubbles, with their material, their lighting and the full data path,
+	 * right in the editor viewport. They are temporary: never saved with the
+	 * level, absent from the outliner, and not selectable, so a click in the
+	 * room cannot grab one by mistake. Select the stage from the outliner.
+	 *
+	 * The viewport must be in real time (Ctrl+R) for anything to move.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation", meta = (DisplayName = "Bulles vivantes dans l'editeur"))
+	bool bLiveInEditor = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Previsualisation", meta = (ClampMin = "1", ClampMax = "64"))
 	int32 PreviewColumns = 7;
@@ -414,6 +448,20 @@ protected:
 	void HandleOscFocusGroup(FName GroupName);
 
 private:
+	void BindToSubsystem(UVibH2OSubsystem* Subsystem);
+	void UnbindFromSubsystem();
+	void DestroyBubbles();
+
+	/**
+	 * Editor-world tick: advances the stand-in subsystem and moves the real
+	 * bubbles. Returns false when there is nothing live to show, so the
+	 * debug-drawn preview can take over.
+	 */
+	bool TickEditorLive(float DeltaSeconds);
+
+	/** Bounds of the bubbles that pass the filter, padded by a bubble radius. */
+	FBox ComputeBubbleBounds(const FVibH2OFocusGroup* Group) const;
+
 	void ReconcileBubbles(const FVibH2ORoomSnapshot& NewRoom);
 	void UpdateBubbles(float DeltaSeconds);
 	void DrawEditorPreview() const;
@@ -447,5 +495,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "VibH2O", meta = (AllowPrivateAccess = "true"))
 	float StageTime = 0.0f;
 
-	bool bBoundToSubsystem = false;
+	/**
+	 * The subsystem whose delegates we are bound to. Kept rather than looked up
+	 * again on unbind: in the editor it is the stand-in, which a world cleanup
+	 * may already have replaced.
+	 */
+	TWeakObjectPtr<UVibH2OSubsystem> BoundSubsystem;
 };

@@ -143,8 +143,45 @@ void AVibH2OSimulatorActor::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	{
 		SendRoomNow();
 	}
+
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(AVibH2OSimulatorActor, bSimulateInEditor)
+		&& !bSimulateInEditor)
+	{
+		StopEditorSimulation();
+	}
+}
+
+void AVibH2OSimulatorActor::StopEditorSimulation()
+{
+	const UWorld* World = GetWorld();
+	if (World == nullptr || World->WorldType != EWorldType::Editor)
+	{
+		return;
+	}
+	StopSimulation();
+	// Clearing the stand-in removes the editor bubbles: a frozen room would
+	// pass for a live one, and quiet sensors would grey it out a few seconds
+	// later anyway.
+	if (UVibH2OSubsystem* Subsystem = GetSubsystem())
+	{
+		Subsystem->ClearRoom();
+	}
 }
 #endif
+
+bool AVibH2OSimulatorActor::ShouldTickIfViewportsOnly() const
+{
+	return bSimulateInEditor;
+}
+
+void AVibH2OSimulatorActor::Destroyed()
+{
+#if WITH_EDITOR
+	// Deleting the simulator in the editor empties the editor room with it.
+	StopEditorSimulation();
+#endif
+	Super::Destroyed();
+}
 
 bool AVibH2OSimulatorActor::IsSeatEmpty(int32 Column, int32 Row, int32 SeatIndex) const
 {
@@ -296,7 +333,39 @@ void AVibH2OSimulatorActor::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	UWorld* World = GetWorld();
-	if (!bSimulating || World == nullptr || !World->IsGameWorld())
+	if (World == nullptr)
+	{
+		return;
+	}
+
+#if WITH_EDITOR
+	if (World->WorldType == EWorldType::Editor)
+	{
+		if (!bSimulateInEditor)
+		{
+			return;
+		}
+		// No BeginPlay in the editor: the first tick starts the audience.
+		if (!bSimulating)
+		{
+			StartSimulation();
+		}
+		// Tick the stand-in from here as well as from the stage actor, so the
+		// room plan settles even before a stage exists. It ticks once a frame
+		// whichever of the two gets there first.
+		if (UVibH2OSubsystem* Preview = GetSubsystem())
+		{
+			Preview->TickEditorPreview(DeltaSeconds);
+		}
+	}
+	else
+#endif
+	if (!World->IsGameWorld())
+	{
+		return;
+	}
+
+	if (!bSimulating)
 	{
 		return;
 	}

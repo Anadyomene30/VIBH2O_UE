@@ -10,6 +10,7 @@
 #include "Common/UdpSocketBuilder.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Misc/ScopeExit.h"
 #include "Osc/VibH2OOscReceiver.h"
 #include "SocketSubsystem.h"
@@ -430,5 +431,78 @@ bool FVibH2OSubsystemPipelineTest::RunTest(const FString& Parameters)
 	Subsystem->StopListening();
 	return true;
 }
+
+// ---------------------------------------------------------------------------
+// The editor stand-in: real bubbles without Play rest on it.
+// ---------------------------------------------------------------------------
+
+#if WITH_EDITOR
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVibH2OEditorPreviewTest,
+	"VibH2O.Integration.PrevisualisationEditeur",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVibH2OEditorPreviewTest::RunTest(const FString& Parameters)
+{
+	using namespace VibH2OIntegrationUtils;
+
+	UVibH2OSettings* Settings = GetMutableDefault<UVibH2OSettings>();
+	const float SavedSettle = Settings->RoomMappingSettleSeconds;
+	Settings->RoomMappingSettleSeconds = 0.0f;
+	ON_SCOPE_EXIT
+	{
+		Settings->RoomMappingSettleSeconds = SavedSettle;
+	};
+
+	// A world of its own rather than the editor's: the test must not leave a
+	// room behind in the level Dimitri has open.
+	UWorld* EditorWorld = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("VibH2O_TestPrevisualisation"));
+	if (EditorWorld == nullptr)
+	{
+		AddError(TEXT("Impossible de creer un monde editeur de test."));
+		return false;
+	}
+	ON_SCOPE_EXIT
+	{
+		EditorWorld->DestroyWorld(false);
+	};
+
+	UVibH2OSubsystem* Preview = UVibH2OSubsystem::Get(EditorWorld);
+	if (!TestNotNull(TEXT("Un monde editeur obtient un subsystem de previsualisation"), Preview))
+	{
+		return false;
+	}
+	TestTrue(TEXT("C'est bien la doublure editeur"), Preview->IsEditorPreview());
+	// The whole point: the editor must never hold the port Play needs.
+	TestFalse(TEXT("La doublure n'ecoute pas le reseau"), Preview->IsListening());
+	TestTrue(TEXT("Une seule doublure par monde"), UVibH2OSubsystem::Get(EditorWorld) == Preview);
+	TestFalse(TEXT("Le moteur ne la fait pas ticker lui-meme"), Preview->IsTickable());
+
+	// Same burst-and-settle path as the network: a 3 x 2 room, one empty seat.
+	Preview->InjectOscMessage(MakeMessageInt(TEXT("/RoomMapping/columns/"), 3));
+	Preview->InjectOscMessage(MakeMessageInt(TEXT("/RoomMapping/rows/"), 2));
+	for (int32 SeatIndex = 1; SeatIndex <= 6; ++SeatIndex)
+	{
+		Preview->InjectOscMessage(MakeMessageInt(FString::Printf(TEXT("/RoomMapping/%d/"), SeatIndex), SeatIndex == 4 ? 0 : 200 + SeatIndex));
+	}
+	Preview->TickEditorPreview(1.0f / 60.0f);
+
+	TestTrue(TEXT("La salle se construit sans Play"), Preview->HasRoom());
+	TestEqual(TEXT("Cinq sieges occupes"), Preview->GetRoomRef().GetOccupiedCount(), 5);
+
+	// A game world with no game instance gets nothing: only plain editor
+	// worlds simulate.
+	UWorld* GameWorld = UWorld::CreateWorld(EWorldType::Game, false, TEXT("VibH2O_TestJeuSansInstance"));
+	if (GameWorld != nullptr)
+	{
+		TestNull(TEXT("Pas de doublure hors du monde editeur"), UVibH2OSubsystem::Get(GameWorld));
+		GameWorld->DestroyWorld(false);
+	}
+
+	return true;
+}
+
+#endif // WITH_EDITOR
 
 #endif // WITH_DEV_AUTOMATION_TESTS

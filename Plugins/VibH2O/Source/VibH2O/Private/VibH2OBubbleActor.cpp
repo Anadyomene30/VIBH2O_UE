@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -60,6 +61,18 @@ void AVibH2OBubbleActor::BeginPlay()
 	Super::BeginPlay();
 	GetOrCreateMaterial();
 }
+
+#if WITH_EDITOR
+bool AVibH2OBubbleActor::IsSelectable() const
+{
+	const UWorld* World = GetWorld();
+	if (World != nullptr && !World->IsGameWorld() && HasAnyFlags(RF_Transient))
+	{
+		return false;
+	}
+	return Super::IsSelectable();
+}
+#endif
 
 UMaterialInstanceDynamic* AVibH2OBubbleActor::GetOrCreateMaterial()
 {
