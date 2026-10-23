@@ -393,6 +393,16 @@ bool FVibH2ORemoteServer::ServiceClient(FClient& Client)
 		return true;
 	}
 
+	// Commands need a header of our own. A browser cannot add one to a
+	// cross-site request without a preflight this server never answers: a
+	// web page open on another machine of the show network cannot drive the
+	// room. The remote's own page sends it.
+	if (Path == TEXT("/api/cmd") && !Head.Contains(TEXT("\nX-VibH2O:"), ESearchCase::IgnoreCase))
+	{
+		SendText(Client.Socket, 403, TEXT("en-tete X-VibH2O attendu"));
+		return true;
+	}
+
 	const int32 BodyStart = HeadEnd + 4;
 	if (Client.Buffer.Num() < BodyStart + ContentLength)
 	{

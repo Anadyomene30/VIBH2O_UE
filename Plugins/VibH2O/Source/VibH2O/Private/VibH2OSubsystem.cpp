@@ -475,22 +475,55 @@ void UVibH2OSubsystem::DrainQueue()
 	}
 
 	// The iPad's commands join the very same path as Max's: one control
-	// route, whatever sent it.
-	if (RemoteServer.IsValid())
+	// route, whatever sent it. Bounded per frame, so a flood from the LAN
+	// costs a few frames of latency, never a hitch; the rest waits its turn.
+	constexpr int32 MaxRemoteCommandsPerFrame = 256;
+	int32 RemoteHandled = 0;
+	while (RemoteHandled < MaxRemoteCommandsPerFrame && RemoteServer.IsValid() && RemoteServer->Dequeue(Message))
 	{
-		while (RemoteServer->Dequeue(Message))
+		++RemoteHandled;
+		if (!IsRemoteAddressAllowed(Message))
 		{
-			if (bLog)
+			// Once a second at most: a flood must not become a flood of logs.
+			static double LastRefusalLog = -1.0;
+			if (FPlatformTime::Seconds() - LastRefusalLog > 1.0)
 			{
-				UE_LOG(LogVibH2O, Verbose, TEXT("iPad < %s"), *Message.ToDebugString());
+				LastRefusalLog = FPlatformTime::Seconds();
+				UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: commande iPad refusee (adresse de donnees) : %s"), *Message.Address);
 			}
-			HandleMessage(Message);
+			continue;
+		}
+		if (bLog)
+		{
+			UE_LOG(LogVibH2O, Verbose, TEXT("iPad < %s"), *Message.ToDebugString());
+		}
+		TGuardValue<bool> Echo(bForceControlEcho, true);
+		HandleMessage(Message);
+	}
+}
+
+bool UVibH2OSubsystem::IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+	const FString* Allowed[] = {
+		&Settings->BlendPrefix, &Settings->FocusGroupPrefix, &Settings->FocusAmountPrefix,
+		&Settings->EffectPrefix, &Settings->BackdropPrefix, &Settings->AttractorPrefix,
+		&Settings->AttractorsGlobalPrefix, &Settings->ExclusionPrefix, &Settings->CuePrefix };
+	for (const FString* Prefix : Allowed)
+	{
+		if (!Prefix->IsEmpty() && Message.MatchesPrefix(*Prefix))
+		{
+			return true;
 		}
 	}
+	return false;
 }
 
 void UVibH2OSubsystem::InjectOscMessage(const FVibH2OOscMessage& Message)
 {
+	// Injected messages are deliberate - cues above all: a control value
+	// reaches the stage even when it repeats the last one.
+	TGuardValue<bool> Echo(bForceControlEcho, true);
 	HandleMessage(Message);
 }
 
@@ -686,7 +719,7 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			return true;
 		}
 		const float Value = FMath::Clamp(Message.GetFloatArg(0, 0.0f), 0.0f, 1.0f);
-		if (!FMath::IsNearlyEqual(Value, OscBlendAlpha))
+		if (bForceControlEcho || !FMath::IsNearlyEqual(Value, OscBlendAlpha))
 		{
 			OscBlendAlpha = Value;
 			OnOscBlendAlphaChanged.Broadcast(Value);
@@ -701,7 +734,7 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			return true;
 		}
 		const float Value = FMath::Clamp(Message.GetFloatArg(0, 0.0f), 0.0f, 1.0f);
-		if (!FMath::IsNearlyEqual(Value, OscFocusAmount))
+		if (bForceControlEcho || !FMath::IsNearlyEqual(Value, OscFocusAmount))
 		{
 			OscFocusAmount = Value;
 			OnOscFocusAmountChanged.Broadcast(Value);
@@ -739,7 +772,7 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			GroupName = FName(*Segments[0]);
 		}
 
-		if (GroupName != OscFocusGroup)
+		if (bForceControlEcho || GroupName != OscFocusGroup)
 		{
 			OscFocusGroup = GroupName;
 			OnOscFocusGroupChanged.Broadcast(GroupName);
@@ -1307,9 +1340,15 @@ void UVibH2OSubsystem::UpdateDebugOverlay(float DeltaTime)
 
 	if (IsRemoteRunning())
 	{
+		const double Now = FPlatformTime::Seconds();
+		if (Now - OverlayRemoteUrlsTime > 2.0)
+		{
+			OverlayRemoteUrls = GetRemoteUrls();
+			OverlayRemoteUrlsTime = Now;
+		}
 		Line(770007, FColor::Green, FString::Printf(
 			TEXT("   iPad     %s   %d requetes, %d commandes"),
-			*FString::Join(GetRemoteUrls(), TEXT("  ")), RemoteServer->GetRequestCount(), RemoteServer->GetCommandCount()));
+			*FString::Join(OverlayRemoteUrls, TEXT("  ")), RemoteServer->GetRequestCount(), RemoteServer->GetCommandCount()));
 	}
 	else
 	{

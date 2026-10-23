@@ -448,8 +448,15 @@ bool FVibH2ORemoteServerTest::RunTest(const FString& Parameters)
 	};
 
 	const FString Body = TEXT("/Attractor/Gauche/ 1\n/Attractors/FadeScale/ 2.5\n\nignoree\n");
-	const FString Posted = Request(FString::Printf(
+
+	// Without the remote's own header, as a page of another site would send it.
+	const FString Foreign = Request(FString::Printf(
 		TEXT("POST /api/cmd HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: %d\r\n\r\n%s"),
+		FTCHARToUTF8(*Body).Length(), *Body));
+	TestTrue(FString::Printf(TEXT("Sans en-tete X-VibH2O, POST /api/cmd est refuse (%s)"), *Foreign.Left(40)), Foreign.StartsWith(TEXT("HTTP/1.1 403")));
+
+	const FString Posted = Request(FString::Printf(
+		TEXT("POST /api/cmd HTTP/1.1\r\nHost: 127.0.0.1\r\nx-vibh2o: 1\r\nContent-Length: %d\r\n\r\n%s"),
 		FTCHARToUTF8(*Body).Length(), *Body));
 	TestTrue(FString::Printf(TEXT("POST /api/cmd repond 200 (%s)"), *Posted.Left(40)), Posted.StartsWith(TEXT("HTTP/1.1 200")));
 	TestTrue(TEXT("Deux commandes acceptees, la ligne sans adresse ignoree"), Posted.EndsWith(TEXT("ok 2")));

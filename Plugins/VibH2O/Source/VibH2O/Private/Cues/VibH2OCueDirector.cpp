@@ -176,7 +176,9 @@ bool AVibH2OCueDirector::FireCue(const FString& CueName, float Value)
 
 void AVibH2OCueDirector::ExecuteCue(int32 CueIndex, float InputValue)
 {
-	const FVibH2OCue& Cue = Cues[CueIndex];
+	// A copy, not a reference: the OSC it sends and OnCueFired reach
+	// Blueprints, and one that edits Cues would leave a reference dangling.
+	const FVibH2OCue Cue = Cues[CueIndex];
 	const UEnum* ActionEnum = StaticEnum<EVibH2OCueAction>();
 	const FString ActionName = ActionEnum ? ActionEnum->GetDisplayNameTextByValue(static_cast<int64>(Cue.Action)).ToString() : FString();
 

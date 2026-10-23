@@ -487,6 +487,21 @@ private:
 	FName OscFocusGroup = NAME_None;
 	float OscBackdropTarget = 1.0f;
 
+	/**
+	 * Set while a deliberate command is handled - a cue, the iPad. Max
+	 * repeats its control values, so they are only passed on when they
+	 * change; a command must act even when it repeats the last OSC value,
+	 * since Sequencer or the Details panel may have moved the stage since.
+	 */
+	bool bForceControlEcho = false;
+
+	/** Only these addresses are taken from the iPad: control, never data. */
+	bool IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const;
+
+	/** The overlay's copy of GetRemoteUrls: listing adapters costs a syscall. */
+	TArray<FString> OverlayRemoteUrls;
+	double OverlayRemoteUrlsTime = -1.0;
+
 	/** Throughput counters, for the debug overlay. */
 	int32 MessagesThisSecond = 0;
 	float MessagesPerSecond = 0.0f;

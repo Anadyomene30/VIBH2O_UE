@@ -39,7 +39,7 @@ class Remote:
     def send(self, *lines):
         body = '\n'.join(lines).encode('utf-8')
         request = urllib.request.Request(self.base + '/api/cmd', data=body, method='POST',
-                                         headers={'Content-Type': 'text/plain'})
+                                         headers={'Content-Type': 'text/plain', 'X-VibH2O': '1'})
         with urllib.request.urlopen(request, timeout=3) as response:
             return response.read().decode('utf-8')
 

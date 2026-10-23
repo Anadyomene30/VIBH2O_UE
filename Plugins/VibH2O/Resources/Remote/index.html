@@ -304,7 +304,7 @@ async function flush() {
   inflight = true;
   try {
     const r = await fetch("api/cmd", { method: "POST", body: batch.map(([, c]) => c.line).join("\n"),
-      headers: { "Content-Type": "text/plain" }, signal: timeoutSignal(2000) });
+      headers: { "Content-Type": "text/plain", "X-VibH2O": "1" }, signal: timeoutSignal(2000) });
     if (!r.ok) throw new Error(r.status);
   } catch (e) {
     // Retry what is still recent and has not been superseded; drop the rest,

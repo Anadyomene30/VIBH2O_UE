@@ -1,3 +1,28 @@
+# Nuit du 23 au 24 octobre 2026 — décisions à valider
+
+Cinq branches développées en parallèle, réunies dans `integration-nuit`. Chacune a consigné ses
+choix ci-dessous, dans cet ordre :
+
+1. Ambiance de salle et look des bulles (`claude/bulles-look-etats-6977f1`)
+2. Attracteurs, zones d'exclusion, télécommande iPad (`claude/attracteurs-ipad-7f55c7`)
+3. Cues MIDI / OSC / clavier (`claude/cues-midi-061e49`)
+4. Tableau 2 : division et vortex (`claude/flock-division-e9c6e8`)
+5. Fond en un clic (`environnement-fond`) — ses choix sont dans le projet LUX,
+   `_RAPPORT_CLAUDE/DECISIONS_NUIT_environnement.md`
+
+## 0. Choix faits à l'intégration
+
+| Choix | Pourquoi | Autre possibilité |
+|---|---|---|
+| Attracteurs et zones d'exclusion indexés par la **graine du membre**, plus par le siège | Les filles partagent le siège de leur mère : chacune faisait avancer le fondu de la mère, et toutes suivaient le même poids | — (c'était un bug) |
+| La télécommande n'accepte que les adresses **de contrôle** et exige l'en-tête `X-VibH2O` | Sans cela, n'importe quel appareil ou page web du réseau du spectacle pouvait vider la salle ou injecter de faux BPM | Ajouter un code PIN, si le réseau est partagé |
+| Au plus **256 commandes iPad par image** | Un afflux ne doit jamais figer l'image | — |
+| Une cue ou l'iPad qui renvoie la **même valeur** de `/Blend` ou `/Focus` agit quand même | Sequencer ou le panneau Details ont pu bouger la scène entre-temps ; sans cela, la cue ne faisait rien | Garder le dédoublonnage pour Max seulement — c'est ce qui est fait |
+| La télécommande affiche l'**état réel du fond** | Le bouton reflète ce que fait la scène, pas la mémoire de l'iPad | — |
+| **Non tranché : 704 bulles** (176 places × 4) au tableau 2 | Le budget documenté est ~200 acteurs ; chaque fille a son matériau dynamique et ses événements Blueprint (un son sur `ReceiveBeat` sonnerait 4 fois) | Baisser `Filles par bulle`, ou passer les filles en meshes instanciés — à mesurer en salle |
+
+---
+
 # Décisions prises seul, nuit du 23 au 24 octobre 2026 — à valider
 
 Branche `claude/bulles-look-etats-6977f1` : les trois états de salle et la bulle à stries. Tes

@@ -184,6 +184,13 @@ peut pas émettre d'UDP. Le plugin sert lui-même la page sur le port TCP **8642
 commande par ligne, au format `adresse argument…` ; `GET /api/state` rend l'état affiché par l'iPad,
 en JSON. Les commandes rejoignent la même file que l'OSC, sur le game thread.
 
+Deux protections, depuis la nuit du 24 octobre : `POST /api/cmd` exige l'en-tête `X-VibH2O: 1`
+(la page de la télécommande l'envoie ; une page web d'un autre site ne peut pas l'ajouter sans
+autorisation préalable, que le serveur ne donne jamais), et seules les adresses **de contrôle**
+passent — `/Blend`, `/Focus/*`, `/Effect`, `/Fond`, `/Attractor(s)`, `/Exclusion`, `/Cue`. Le plan
+de salle et les données des capteurs ne viennent que de Max. Au plus 256 commandes sont traitées
+par image ; le reste attend l'image suivante.
+
 
 `/Fond` est lu par l'acteur **VibH2O — Fond** (`AVibH2OBackdrop`), qui fait glisser sa présence
 vers la valeur reçue. Chaque message relance le fondu, même s'il répète la valeur précédente :
