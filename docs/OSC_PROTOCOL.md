@@ -162,7 +162,14 @@ contrôleur physique entrant dans Max et ressortant en OSC.
 /Blend/        0.0–1.0    morph du tableau 1 vers le tableau 2
 /Focus/Group/  <nom>      sélectionne un groupe de focus défini dans Unreal
 /Focus/Amount/ 0.0–1.0    intensité du focus
+/Fond/         0.0–1.0 [s] présence du fond sous-marin : 0 = noir pur derrière les bulles,
+                           1 = l'eau ; 2e argument facultatif = durée du fondu en secondes
 ```
+
+`/Fond` est lu par l'acteur **VibH2O — Fond** (`AVibH2OBackdrop`), qui fait glisser sa présence
+vers la valeur reçue. Chaque message relance le fondu, même s'il répète la valeur précédente :
+un bouton bascule d'iPad qui envoie 1 puis 0 convient tel quel. Sur le tulle de projection, le
+noir est transparent — enlever le fond, c'est laisser voir la scène derrière.
 
 Ces mêmes commandes sont accessibles depuis le panneau Details, depuis Blueprint, et animables
 dans Sequencer.

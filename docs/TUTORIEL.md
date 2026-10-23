@@ -92,6 +92,38 @@ propre — aucune n'est jamais une sphère.
 0,1, la bulle s'étire comme du caoutchouc. `Beat Pop Amount` vaut 0,10 : un gonflement au pouls,
 pas un rebond de dessin animé.
 
+### `VibH2O — Fond` — enlever le fond en un geste
+
+Sur le tulle de projection, **le noir est transparent** : ce que l'image n'éclaire pas, le public
+le traverse du regard. Enlever le fond, c'est donc laisser apparaître la scène et les circassiennes
+derrière le tulle, avec seulement les bulles et les particules en suspension devant. Pour cela, le
+noir doit être un vrai noir, pas un bleu très sombre.
+
+L'acteur **`VibH2O — Fond`** s'en charge, par quatre chemins qui font la même chose :
+
+| Depuis | Geste |
+|---|---|
+| Panneau Details | Boutons **Enlever le fond** / **Remettre le fond** (fonctionnent aussi sans Play). |
+| Clavier, en Play | Touche **B** (réglable : `Touche`) — bascule. |
+| iPad ou Max | `/Fond 0` enlève, `/Fond 1` remet ; 2e argument facultatif = durée en secondes. |
+| Sequencer | Piste `Presence du fond`, de 1 (l'eau) à 0 (noir). |
+
+Le fondu dure `Duree du fondu` (4 s par défaut), adouci aux deux bouts. Ce qui s'éteint : la
+lumière que **diffuse** le brouillard (sa couleur, le terme directionnel, l'albédo et l'émission du
+brouillard volumétrique) et l'atmosphère. La **densité** du brouillard reste : les bulles lointaines
+sombrent toujours dans la profondeur, mais vers le noir. Les maillages de décor (sphère de ciel,
+surface) disparaissent une fois le noir atteint ; les **systèmes de particules ne sont jamais
+touchés**, et les **lumières non plus**, sauf à cocher `Eteindre les lumieres` : les bulles gardent
+exactement leur éclairage.
+
+**Remplir depuis la carte** liste d'office les brouillards, atmosphères, lumières de ciel et
+très grands maillages ; corriger la liste `Environnement` à la main au besoin. Pour qu'un matériau
+d'artiste s'efface en douceur plutôt que d'un coup à la fin, lui faire lire le paramètre `Fond`
+d'une *Material Parameter Collection* renseignée dans `Collection de parametres`.
+
+Rien n'est écrasé : les valeurs d'origine sont gardées dans l'acteur, sauvegardées avec la carte, et
+rendues dès que le fond revient à 1 — ou si l'on supprime l'acteur.
+
 ### `VibH2O_Lumieres` — l'éclairage qui suit la salle
 
 L'acteur **`VibH2O — Rig de lumieres`** porte trois projecteurs :
