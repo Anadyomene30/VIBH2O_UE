@@ -106,7 +106,12 @@ Vérifié le 23 octobre 2026, dans la branche `claude/bulles-look-etats-6977f1` 
 | `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — après correction : couper la teinte coupe désormais **aussi** la couleur d'état |
 | Les trois états au simulateur | ✅ `VibH2O.DemoSweep` phases 15 à 22, par le vrai chemin de données : calme à 0,09, normal à 0,40, excité à 0,85, puis chaque état synchrone et désynchrone. `VibH2O.DemoSweep ambiance` rejoue ces seules phases en une minute. |
 | Images par seconde, salle de 176 | 🟡 **182 images/s**, contre 303 avant — mesure faite pendant qu'un éditeur 5.8 d'une autre session occupait le même GPU. Large marge, mais à remesurer seul. |
-| UE 5.8 | ⬜ non relancé pour cette passe |
+| UE 5.8, Editor et Shipping (copie au chemin court `C:\VB58bulles`) | ✅ propre, zéro avertissement ; **19 / 19** tests |
+
+Captures avant / après : `Saved/VibH2OSweep_ambiance_2026-10-23/PLANCHE_avant_apres.png` à la
+racine du dépôt principal (hors git). Les choix faits sans Dimitri, à valider, sont dans
+[`DECISIONS_NUIT.md`](DECISIONS_NUIT.md). Non fait : l'essai dans une copie de PPCM, l'éditeur LUX
+étant occupé et son plugin partagé entre branches (décision 10).
 
 Trois pièges rencontrés, notés pour la suite :
 
