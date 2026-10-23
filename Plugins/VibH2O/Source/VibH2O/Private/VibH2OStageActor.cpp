@@ -1,10 +1,19 @@
 #include "VibH2OStageActor.h"
 
 #include "Curves/CurveFloat.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Layout/VibH2OLayoutMath.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
+#include "Steering/VibH2OAttractorActor.h"
+#include "Steering/VibH2OExclusionZoneActor.h"
+#include "Steering/VibH2OSteeringMath.h"
 #include "VibH2OBubbleActor.h"
 #include "VibH2OMood.h"
 #include "VibH2OModule.h"
@@ -79,6 +88,12 @@ void AVibH2OStageActor::BindToSubsystem(UVibH2OSubsystem* Subsystem)
 	Subsystem->OnOscBlendAlphaChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
 	Subsystem->OnOscFocusAmountChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
 	Subsystem->OnOscFocusGroupChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
+	Subsystem->OnOscAttractorChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscAttractor);
+	Subsystem->OnOscAttractorShareChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscAttractorShare);
+	Subsystem->OnOscAttractorsReleased.AddDynamic(this, &AVibH2OStageActor::HandleOscAttractorsReleased);
+	Subsystem->OnOscAttractorFadeScaleChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscAttractorFadeScale);
+	Subsystem->OnOscExclusionChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscExclusion);
+	Subsystem->OnOscExclusionMoved.AddDynamic(this, &AVibH2OStageActor::HandleOscExclusionMoved);
 	BoundSubsystem = Subsystem;
 
 	// A room may have arrived before this actor started up.
@@ -96,6 +111,12 @@ void AVibH2OStageActor::UnbindFromSubsystem()
 		Subsystem->OnOscBlendAlphaChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscBlendAlpha);
 		Subsystem->OnOscFocusAmountChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusAmount);
 		Subsystem->OnOscFocusGroupChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscFocusGroup);
+		Subsystem->OnOscAttractorChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAttractor);
+		Subsystem->OnOscAttractorShareChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAttractorShare);
+		Subsystem->OnOscAttractorsReleased.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAttractorsReleased);
+		Subsystem->OnOscAttractorFadeScaleChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAttractorFadeScale);
+		Subsystem->OnOscExclusionChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscExclusion);
+		Subsystem->OnOscExclusionMoved.RemoveDynamic(this, &AVibH2OStageActor::HandleOscExclusionMoved);
 	}
 	BoundSubsystem.Reset();
 }
@@ -306,6 +327,7 @@ void AVibH2OStageActor::Tick(float DeltaSeconds)
 	if (World != nullptr && World->IsGameWorld())
 	{
 		UpdateBubbles(DeltaSeconds);
+		PublishRemoteState(DeltaSeconds);
 		return;
 	}
 
@@ -425,6 +447,9 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		FlockDriver->PrepareFrame(Frame);
 	}
 
+	// The hand-steered layers step their fades once, before any bubble.
+	BeginSteering(DeltaSeconds);
+
 	// One view position for the whole room: every seat number turns toward it,
 	// and asking the player controller once beats asking it two hundred times.
 	FVector ViewLocation = GetActorLocation();
@@ -509,6 +534,11 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 			Rotation.Normalize();
 		}
 
+		// Attractors pull AFTER the blend, never inside a driver: the drivers
+		// keep running underneath, so a released bubble falls back onto a place
+		// that was kept for it all along.
+		Location = ApplyAttractors(Location, Seat.SeatIndex, Context.Seed);
+
 		// The float is added AFTER the blend, and not inside the grid driver:
 		// it is a property of the bubble - it is underwater, so it floats - and
 		// not of the tableau. That is how it survives the move to the vortex.
@@ -527,6 +557,10 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		{
 			Location += FVibH2OLayoutMath::EvaluateDriftOffset(DriftParams, Context.Seed, StageTime, State.Excitation, MinSpacing);
 		}
+
+		// Exclusion comes last of all, so nothing added after it - float,
+		// drift, attractor - can carry a bubble back in front of a performer.
+		Location = ApplyExclusionZones(Location, Seat.SeatIndex, Context.Seed);
 
 		float Scale = BaseScale;
 		if (bScaleEnabled)
@@ -605,6 +639,353 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 
 		Bubble->UpdateFromState(State, Mask, Tint, CollectiveSynchrony, Blend, StriationSpeedScale, DeltaSeconds);
 	}
+
+	EndSteering();
+}
+
+// ------------------------------------------------------ Attractors and zones
+
+namespace
+{
+	template <typename ActorType>
+	void SortForDisplay(TArray<ActorType*>& Actors)
+	{
+		Actors.Sort([](const ActorType& A, const ActorType& B)
+		{
+			if (A.DisplayOrder != B.DisplayOrder)
+			{
+				return A.DisplayOrder < B.DisplayOrder;
+			}
+			return A.GetEffectiveLabel() < B.GetEffectiveLabel();
+		});
+	}
+
+	FString ToHexColor(const FLinearColor& Color)
+	{
+		const FColor Srgb = Color.ToFColor(true);
+		return FString::Printf(TEXT("#%02x%02x%02x"), Srgb.R, Srgb.G, Srgb.B);
+	}
+}
+
+void AVibH2OStageActor::BeginSteering(float DeltaSeconds)
+{
+	FrameAttractors.Reset();
+	FrameZones.Reset();
+
+	UWorld* World = GetWorld();
+	if (World == nullptr || StageRoot == nullptr)
+	{
+		return;
+	}
+
+	// Found afresh every frame rather than registered: a zone dropped into the
+	// level, deleted, or streamed in takes effect at once, in the editor as in
+	// Play. A few dozen actors of one class is a cheap walk.
+	const FTransform RootTransform = StageRoot->GetComponentTransform();
+
+	if (bApplyAttractors)
+	{
+		for (TActorIterator<AVibH2OAttractorActor> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				It->BeginSteeringFrame(RootTransform, AttractorFadeScale, DeltaSeconds, StageTime);
+				FrameAttractors.Add(*It);
+			}
+		}
+	}
+
+	if (bApplyExclusionZones)
+	{
+		for (TActorIterator<AVibH2OExclusionZoneActor> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				It->BeginSteeringFrame(RootTransform, DeltaSeconds);
+				FrameZones.Add(*It);
+			}
+		}
+	}
+}
+
+void AVibH2OStageActor::EndSteering()
+{
+	for (AVibH2OAttractorActor* Attractor : FrameAttractors)
+	{
+		if (IsValid(Attractor))
+		{
+			Attractor->EndSteeringFrame();
+		}
+	}
+	for (AVibH2OExclusionZoneActor* Zone : FrameZones)
+	{
+		if (IsValid(Zone))
+		{
+			Zone->EndSteeringFrame();
+		}
+	}
+}
+
+FVector AVibH2OStageActor::ApplyAttractors(const FVector& Base, int32 SeatIndex, int32 Seed)
+{
+	if (FrameAttractors.Num() == 0)
+	{
+		return Base;
+	}
+
+	TArray<FVector, TInlineAllocator<8>> Targets;
+	TArray<float, TInlineAllocator<8>> Weights;
+	for (AVibH2OAttractorActor* Attractor : FrameAttractors)
+	{
+		const float Weight = Attractor->StepBubbleWeight(SeatIndex, Seed);
+		if (Weight > 0.0f)
+		{
+			Targets.Add(Attractor->GetCloudTarget(Seed));
+			Weights.Add(Weight);
+		}
+	}
+	return FVibH2OSteeringMath::BlendTowardTargets(Base, MakeArrayView(Targets), MakeArrayView(Weights));
+}
+
+FVector AVibH2OStageActor::ApplyExclusionZones(const FVector& Location, int32 SeatIndex, int32 Seed)
+{
+	FVector Result = Location;
+	for (AVibH2OExclusionZoneActor* Zone : FrameZones)
+	{
+		Result = Zone->ApplyToBubble(SeatIndex, Seed, Result);
+	}
+	return Result;
+}
+
+TArray<AVibH2OAttractorActor*> AVibH2OStageActor::GetAttractors() const
+{
+	TArray<AVibH2OAttractorActor*> Result;
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AVibH2OAttractorActor> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				Result.Add(*It);
+			}
+		}
+	}
+	SortForDisplay(Result);
+	return Result;
+}
+
+TArray<AVibH2OExclusionZoneActor*> AVibH2OStageActor::GetExclusionZones() const
+{
+	TArray<AVibH2OExclusionZoneActor*> Result;
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AVibH2OExclusionZoneActor> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				Result.Add(*It);
+			}
+		}
+	}
+	SortForDisplay(Result);
+	return Result;
+}
+
+AVibH2OAttractorActor* AVibH2OStageActor::FindAttractor(FName Name) const
+{
+	// FName comparison ignores case: "/Attractor/gauche/" finds "Gauche".
+	for (AVibH2OAttractorActor* Attractor : GetAttractors())
+	{
+		if (Attractor->GetEffectiveControlName() == Name)
+		{
+			return Attractor;
+		}
+	}
+	UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: attracteur '%s' inconnu dans ce niveau."), *Name.ToString());
+	return nullptr;
+}
+
+AVibH2OExclusionZoneActor* AVibH2OStageActor::FindExclusionZone(FName Name) const
+{
+	for (AVibH2OExclusionZoneActor* Zone : GetExclusionZones())
+	{
+		if (Zone->GetEffectiveControlName() == Name)
+		{
+			return Zone;
+		}
+	}
+	UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: zone d'exclusion '%s' inconnue dans ce niveau."), *Name.ToString());
+	return nullptr;
+}
+
+void AVibH2OStageActor::ReleaseAllAttractors()
+{
+	int32 Released = 0;
+	for (AVibH2OAttractorActor* Attractor : GetAttractors())
+	{
+		// One driven by Sequencer is not ours to release.
+		if (Attractor->bFollowOsc && Attractor->Activation > 0.0f)
+		{
+			Attractor->Activation = 0.0f;
+			++Released;
+		}
+	}
+	UE_LOG(LogVibH2O, Log, TEXT("VibH2O: tous les attracteurs relaches (%d)."), Released);
+}
+
+void AVibH2OStageActor::HandleOscAttractor(FName Name, float Value)
+{
+	AVibH2OAttractorActor* Attractor = FindAttractor(Name);
+	if (Attractor != nullptr && Attractor->bFollowOsc)
+	{
+		Attractor->Activation = FMath::Clamp(Value, 0.0f, 1.0f);
+	}
+}
+
+void AVibH2OStageActor::HandleOscAttractorShare(FName Name, float Value)
+{
+	AVibH2OAttractorActor* Attractor = FindAttractor(Name);
+	if (Attractor != nullptr && Attractor->bFollowOsc)
+	{
+		Attractor->Share = FMath::Clamp(Value, 0.0f, 1.0f);
+	}
+}
+
+void AVibH2OStageActor::HandleOscAttractorsReleased()
+{
+	if (bFollowOscSteering)
+	{
+		ReleaseAllAttractors();
+	}
+}
+
+void AVibH2OStageActor::HandleOscAttractorFadeScale(float Value)
+{
+	if (bFollowOscSteering)
+	{
+		AttractorFadeScale = FMath::Clamp(Value, 0.1f, 10.0f);
+	}
+}
+
+void AVibH2OStageActor::HandleOscExclusion(FName Name, float Value)
+{
+	AVibH2OExclusionZoneActor* Zone = FindExclusionZone(Name);
+	if (Zone != nullptr && Zone->bFollowOsc)
+	{
+		Zone->Activation = FMath::Clamp(Value, 0.0f, 1.0f);
+	}
+}
+
+void AVibH2OStageActor::HandleOscExclusionMoved(FName Name, FVector2D Position)
+{
+	AVibH2OExclusionZoneActor* Zone = FindExclusionZone(Name);
+	if (Zone != nullptr && Zone->bFollowOsc)
+	{
+		Zone->SetDragPosition(static_cast<float>(Position.X), static_cast<float>(Position.Y));
+	}
+}
+
+// ------------------------------------------------------------------ Remote
+
+void AVibH2OStageActor::PublishRemoteState(float DeltaSeconds)
+{
+	if (!bPublishRemoteState)
+	{
+		return;
+	}
+	UVibH2OSubsystem* Subsystem = GetSubsystem();
+	if (Subsystem == nullptr || !Subsystem->IsRemoteRunning())
+	{
+		return;
+	}
+
+	// A few times a second is plenty for a button ring, and keeps the JSON
+	// off the frame budget.
+	RemotePublishTimer -= DeltaSeconds;
+	if (RemotePublishTimer > 0.0f)
+	{
+		return;
+	}
+	RemotePublishTimer = 0.15f;
+	Subsystem->SetRemoteState(BuildRemoteStateJson());
+}
+
+FString AVibH2OStageActor::BuildRemoteStateJson() const
+{
+	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("v"), 1);
+	Root->SetNumberField(TEXT("bubbles"), Bubbles.Num());
+	Root->SetNumberField(TEXT("blend"), BlendAlpha);
+	Root->SetNumberField(TEXT("fadeScale"), AttractorFadeScale);
+
+	TArray<TSharedPtr<FJsonValue>> Attractors;
+	for (const AVibH2OAttractorActor* Attractor : GetAttractors())
+	{
+		const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+		Entry->SetStringField(TEXT("id"), Attractor->GetEffectiveControlName().ToString());
+		Entry->SetStringField(TEXT("label"), Attractor->GetEffectiveLabel());
+		Entry->SetStringField(TEXT("color"), ToHexColor(Attractor->DisplayColor));
+		Entry->SetNumberField(TEXT("on"), Attractor->Activation);
+		Entry->SetNumberField(TEXT("w"), Attractor->GetCurrentWeight());
+		Entry->SetNumberField(TEXT("share"), Attractor->Share);
+		Entry->SetBoolField(TEXT("osc"), Attractor->bFollowOsc);
+		Attractors.Add(MakeShared<FJsonValueObject>(Entry));
+	}
+	Root->SetArrayField(TEXT("attractors"), Attractors);
+
+	TArray<TSharedPtr<FJsonValue>> Zones;
+	for (const AVibH2OExclusionZoneActor* Zone : GetExclusionZones())
+	{
+		const FVector2D HalfSize = Zone->GetHalfSize();
+		const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+		Entry->SetStringField(TEXT("id"), Zone->GetEffectiveControlName().ToString());
+		Entry->SetStringField(TEXT("label"), Zone->GetEffectiveLabel());
+		Entry->SetStringField(TEXT("color"), ToHexColor(Zone->DisplayColor));
+		Entry->SetNumberField(TEXT("on"), Zone->Activation);
+		Entry->SetNumberField(TEXT("w"), Zone->GetCurrentWeight());
+		Entry->SetNumberField(TEXT("x"), Zone->DragX);
+		Entry->SetNumberField(TEXT("y"), Zone->DragY);
+		// The zone's size on the pad, as a fraction of the drag range.
+		Entry->SetNumberField(TEXT("sx"), HalfSize.X / FMath::Max(Zone->DragRange.X, 1.0));
+		Entry->SetNumberField(TEXT("sy"), HalfSize.Y / FMath::Max(Zone->DragRange.Y, 1.0));
+		Entry->SetNumberField(TEXT("aspect"), Zone->DragRange.X / FMath::Max(Zone->DragRange.Y, 1.0));
+		Entry->SetBoolField(TEXT("mirror"), Zone->bMirrorDrag);
+		Entry->SetStringField(TEXT("shape"), Zone->Shape == EVibH2OExclusionShape::Rectangle ? TEXT("rect") : TEXT("ellipse"));
+		Entry->SetBoolField(TEXT("osc"), Zone->bFollowOsc);
+		Zones.Add(MakeShared<FJsonValueObject>(Entry));
+	}
+	Root->SetArrayField(TEXT("zones"), Zones);
+
+	const TSharedRef<FJsonObject> Focus = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Groups;
+	for (const FVibH2OFocusGroup& Group : FocusGroups)
+	{
+		Groups.Add(MakeShared<FJsonValueString>(Group.GroupName.ToString()));
+	}
+	Focus->SetArrayField(TEXT("groups"), Groups);
+	Focus->SetStringField(TEXT("active"), ActiveFocusGroup.IsNone() ? FString() : ActiveFocusGroup.ToString());
+	Focus->SetNumberField(TEXT("amount"), FocusAmount);
+	Root->SetObjectField(TEXT("focus"), Focus);
+
+	TArray<TSharedPtr<FJsonValue>> Effects;
+	if (const UVibH2OSubsystem* Subsystem = GetSubsystem())
+	{
+		for (const FName& Effect : Subsystem->GetKnownEffects())
+		{
+			const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+			Entry->SetStringField(TEXT("id"), Effect.ToString());
+			Entry->SetBoolField(TEXT("on"), Subsystem->IsEffectEnabled(Effect));
+			Effects.Add(MakeShared<FJsonValueObject>(Entry));
+		}
+		Root->SetBoolField(TEXT("oscIgnored"), Subsystem->bIgnoreOscControl);
+	}
+	Root->SetArrayField(TEXT("effects"), Effects);
+
+	FString Out;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
+	FJsonSerializer::Serialize(Root, Writer);
+	return Out;
 }
 
 // ------------------------------------------------------------------- Focus

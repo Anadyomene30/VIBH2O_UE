@@ -329,13 +329,24 @@ rotation ne se voit pas.
 
 ---
 
+## Attracteurs, zones d'exclusion et télécommande iPad
+
+Deux acteurs à placer à la main — `VibH2O — Attracteur` et `VibH2O — Zone d'exclusion` — et une page
+web que le plugin sert lui-même sur le port **8642**, à installer sur l'iPad comme une appli plein
+écran. Les attracteurs appellent une part de la salle puis la rendent, sans à-coup ; les zones
+écartent les bulles des circassiennes et se font glisser en direct. Mode d'emploi :
+[`docs/ATTRACTEURS_ET_IPAD.md`](../../docs/ATTRACTEURS_ET_IPAD.md).
+
+La page vit dans `Resources/Remote/` ; en version packagée elle est copiée à côté de l'exécutable,
+hors du pak, donc modifiable sur place (`VibH2O.Restart` la recharge).
+
 ## Commandes console
 
 | Commande | Effet |
 |---|---|
 | `VibH2O.ShowDebug` | Bascule l'affichage réseau / salle / moyennes. |
 | `VibH2O.DumpRoom` | Écrit le plan dans le log, une ligne par rangée. **L'outil du test 7 × 3.** |
-| `VibH2O.Restart` | Redémarre l'écoute avec les réglages courants. |
+| `VibH2O.Restart` | Redémarre l'écoute OSC et la télécommande iPad avec les réglages courants — et recharge la page de la télécommande depuis le disque. |
 | `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep [ambiance]` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/`, dont les trois états de salle croisés avec la synchronie — puis quitte. `ambiance` : seulement les états, en une minute, pour régler palettes et matériau. Absente des builds Shipping. |

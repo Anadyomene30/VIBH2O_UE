@@ -129,6 +129,25 @@ Et un problème hors périmètre : dans ce worktree, `make_demo_material.py` pla
 écrit la bulle et les particules, à la recréation des caustiques (assertion Slate dans
 `AssetTools.CreateAsset`). Bulle et particules sont bien écrites ; seule la bulle est commitée.
 
+### Attracteurs, zones d'exclusion, télécommande iPad — 23 octobre 2026
+
+Demandés pour piloter la salle à la main pendant le spectacle. Mode d'emploi complet :
+[`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md).
+
+| Vérification | Résultat |
+|---|---|
+| Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
+| Compilation UE 5.8, Editor, Game **et** Shipping (`RunUAT BuildPlugin`, copie au chemin court) | ✅ propre, sans avertissement ; la page de la télécommande part bien avec le plugin |
+| Tests d'automation | ✅ **19 / 19** sous 5.5, dont les quatre nouveaux : `Steering.FonduActivation`, `Steering.PartDeLaSalle`, `Steering.ProjectionHorsZone`, `Remote.Telecommande` |
+| De bout en bout, jeu lancé sur la carte de démo | ✅ `Tools/vibh2o_remote_check.py` : page, état, appel d'un attracteur (mi-chemin à 0,8 s, ni recul ni saut), contre-ordre, retour exact à 0, zone déplacée, éteinte, rallumée |
+| Interface vue dans un navigateur au format iPad | ✅ appui sur un attracteur et glisser d'une zone reçus par Unreal |
+
+Reste à faire, sur place :
+
+1. Ouvrir la page **sur le vrai iPad**, l'ajouter à l'écran d'accueil, la juger dans le noir.
+2. Placer les zones devant les deux circassiennes réelles, la *Camera de projection* désignée, et
+   vérifier à l'image que les bulles s'écartent bien.
+
 ### Rejouer les vérifications
 
 ```bash

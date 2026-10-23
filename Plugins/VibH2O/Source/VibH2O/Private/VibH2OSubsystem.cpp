@@ -3,8 +3,12 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Interfaces/IPluginManager.h"
 #include "Layout/VibH2OLayoutMath.h"
+#include "Misc/Paths.h"
 #include "Osc/VibH2OOscReceiver.h"
+#include "Remote/VibH2ORemoteServer.h"
+#include "SocketSubsystem.h"
 #include "UObject/ObjectKey.h"
 #include "UObject/Package.h"
 #include "VibH2OModule.h"
@@ -66,6 +70,12 @@ namespace VibH2OConsole
 			if (UVibH2OSubsystem* Subsystem = FindSubsystem(World))
 			{
 				Subsystem->StartListening();
+				// The remote too - which also reloads its page from disk, so an
+				// edit made on site needs no restart of the game.
+				if (UVibH2OSettings::Get()->bEnableRemote)
+				{
+					Subsystem->StartRemote();
+				}
 			}
 		}));
 }
@@ -105,6 +115,10 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		StartListening();
 	}
+	if (UVibH2OSettings::Get()->bEnableRemote)
+	{
+		StartRemote();
+	}
 }
 
 void UVibH2OSubsystem::RegisterBuiltInEffects()
@@ -123,6 +137,7 @@ void UVibH2OSubsystem::RegisterBuiltInEffects()
 void UVibH2OSubsystem::Deinitialize()
 {
 	StopListening();
+	StopRemote();
 	Individuals.Reset();
 	Room.Reset();
 	Super::Deinitialize();
@@ -298,6 +313,103 @@ FVibH2ONetworkStats UVibH2OSubsystem::GetNetworkStats() const
 	return Stats;
 }
 
+// ------------------------------------------------------------------ Remote
+
+bool UVibH2OSubsystem::StartRemote()
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+
+	FString WebRoot = Settings->RemoteWebRoot;
+	if (WebRoot.IsEmpty())
+	{
+		// Inside the plugin, so copying the plugin folder into the show's
+		// project brings the page along. Staged next to the game as loose
+		// files - see VibH2O.Build.cs - so it stays editable once packaged.
+		if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("VibH2O")))
+		{
+			WebRoot = FPaths::Combine(Plugin->GetBaseDir(), TEXT("Resources"), TEXT("Remote"));
+		}
+	}
+	else if (FPaths::IsRelative(WebRoot))
+	{
+		WebRoot = FPaths::Combine(FPaths::ProjectDir(), WebRoot);
+	}
+
+	if (!RemoteServer.IsValid())
+	{
+		RemoteServer = MakeUnique<FVibH2ORemoteServer>();
+	}
+	if (!RemoteServer->Start(Settings->RemoteListenAddress, Settings->RemotePort, WebRoot))
+	{
+		return false;
+	}
+
+	for (const FString& Url : GetRemoteUrls())
+	{
+		UE_LOG(LogVibH2O, Display, TEXT("VibH2O: telecommande iPad — ouvrir %s dans Safari."), *Url);
+	}
+	return true;
+}
+
+void UVibH2OSubsystem::StopRemote()
+{
+	if (RemoteServer.IsValid())
+	{
+		RemoteServer->Shutdown();
+		RemoteServer.Reset();
+	}
+}
+
+bool UVibH2OSubsystem::IsRemoteRunning() const
+{
+	return RemoteServer.IsValid() && RemoteServer->IsRunning();
+}
+
+TArray<FString> UVibH2OSubsystem::GetRemoteUrls() const
+{
+	TArray<FString> Urls;
+	if (!IsRemoteRunning())
+	{
+		return Urls;
+	}
+
+	const int32 Port = RemoteServer->GetPort();
+	if (ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM))
+	{
+		TArray<TSharedPtr<FInternetAddr>> Addresses;
+		if (SocketSubsystem->GetLocalAdapterAddresses(Addresses))
+		{
+			for (const TSharedPtr<FInternetAddr>& Address : Addresses)
+			{
+				if (!Address.IsValid() || Address->GetProtocolType() != FNetworkProtocolTypes::IPv4)
+				{
+					continue;
+				}
+				// Loopback and self-assigned addresses are no use to an iPad.
+				const FString Ip = Address->ToString(/*bAppendPort=*/false);
+				if (Ip.StartsWith(TEXT("127.")) || Ip.StartsWith(TEXT("169.254.")) || Ip == TEXT("0.0.0.0"))
+				{
+					continue;
+				}
+				Urls.AddUnique(FString::Printf(TEXT("http://%s:%d/"), *Ip, Port));
+			}
+		}
+	}
+	if (Urls.Num() == 0)
+	{
+		Urls.Add(FString::Printf(TEXT("http://127.0.0.1:%d/"), Port));
+	}
+	return Urls;
+}
+
+void UVibH2OSubsystem::SetRemoteState(const FString& Json)
+{
+	if (RemoteServer.IsValid())
+	{
+		RemoteServer->SetStateJson(Json);
+	}
+}
+
 // -------------------------------------------------------------------- Tick
 
 TStatId UVibH2OSubsystem::GetStatId() const
@@ -342,22 +454,34 @@ void UVibH2OSubsystem::Tick(float DeltaTime)
 
 void UVibH2OSubsystem::DrainQueue()
 {
-	if (!Receiver.IsValid())
-	{
-		return;
-	}
-
 	const bool bLog = UVibH2OSettings::Get()->bLogOscTraffic;
 
 	FVibH2OOscMessage Message;
-	while (Receiver->Dequeue(Message))
+	if (Receiver.IsValid())
 	{
-		++MessagesThisSecond;
-		if (bLog)
+		while (Receiver->Dequeue(Message))
 		{
-			UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
+			++MessagesThisSecond;
+			if (bLog)
+			{
+				UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
+			}
+			HandleMessage(Message);
 		}
-		HandleMessage(Message);
+	}
+
+	// The iPad's commands join the very same path as Max's: one control
+	// route, whatever sent it.
+	if (RemoteServer.IsValid())
+	{
+		while (RemoteServer->Dequeue(Message))
+		{
+			if (bLog)
+			{
+				UE_LOG(LogVibH2O, Verbose, TEXT("iPad < %s"), *Message.ToDebugString());
+			}
+			HandleMessage(Message);
+		}
 	}
 }
 
@@ -604,8 +728,82 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 		return true;
 	}
 
+	return HandleSteeringMessage(Message);
+}
+
+bool UVibH2OSubsystem::HandleSteeringMessage(const FVibH2OOscMessage& Message)
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+
+	TArray<FString> Segments;
+
+	// Segments are compared whole, so "/Attractors" and "/Attractor" cannot
+	// swallow each other. Each route still guards against a cleared prefix,
+	// which would match every address.
+	if (!Settings->AttractorsGlobalPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->AttractorsGlobalPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		if (Segments[0].Equals(TEXT("Release"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorsReleased.Broadcast();
+		}
+		else if (Segments[0].Equals(TEXT("FadeScale"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorFadeScaleChanged.Broadcast(FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.1f, 10.0f));
+		}
+		return true;
+	}
+
+	if (!Settings->AttractorPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->AttractorPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		const FName Name(*Segments[0]);
+		// No argument means "on": a bare address is the simplest cue to send.
+		const float Value = FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f);
+		if (Segments.Num() >= 2 && Segments[1].Equals(TEXT("Share"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorShareChanged.Broadcast(Name, Value);
+		}
+		else
+		{
+			OnOscAttractorChanged.Broadcast(Name, Value);
+		}
+		return true;
+	}
+
+	if (!Settings->ExclusionPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->ExclusionPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		const FName Name(*Segments[0]);
+		if (Segments.Num() >= 2 && Segments[1].Equals(TEXT("Position"), ESearchCase::IgnoreCase))
+		{
+			const FVector2D Position(
+				FMath::Clamp(Message.GetFloatArg(0, 0.0f), -1.0f, 1.0f),
+				FMath::Clamp(Message.GetFloatArg(1, 0.0f), -1.0f, 1.0f));
+			OnOscExclusionMoved.Broadcast(Name, Position);
+		}
+		else
+		{
+			OnOscExclusionChanged.Broadcast(Name, FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f));
+		}
+		return true;
+	}
+
 	return false;
 }
+
 
 // --------------------------------------------------------------- Room plan
 
@@ -1087,4 +1285,17 @@ void UVibH2OSubsystem::UpdateDebugOverlay(float DeltaTime)
 		TEXT("   controle  blend %.2f   focus %.2f sur '%s'   OSC de controle %s   battements externes %d"),
 		OscBlendAlpha, OscFocusAmount, *OscFocusGroup.ToString(),
 		bIgnoreOscControl ? TEXT("IGNORE") : TEXT("actif"), ExternalBeatCount));
+
+	if (IsRemoteRunning())
+	{
+		Line(770007, FColor::Green, FString::Printf(
+			TEXT("   iPad     %s   %d requetes, %d commandes"),
+			*FString::Join(GetRemoteUrls(), TEXT("  ")), RemoteServer->GetRequestCount(), RemoteServer->GetCommandCount()));
+	}
+	else
+	{
+		const FString Error = RemoteServer.IsValid() ? RemoteServer->GetLastError() : FString();
+		Line(770007, FColor::Silver, FString::Printf(TEXT("   iPad     telecommande inactive%s"),
+			Error.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("  [%s]"), *Error)));
+	}
 }

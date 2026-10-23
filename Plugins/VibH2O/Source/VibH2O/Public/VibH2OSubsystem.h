@@ -9,6 +9,7 @@
 #include "CoreMinimal.h"
 #include "Osc/VibH2OOscReceiver.h"
 #include "Osc/VibH2OOscTypes.h"
+#include "Remote/VibH2ORemoteServer.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Tickable.h"
 #include "VibH2OTypes.h"
@@ -20,6 +21,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OEffectChangedSignature, FNam
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFocusGroupChangedSignature, FName, GroupName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFloatControlSignature, float, Value);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBeatSignature, int32, IndividualId, int32, BeatCount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, FName, TargetName, float, Value);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
 
 /** Operational figures, for the debug overlay and for get-in. */
 USTRUCT(BlueprintType)
@@ -128,6 +132,31 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Reseau")
 	FVibH2ONetworkStats GetNetworkStats() const;
+
+	// ---------------------------------------------------------------- Remote
+
+	/** (Re)starts the iPad remote with the current project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	bool StartRemote();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	void StopRemote();
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	bool IsRemoteRunning() const;
+
+	/**
+	 * Addresses to type into Safari on the iPad, one per network card of this
+	 * PC: "http://192.168.1.20:8642/".
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	TArray<FString> GetRemoteUrls() const;
+
+	/**
+	 * Hands the remote the state it shows - the stage builds it, since only
+	 * the stage knows its attractors and zones. Cheap when no remote runs.
+	 */
+	void SetRemoteState(const FString& Json);
 
 	// ------------------------------------------------------------- Room plan
 
@@ -252,6 +281,30 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
 	FVibH2OFloatControlSignature OnOscFocusAmountChanged;
 
+	/** /Attractor/<name>/ value - the attractor's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorChanged;
+
+	/** /Attractor/<name>/Share/ value - its share of the room. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorShareChanged;
+
+	/** /Attractors/Release/ - every attractor lets go. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OControlSignature OnOscAttractorsReleased;
+
+	/** /Attractors/FadeScale/ value - scales every fade time. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFloatControlSignature OnOscAttractorFadeScaleChanged;
+
+	/** /Exclusion/<name>/ value - the zone's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscExclusionChanged;
+
+	/** /Exclusion/<name>/Position/ x y - the zone's live position, -1 to 1. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedPositionControlSignature OnOscExclusionMoved;
+
 	// ------------------------------------------------------------- Injection
 
 	/**
@@ -281,6 +334,7 @@ private:
 	bool HandleRoomMappingMessage(const FVibH2OOscMessage& Message);
 	bool HandleDataMessage(const FVibH2OOscMessage& Message);
 	bool HandleControlMessage(const FVibH2OOscMessage& Message);
+	bool HandleSteeringMessage(const FVibH2OOscMessage& Message);
 
 	void RebuildRoomFromPending();
 	void UpdateOccupiedOrdinals();
@@ -304,6 +358,9 @@ private:
 	 * there.
 	 */
 	TUniquePtr<FVibH2OOscReceiver> Receiver;
+
+	/** The iPad remote. Complete type above, for the same reason. */
+	TUniquePtr<FVibH2ORemoteServer> RemoteServer;
 
 	UPROPERTY(Transient)
 	FVibH2ORoomSnapshot Room;
