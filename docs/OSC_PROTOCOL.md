@@ -162,10 +162,15 @@ contrôleur physique entrant dans Max et ressortant en OSC.
 /Blend/        0.0–1.0    morph du tableau 1 vers le tableau 2
 /Focus/Group/  <nom>      sélectionne un groupe de focus défini dans Unreal
 /Focus/Amount/ 0.0–1.0    intensité du focus
+/Cue/<Nom>/    [1]        déclenche la cue de ce nom (directeur de cues) ; 0 est ignoré
 ```
 
 Ces mêmes commandes sont accessibles depuis le panneau Details, depuis Blueprint, et animables
 dans Sequencer.
+
+**Cues.** Tout message de contrôle — c'est-à-dire tout ce qui n'est ni plan de salle ni donnée
+capteur — peut aussi servir de déclencheur à une cue apprise : `/composition/columns/3/connect`
+émis par Resolume, par exemple. Voir [`CUES.md`](CUES.md).
 
 **Arbitrage OSC / Sequencer :** l'OSC écrit à la réception d'un message, Sequencer réécrit à
 chaque frame pendant la lecture — Sequencer l'emporte donc naturellement pendant une séquence. Un

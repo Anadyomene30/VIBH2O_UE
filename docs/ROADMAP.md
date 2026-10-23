@@ -43,6 +43,7 @@ Trois apports qui ne figuraient pas dans le découpage initial, chacun compilé 
 | **Prévisualisation animée en éditeur** | ✅ | `VibH2O.PreviewProbe` mesure `StageTime` sur trois secondes de tick éditeur : 0,000 → 1,311, hors Play. La documentation l'affirmait, la sonde le prouve. |
 | **Passe artistique** | ✅ | Silhouette organique, rampe de couleur à trois paliers, **vrais boids** pour le tableau 2, numéros de siège, particules, éclairage volumétrique. |
 | **Isolement des effets** (`VibH2O.EffectIsolation`) | ✅ | Le point 8 de la recette, devenu mesurable. Voir ci-dessous. |
+| **Cues MIDI / OSC / clavier** (`AVibH2OCueDirector`) | ✅ sauf Resolume réel | Compilé en 5.5 **et** 5.8, Editor et Shipping ; 19 tests au vert sous les deux moteurs, dont 4 pour les cues. Essai en jeu le 24 octobre, **Resolume Arena au premier plan** : note MIDI, OSC de colonne, `/Cue/<nom>` et Ctrl+Maj+F12 ont lancé, mis en pause, fait sauter et arrêté une Level Sequence. Reste à brancher la sortie OSC de Resolume elle-même. Voir [`CUES.md`](CUES.md) et [`DECISIONS_NUIT.md`](DECISIONS_NUIT.md). |
 
 ### Passe du 22 octobre 2026 — réalisme, lumière, éditeur — **compilée et testée, reste à juger à l'œil**
 

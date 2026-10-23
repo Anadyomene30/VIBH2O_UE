@@ -160,30 +160,29 @@ void UVibH2OSubsystem::DrainCueInputs()
 {
 	FVibH2OCueInput Input;
 
-	if (MidiInput.IsValid())
+	// Validity re-checked on every pass: an input may end a learn capture,
+	// which closes the inputs from inside InjectCueInput.
+	while (MidiInput.IsValid() && MidiInput->Dequeue(Input))
 	{
-		while (MidiInput->Dequeue(Input))
-		{
-			InjectCueInput(Input);
-		}
+		InjectCueInput(Input);
+	}
 
-		// A loopMIDI port created after start-up, or a controller plugged in
-		// late: try again, quietly, until something opens.
+	// A loopMIDI port created after start-up, or a controller plugged in late:
+	// try again, quietly, until something opens.
+	if (MidiInput.IsValid() && MidiInput->GetOpenCount() == 0)
+	{
 		const UVibH2OSettings* Settings = UVibH2OSettings::Get();
 		const double Now = FPlatformTime::Seconds();
-		if (MidiInput->GetOpenCount() == 0 && Settings->bEnableMidiInput && Now >= NextMidiRetryTime)
+		if (Settings->bEnableMidiInput && Now >= NextMidiRetryTime)
 		{
 			NextMidiRetryTime = Now + 5.0;
 			MidiInput->Start(Settings->MidiInputDevices);
 		}
 	}
 
-	if (KeyboardSink.IsValid())
+	while (KeyboardSink.IsValid() && KeyboardSink->Dequeue(Input))
 	{
-		while (KeyboardSink->Dequeue(Input))
-		{
-			InjectCueInput(Input);
-		}
+		InjectCueInput(Input);
 	}
 }
 

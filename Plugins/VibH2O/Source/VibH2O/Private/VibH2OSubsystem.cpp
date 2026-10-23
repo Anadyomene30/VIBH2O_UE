@@ -355,7 +355,9 @@ void UVibH2OSubsystem::DrainQueue()
 	const bool bLog = UVibH2OSettings::Get()->bLogOscTraffic;
 
 	FVibH2OOscMessage Message;
-	while (Receiver->Dequeue(Message))
+	// Re-checked every time: a message may end a learn capture, which closes
+	// the editor stand-in's receiver from inside HandleMessage.
+	while (Receiver.IsValid() && Receiver->Dequeue(Message))
 	{
 		++MessagesThisSecond;
 		if (bLog)

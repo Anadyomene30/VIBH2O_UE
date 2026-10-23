@@ -282,6 +282,11 @@ void AVibH2OCueDirector::ExecuteSequenceAction(const FVibH2OCue& Cue)
 	default:
 		break;
 	}
+
+	UE_LOG(LogVibH2O, Display, TEXT("VibH2O:    sequence '%s' %s a %.2f s."),
+		*Player->GetSequence()->GetName(),
+		Player->IsPlaying() ? TEXT("en lecture") : (Player->IsPaused() ? TEXT("en pause") : TEXT("arretee")),
+		Player->GetCurrentTime().AsSeconds());
 }
 
 // ------------------------------------------------------------------- Learn

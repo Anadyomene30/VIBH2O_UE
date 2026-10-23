@@ -8,6 +8,11 @@
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 
+#include "Common/UdpSocketBuilder.h"
+#include "Containers/Ticker.h"
+#include "SocketSubsystem.h"
+#include "Sockets.h"
+
 #include "Cues/VibH2OCueDirector.h"
 #include "Cues/VibH2OCueTypes.h"
 #include "Engine/Engine.h"
@@ -408,5 +413,127 @@ bool FVibH2OCueSequenceTest::RunTest(const FString& Parameters)
 
 	return true;
 }
+
+// ---------------------------------------------------------------------------
+// Learning, end to end: the editor button, a real UDP datagram, the cue.
+// ---------------------------------------------------------------------------
+
+#if WITH_EDITOR
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVibH2OCueLearnTest,
+	"VibH2O.Cues.Apprentissage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVibH2OCueLearnTest::RunTest(const FString& Parameters)
+{
+	// Away from the production port, and no MIDI device: what is under test
+	// is the capture path - the stand-in opening its receiver, the ticker
+	// draining it, the director taking the first input.
+	UVibH2OSettings* Settings = GetMutableDefault<UVibH2OSettings>();
+	const int32 SavedPort = Settings->ListenPort;
+	const bool bSavedMidi = Settings->bEnableMidiInput;
+	const bool bSavedKeyboard = Settings->bEnableKeyboardCues;
+	Settings->ListenPort = 9188;
+	Settings->bEnableMidiInput = false;
+	Settings->bEnableKeyboardCues = false;
+	ON_SCOPE_EXIT
+	{
+		Settings->ListenPort = SavedPort;
+		Settings->bEnableMidiInput = bSavedMidi;
+		Settings->bEnableKeyboardCues = bSavedKeyboard;
+	};
+
+	UWorld* EditorWorld = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("VibH2O_TestApprentissage"));
+	if (EditorWorld == nullptr)
+	{
+		AddError(TEXT("Impossible de creer un monde editeur de test."));
+		return false;
+	}
+	ON_SCOPE_EXIT
+	{
+		EditorWorld->DestroyWorld(false);
+	};
+
+	AVibH2OCueDirector* Director = EditorWorld->SpawnActor<AVibH2OCueDirector>();
+	if (!TestNotNull(TEXT("Directeur"), Director))
+	{
+		return false;
+	}
+	Director->LearnTargetIndex = -1;
+	Director->Learn();
+	if (!Director->IsLearning())
+	{
+		AddWarning(FString::Printf(TEXT("Capture non ouverte, test ignore : %s"), *Director->LearnStatus));
+		return true;
+	}
+	ON_SCOPE_EXIT
+	{
+		Director->CancelLearn();
+	};
+
+	UVibH2OSubsystem* Preview = UVibH2OSubsystem::Get(EditorWorld);
+	if (Preview == nullptr || !Preview->IsListening())
+	{
+		AddWarning(TEXT("Port 9188 indisponible, test d'apprentissage ignore."));
+		return true;
+	}
+
+	ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+	FSocket* Sender = FUdpSocketBuilder(TEXT("VibH2OLearnSender")).AsReusable().Build();
+	if (SocketSubsystem == nullptr || Sender == nullptr)
+	{
+		AddWarning(TEXT("Socket emetteur indisponible, test ignore."));
+		return true;
+	}
+	ON_SCOPE_EXIT
+	{
+		Sender->Close();
+		SocketSubsystem->DestroySocket(Sender);
+	};
+	TSharedRef<FInternetAddr> Destination = SocketSubsystem->CreateInternetAddr();
+	bool bValid = false;
+	Destination->SetIp(TEXT("127.0.0.1"), bValid);
+	Destination->SetPort(9188);
+
+	// "/composition/columns/3/connect" ,i 1 - exactly what Resolume sends.
+	TArray<uint8> Packet;
+	auto WriteString = [&Packet](const char* Text)
+	{
+		for (const char* P = Text; *P != 0; ++P)
+		{
+			Packet.Add(static_cast<uint8>(*P));
+		}
+		Packet.Add(0);
+		while (Packet.Num() % 4 != 0)
+		{
+			Packet.Add(0);
+		}
+	};
+	WriteString("/composition/columns/3/connect");
+	WriteString(",i");
+	Packet.Append({ 0, 0, 0, 1 });
+	int32 Sent = 0;
+	Sender->SendTo(Packet.GetData(), Packet.Num(), Sent, *Destination);
+
+	// Pump the core ticker, as the editor would, until the capture ends.
+	const double Deadline = FPlatformTime::Seconds() + 3.0;
+	while (Director->IsLearning() && FPlatformTime::Seconds() < Deadline)
+	{
+		FTSTicker::GetCoreTicker().Tick(0.01f);
+		FPlatformProcess::Sleep(0.01f);
+	}
+
+	TestFalse(TEXT("La capture se ferme apres la premiere entree"), Director->IsLearning());
+	TestFalse(TEXT("Le port est rendu apres la capture"), Preview->IsListening());
+	if (TestEqual(TEXT("Une cue a ete apprise"), Director->Cues.Num(), 1))
+	{
+		TestTrue(TEXT("Cue apprise : OSC"), Director->Cues[0].Source == EVibH2OCueSource::Osc);
+		TestEqual(TEXT("Cue apprise : adresse de la colonne 3"), Director->Cues[0].OscAddress, FString(TEXT("/composition/columns/3/connect")));
+	}
+	return true;
+}
+
+#endif // WITH_EDITOR
 
 #endif // WITH_DEV_AUTOMATION_TESTS
