@@ -112,6 +112,7 @@ Comment c'est construit, et pourquoi :
 | Vérification | Résultat |
 |---|---|
 | Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
+| Compilation UE 5.8, Editor, Game **et** Shipping (`RunUAT BuildPlugin`, copie au chemin court) | ✅ propre, sans avertissement |
 | Tests d'automation | ✅ **18 / 18** — les 15 d'avant + `Tableau2.Division`, `Tableau2.BancVortex`, `Integration.DivisionReversible` |
 | `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — rien ne change au tableau 1 |
 | Vortex (test, 176 × 4) | ✅ rotation d'ensemble **0,98**, **100 %** des bulles sur la paroi du cône |
@@ -130,7 +131,7 @@ Reste à faire, à l'œil :
 1. Juger la lisibilité des familles dispersées : nettes en périphérie, plus serrées au centre du
    volume. Si besoin, agrandir `Bounds Radius` dans `Flock Driver`.
 2. Juger la vitesse de formation : le vortex se forme en ~5 s, les familles se reforment en ~6 s.
-3. Compiler sous UE 5.8 (non fait dans cette passe).
+3. Valider les choix pris seul pendant la nuit : [`DECISIONS_NUIT.md`](DECISIONS_NUIT.md).
 
 ### Rejouer les vérifications
 
