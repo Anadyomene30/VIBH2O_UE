@@ -135,6 +135,33 @@ Et un problème hors périmètre : dans ce worktree, `make_demo_material.py` pla
 Demandés pour piloter la salle à la main pendant le spectacle. Mode d'emploi complet :
 [`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md).
 
+### Tableau 2 enrichi — division et vortex — **24 octobre 2026, compilé, testé, mesuré**
+
+Choix artistiques de Dimitri, posés avant d'écrire le code :
+
+| Question | Choix |
+|---|---|
+| Forme de la division | **Mitose égale** : sœurs de même taille, volume de la mère conservé à chaque instant, même cœur, même couleur. |
+| Moment | **Au début du morph** : division sur place entre `BlendAlpha` 0 et 0,35 ; départ vers le banc à mi-division. |
+| Hors synchronie | **Les familles** restent groupées, réparties dans tout le volume : chaque spectateur reste lisible. |
+| Bascule | **Fondu entre deux seuils** de synchronie collective (0,35 → 0,70), lissé sur 2 s. |
+| Forme en synchronie | **Cône évasé** — les réglages `Vortex` existants. |
+| Taille | **3 filles par bulle** : 704 bulles pour 176 places, plafond réglable à 1 000. |
+
+Comment c'est construit, et pourquoi :
+
+- **Les filles sont des bulles à part entière**, possédées par l'acteur de scène, nées avec la salle
+  et jamais pendant le morph. La division est une **fonction pure de `BlendAlpha`** : aucun état,
+  donc réversible ; au retour, les sœurs se refondent et la mère retrouve sa place exacte.
+- **Des acteurs plutôt que des meshes instanciés**, sur mesure : 704 bulles tiennent **120 à 145
+  images/s** en rendu réel avec Lumen (380 à 411 avec les 176 mères seules). Les instances gardent
+  par ailleurs le problème de matériau noir déjà constaté sur les particules, et obligeraient à un
+  autre contrat matériau.
+- **Le banc ne coûte presque rien** : 0,88 ms par pas pour 704 bulles, grâce à un hachage spatial.
+- **Deux réglages mesurés, pas devinés** (simulation numpy du pilote, puis tests) : la cohésion de
+  voisinage effondrait le vortex en boule au bout de 15 s, et l'alignement à plein poids figeait les
+  mouvements verticaux. Le cône tient désormais seul la forme, avec la force centripète exacte.
+
 | Vérification | Résultat |
 |---|---|
 | Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
@@ -148,6 +175,27 @@ Reste à faire, sur place :
 1. Ouvrir la page **sur le vrai iPad**, l'ajouter à l'écran d'accueil, la juger dans le noir.
 2. Placer les zones devant les deux circassiennes réelles, la *Camera de projection* désignée, et
    vérifier à l'image que les bulles s'écartent bien.
+
+| Compilation UE 5.8, Editor, Game **et** Shipping (`RunUAT BuildPlugin`, copie au chemin court) | ✅ propre, sans avertissement |
+| Tests d'automation | ✅ **18 / 18** — les 15 d'avant + `Tableau2.Division`, `Tableau2.BancVortex`, `Integration.DivisionReversible` |
+| `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — rien ne change au tableau 1 |
+| Vortex (test, 176 × 4) | ✅ rotation d'ensemble **0,98**, **100 %** des bulles sur la paroi du cône |
+| Dispersion (test) | ✅ rotation 0,0, familles de **39 cm** de rayon, **124 cm** entre familles |
+| Balayage de synchronie (`VibH2O.SchoolSweep`, simulateur) | ✅ dispersé → vortex (ordre 0,99, rotation 0,90) → dispersé (familles à 50 cm), filles refondues au retour |
+
+Le balayage se rejoue d'une commande (une minute et demie, captures dans `Saved/VibH2OSchool/`). Il
+attend chaque état **sur mesure de l'ordre du banc**, pas sur un minutage supposé :
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.SchoolSweep" -NoSound -unattended -nosplash -abslog="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Saved/Logs/SchoolSweep.log"
+```
+
+Reste à faire, à l'œil :
+
+1. Juger la lisibilité des familles dispersées : nettes en périphérie, plus serrées au centre du
+   volume. Si besoin, agrandir `Bounds Radius` dans `Flock Driver`.
+2. Juger la vitesse de formation : le vortex se forme en ~5 s, les familles se reforment en ~6 s.
+3. Valider les choix pris seul pendant la nuit : [`DECISIONS_NUIT.md`](DECISIONS_NUIT.md).
 
 ### Rejouer les vérifications
 
@@ -460,5 +508,8 @@ première livraison.**
 - La **direction artistique** des bulles : avancée le 23 octobre — bulle à stries façon PPCM, en
   subsurface masked, et trois états de salle (voir plus haut). Reste à la juger dans `VIBH2o_PPCM`,
   sur le tulle, et à la régler en salle.
+
+- ~~Le **comportement de banc** du tableau 2~~ — fait : vrais boids, pilote par défaut du tableau 2. Enrichi le 24 octobre : **division** de chaque bulle en sœurs au début du morph, **vortex en cône** en synchronie, **familles lisibles** hors synchronie. Reste à le juger en salle.
+- La **direction artistique** des bulles : mesh, matériau subsurface, stries, anneaux.
 - Un éventuel **pilotage MIDI direct**, à brancher sur les fonctions existantes.
 - Les **tableaux suivants**, chacun étant une nouvelle classe de pilote de position.

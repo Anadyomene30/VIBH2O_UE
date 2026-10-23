@@ -26,6 +26,16 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OStageFocusChangedSignature, F
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OStageRoomBuiltSignature, int32, BubbleCount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OStageMoodChangedSignature, EVibH2OMood, NewMood, EVibH2OMood, PreviousMood);
 
+/** The daughters born from one seat's bubble. A struct only because a TMap cannot hold a TArray as a UPROPERTY. */
+USTRUCT()
+struct FVibH2OBubbleFamily
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AVibH2OBubbleActor>> Daughters;
+};
+
 /**
  * The room, and the tableaux that move it about.
  */
@@ -353,6 +363,90 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Vortex", meta = (ForceUnits = "cm"))
 	float VortexZOffset = 0.0f;
 
+	// -------- Division, on the way to tableau 2.
+
+	/**
+	 * Daughters born from each bubble on the way to tableau 2.
+	 *
+	 * A room of a hundred and fifty makes a thin school. Each bubble divides
+	 * into sisters of equal size - its volume shared, its heart and colour
+	 * kept - so the shoal gains a body while every family still belongs to one
+	 * spectator. Zero turns the division off.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Tableaux|Division", meta = (DisplayName = "Filles par bulle", ClampMin = "0", ClampMax = "8"))
+	int32 DaughtersPerBubble = 3;
+
+	/**
+	 * Ceiling on the whole school, mothers included. Past it, fewer daughters
+	 * are born rather than the frame rate falling.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Tableaux|Division", meta = (DisplayName = "Plafond du banc", ClampMin = "1"))
+	int32 MaxSchoolSize = 1000;
+
+	/** BlendAlpha at which the bubbles begin to divide. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Division", meta = (DisplayName = "Division : debut", ClampMin = "0.0", ClampMax = "1.0"))
+	float DivisionStart = 0.0f;
+
+	/**
+	 * BlendAlpha at which the division is complete. The families leave their
+	 * seats half way through it, so the two gestures overlap.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Division", meta = (DisplayName = "Division : fin", ClampMin = "0.0", ClampMax = "1.0"))
+	float DivisionEnd = 0.35f;
+
+	/** How far the sisters stand from their seat once divided, in cm. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Division", meta = (DisplayName = "Ecart des soeurs", ClampMin = "0.0", ForceUnits = "cm"))
+	float DivisionSpread = 35.0f;
+
+	// -------- Order of the school, read by the tableau 2 boids driver.
+
+	/** Below this collective synchrony the school is fully dispersed into families. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Banc", meta = (DisplayName = "Synchronie : dispersion sous", ClampMin = "0.0", ClampMax = "1.0"))
+	float SchoolDisperseBelow = 0.35f;
+
+	/** Above this collective synchrony the whole school mills as one vortex. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Banc", meta = (DisplayName = "Synchronie : vortex au-dessus de", ClampMin = "0.0", ClampMax = "1.0"))
+	float SchoolVortexAbove = 0.70f;
+
+	/**
+	 * Seconds the school takes to follow a change of synchrony. Synchrony is a
+	 * noisy measurement; without this the vortex would tremble.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Banc", meta = (DisplayName = "Lissage", ClampMin = "0.0", ForceUnits = "s"))
+	float SchoolOrderSmoothing = 2.0f;
+
+	/**
+	 * 1: the room's synchrony decides the order of the school. 0: "Ordre
+	 * manuel" decides. In between, a mix - to hand control to the director
+	 * for a moment, or to rehearse without an audience.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Banc", meta = (DisplayName = "Part de la synchronie", ClampMin = "0.0", ClampMax = "1.0"))
+	float SchoolSyncInfluence = 1.0f;
+
+	/** Order used instead of the synchrony's: 0 dispersed into families, 1 vortex. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Banc", meta = (DisplayName = "Ordre manuel", ClampMin = "0.0", ClampMax = "1.0"))
+	float SchoolManualOrder = 0.0f;
+
+	/** Members per family on stage, mother included: 1 + the daughters actually born. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Tableaux")
+	int32 GetFamilySize() const { return FamilySize; }
+
+	/** Order of the school in force, 0 dispersed to 1 vortex. 0 when tableau 2 is not the boids driver. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Tableaux")
+	float GetSchoolOrder() const;
+
+	/** Division progress in force, 0 to 1. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Tableaux")
+	float GetDivisionProgress() const;
+
+	/** Every daughter bubble, all families together. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Tableaux")
+	TArray<AVibH2OBubbleActor*> GetDaughters() const;
+
+	/** The daughters of one seat's bubble. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Tableaux")
+	TArray<AVibH2OBubbleActor*> GetDaughtersOfSeat(int32 InSeatIndex) const;
+
 	// =====================================================  Focus
 
 	/** Named groups, defined here in the Details panel. */
@@ -624,6 +718,22 @@ private:
 	FBox ComputeBubbleBounds(const FVibH2OFocusGroup* Group) const;
 
 	void ReconcileBubbles(const FVibH2ORoomSnapshot& NewRoom);
+
+	/** Spawns one bubble under the stage root, with the editor-scaffolding flags when needed. */
+	AVibH2OBubbleActor* SpawnBubbleActor(UWorld* World, const UClass* SpawnClass);
+
+	/**
+	 * Brings every family to the size the settings ask for: daughters are born
+	 * with the room, never on the fly during the morph, so the division is a
+	 * pure function of BlendAlpha and can run backwards.
+	 */
+	void ReconcileDaughters();
+	void DestroyDaughters();
+
+	/** Hides a daughter and folds her to a speck: invisible in game and in the editor viewport alike. */
+	static void TuckAway(AVibH2OBubbleActor* Daughter);
+	void TuckAwayDaughters();
+
 	void UpdateBubbles(float DeltaSeconds);
 	void DrawEditorPreview() const;
 
@@ -662,6 +772,20 @@ private:
 	/** Live bubbles, keyed by seat index. */
 	UPROPERTY(Transient)
 	TMap<int32, TObjectPtr<AVibH2OBubbleActor>> Bubbles;
+
+	/** Daughters, keyed by their mother's seat index. They belong to the stage, like the bubbles. */
+	UPROPERTY(Transient)
+	TMap<int32, FVibH2OBubbleFamily> Families;
+
+	/** Members per family currently spawned, mother included. */
+	int32 FamilySize = 1;
+
+	/**
+	 * True while every daughter is tucked away, at division progress zero.
+	 * Tableau 1 then skips them entirely: five hundred hidden bubbles cost
+	 * nothing instead of a full update each.
+	 */
+	bool bDaughtersTucked = false;
 
 	/** Local copy of the plan, so we do not query the subsystem every frame. */
 	UPROPERTY(Transient)

@@ -207,11 +207,57 @@ Vous pouvez vous arrêter à mi-chemin, revenir en arrière : la transition est 
 sens, et les cœurs ne perdent jamais le rythme.
 
 Le tableau 2 est un **vrai banc de poissons** : séparation, alignement et cohésion évalués sur le
-voisinage réel, plus un attracteur qui promène le banc. Chaque bulle regarde là où elle nage. Ses
-réglages sont dans le pilote `Flock Driver`, catégorie `Banc`.
+voisinage réel. Chaque bulle regarde là où elle nage.
 
-**La synchronie collective en règle l'ordre** : à 1 le banc est serré et rapide, à 0 il se disperse
-en nuage lâche. Pour le voir respirer, scénario *Balayage de synchronie* avec `Blend Alpha` à 1.
+#### La division — `VibH2O|Tableaux|Division`
+
+Au début du passage, **chaque bulle se divise sur place** en sœurs de même taille, comme une cellule :
+les filles gonflent à l'intérieur de la mère pendant qu'elle rétrécit, puis les sœurs s'écartent.
+Le volume de la famille reste celui de la mère à chaque instant. Les sœurs gardent **le cœur et la
+couleur** de leur spectateur : une personne devient une famille, toujours reconnaissable. Une fois la
+division à moitié faite, la famille quitte son siège pour rejoindre le banc.
+
+**Tout se joue au curseur `Blend Alpha`** : en revenant vers 0, les sœurs se rapprochent et se
+refondent dans leur mère, qui retrouve sa taille et sa place exactes. Rien n'est détruit, le cœur ne
+perd jamais le rythme.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Filles par bulle`** | Combien de filles naissent de chaque bulle. **3** par défaut : une salle de 176 donne un banc de 704. **0** coupe la division. |
+| `Plafond du banc` | Nombre total de bulles à ne pas dépasser (1 000). Au-delà, moins de filles naissent. |
+| `Division : debut` / `fin` | La plage de `Blend Alpha` où la division a lieu (0 → 0,35). |
+| `Ecart des soeurs` | Distance entre les sœurs une fois divisées, en cm. |
+
+> Dans un Blueprint de bulle, **`Is Daughter`** dit si la bulle est une fille. Les filles déclenchent
+> `Sur battement` comme leur mère : pour un son par spectateur et non par sœur, filtrer sur ce test.
+
+#### Le banc — `VibH2O|Tableaux|Banc`
+
+**La synchronie collective en règle l'ordre**, entre deux états :
+
+- **En synchronie : le vortex.** Tout le banc tourne dans le même sens autour d'un axe, sur la paroi
+  d'un cône qui s'évase vers le haut — une tornade de poissons. Sa forme se règle dans
+  `VibH2O|Tableaux|Vortex` (`Vortex Base Radius`, `Vortex Top Radius`, `Vortex Height`) ; le signe de
+  `Vortex Spin Speed` donne le sens de rotation.
+- **Hors synchronie : les familles.** Chaque famille reste groupée en petit essaim, et les essaims se
+  répartissent dans tout le volume, plus lentement. Dispersé, mais chaque spectateur reste lisible.
+
+Entre les deux, les forces se mélangent : rien ne bascule d'un coup.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Synchronie : dispersion sous`** | Sous ce seuil (0,35), le banc est entièrement dispersé en familles. |
+| **`Synchronie : vortex au-dessus de`** | Au-dessus (0,70), c'est le vortex plein. Fondu entre les deux. |
+| `Lissage` | Le temps que met le banc à suivre la synchronie (2 s). La mesure est bruitée : sans lissage, le vortex tremblerait. |
+| `Part de la synchronie` | 1 : la salle décide. 0 : `Ordre manuel` décide. Pour reprendre la main un moment, ou répéter sans public. |
+| `Ordre manuel` | 0 = familles dispersées, 1 = vortex. Animable dans Sequencer, comme tous les réglages ci-dessus. |
+
+Les réglages fins du comportement (rayons, poids, vitesses, volume de dispersion) sont dans le
+pilote `Flock Driver`, catégories `Banc`, `Banc|Vortex` et `Banc|Familles`. On n'y touche
+normalement pas en salle.
+
+**Pour le voir respirer** : scénario *Balayage de synchronie* avec `Blend Alpha` à 1. Le banc se
+disperse en familles, s'enroule en vortex quand la synchronie monte, puis se défait.
 
 ---
 
@@ -232,7 +278,7 @@ redimensionne sous le curseur. `Aisle Columns` vide des colonnes entières — l
 |---|---|
 | **Nominal** | Salle calme, chacun à son rythme. |
 | **Vague d'excitation** | Une vague traverse la salle de gauche à droite. |
-| **Balayage de synchronie** | La synchronie collective monte et redescend. **À combiner avec `Blend Alpha` à 1** : le vortex se resserre puis se disperse. |
+| **Balayage de synchronie** | La synchronie collective monte et redescend en 25 s. **À combiner avec `Blend Alpha` à 1** : les familles dispersées s'enroulent en vortex, puis se dispersent. |
 | **Pic collectif** | Toute la salle monte ensemble, puis retombe. |
 | **Coupure de capteurs** | Des capteurs se taisent : les bulles concernées se désaturent et cessent de battre. |
 | **Vague collective : calme, normal, excite** | Toute la salle passe par les trois états, chacun tenu une vingtaine de secondes (cycle de 96 s) ; la synchronie monte et descend sur sa propre période (37 s), pour voir chaque état synchrone et désynchrone. Équivalent réseau : `python Tools/vibh2o_osc_sim.py --scenario moods`. |
@@ -389,6 +435,7 @@ secondes.
 | Le plugin est correct | `Automation RunTests VibH2O` dans la console |
 | Voir la recette visuelle complète | `VibH2O.DemoSweep` — quatorze captures dans `Saved/VibH2OSweep/`, puis le moteur quitte |
 | Vérifier qu'un effet ne dérange que le sien | `VibH2O.EffectIsolation` — un verdict et une capture par effet, dans `Saved/VibH2OIsolation/` |
+| Voir le tableau 2 de bout en bout | `VibH2O.SchoolSweep` — division, départ, balayage de synchronie (dispersion, vortex, dispersion), retour, avec mesures et captures dans `Saved/VibH2OSchool/` |
 
 ---
 
@@ -399,6 +446,8 @@ secondes.
 | Voir la salle vivre | Ouvrir `VibH2O_Demo`, **Alt + S** |
 | Régler la géométrie | Sélectionner `VibH2O_Stage`, catégorie `VibH2O|Geometrie` |
 | Passer au vortex | `Blend Alpha` de 0 à 1 |
+| Régler la division | `Filles par bulle`, catégorie `VibH2O|Tableaux|Division` |
+| Régler quand le vortex se forme | Les deux seuils de synchronie, catégorie `VibH2O|Tableaux|Banc` |
 | Changer de salle | `VibH2O.Simulate ales` |
 | Comprendre pourquoi rien n'apparaît | `VibH2O.ShowDebug` |
 | Voir le plan en texte | `VibH2O.DumpRoom` |

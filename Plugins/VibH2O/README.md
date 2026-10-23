@@ -72,7 +72,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `AVibH2OStageActor` | La racine de l'installation. **Possède les bulles**, en permanence. |
 | `AVibH2OBubbleActor` | Une bulle. À dériver en Blueprint pour lui donner son apparence. |
 | `AVibH2OSimulatorActor` | Le Max de poche : simule plan et données par le chemin d'injection, et s'efface dès que le vrai réseau parle. |
-| `UVibH2OFlockDriver` | Tableau 2 — vrais boids : séparation, alignement, cohésion, attracteur mouvant. Pilote par défaut. |
+| `UVibH2OFlockDriver` | Tableau 2 — vrais boids. En synchronie, un vortex en cône ; hors synchronie, des familles groupées réparties dans le volume. Pilote par défaut. |
 | `AVibH2OWaterMotes` | Les particules en suspension dans l'eau. |
 | `AVibH2OBackdrop` | **Le bouton « fond »** : un fondu de l'environnement sous-marin vers le noir pur, bulles et particules intactes. Bouton dans le panneau Details, touche **B** en Play, adresse OSC `/Fond`, propriété `Presence du fond` animable dans Sequencer. |
 | `AVibH2OLightRig` | Trois projecteurs (face, contre-jour, débouchage) qui suivent les bulles réellement affichées : recul et puissance recalculés à chaque image, quelle que soit la taille de la salle. Éclairage de démonstration, entièrement réglable ou supprimable. |
@@ -82,6 +82,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `AVibH2OCueDirector` | La liste des cues : une note ou un CC MIDI, une adresse OSC, une touche → lancer, arrêter, sauter dans une Level Sequence, régler `BlendAlpha`, envoyer une commande au plugin. Apprend ses déclencheurs. Fonctionne sans que la fenêtre ait le focus — voir [`docs/CUES.md`](../../docs/CUES.md). |
 | `FVibH2OOscParser` | Parseur OSC 1.0, sans dépendance au moteur. |
 | `FVibH2OLayoutMath` | Toute la géométrie, en fonctions pures. Testée hors acteur. |
+| `FVibH2OSchoolMath` | La division (mitose à volume conservé) et l'ordre du banc, en fonctions pures. |
 
 **Les bulles n'appartiennent à aucun tableau.** C'est la décision structurante du projet : les deux
 pilotes tournent en permanence et `BlendAlpha` interpole entre eux. La transition est donc continue,
@@ -245,8 +246,9 @@ Sur `AVibH2OStageActor` : `OnFocusGroupChanged`, `OnRoomBuilt`, `OnMoodChanged`.
 
 Tout paramètre pilotable porte le spécificateur `Interp`, ce qui le rend visible dans la liste des
 propriétés animables. Les plus utiles : `BlendAlpha`, `FocusAmount`, `CurvatureAngle`,
-`FloatAmplitude`, `DriftIntensity`, les dix réglages du vortex — et toute l'ambiance : seuils,
-`Forcer l'etat`, lumière, taille, et chaque couleur et réglage des `Palettes par etat`.
+`FloatAmplitude`, `DriftIntensity`, les dix réglages du vortex, la plage de la division, les
+seuils de synchronie du banc — et toute l'ambiance : seuils, `Forcer l'etat`, lumière, taille, et
+chaque couleur et réglage des `Palettes par etat`.
 
 **Arbitrage OSC / Sequencer.** L'OSC n'écrit qu'à la réception d'un message ; Sequencer réécrit la
 propriété à chaque frame pendant la lecture. Sequencer l'emporte donc naturellement. Pour couper
@@ -373,7 +375,7 @@ Ce que la carte montre, et où le régler :
 | **Reflets** | `Reflets` (capture sphérique) + **Lumen** activé dans `Config/DefaultEngine.ini`. |
 | **Couleur selon l'état de salle** | Palettes par état sur `VibH2O_Stage` → `Ambiance`, et en presets. Le matériau ne calcule plus de couleur : il prend `TintColor`. |
 | **Numéros sur les bulles** | `VibH2O_Stage` → `Show Seat Numbers`. Tournés vers la caméra à chaque frame. |
-| **Banc de poissons** | `VibH2O_Stage` → `Flock Driver`, catégorie `Banc`. La synchronie collective serre ou disperse le banc. |
+| **Banc de poissons** | `VibH2O_Stage`, catégories `Tableaux|Division` et `Tableaux|Banc`. Chaque bulle se divise en sœurs au début du morph ; la synchronie collective enroule le banc en vortex ou le disperse en familles. Réglages fins dans `Flock Driver`. |
 | **Particules dans l'eau** | Acteur `VibH2O_Particules`. Le champ entier dérive comme un corps, pas mote par mote. |
 | **Ambiance** | Brouillard **volumétrique**, soleil diffusant (tombant enfin d'en haut : il était tourné vers le haut, voir `make_demo_map.py`) et `PostProcess` (bloom, vignette, étalonnage froid). |
 
@@ -400,8 +402,6 @@ en français. La frontière retenue ici :
 
 ## Ce qui reste hors périmètre
 
-- **Le comportement de banc** du tableau 2 : voisinage, séparation, alignement, cohésion. Le vortex
-  livré donne la forme, ce qui suffit à rendre la transition testable.
 - **Le look définitif des bulles** : mesh, matériau subsurface, stries, anneaux. Le matériau de
   démonstration (`/VibH2O/M_VibH2ODemoBubble`, régénérable par `Tools/make_demo_material.py`)
   prouve que les onze paramètres circulent et agissent — il ne prétend à aucune direction

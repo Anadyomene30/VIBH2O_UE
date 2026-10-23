@@ -144,7 +144,9 @@ void AVibH2OBubbleActor::AssignSeat(const FVibH2OSeat& Seat)
 	}
 
 #if WITH_EDITOR
-	SetActorLabel(FString::Printf(TEXT("Bubble_S%03d_I%03d"), SeatIndex, IndividualId));
+	SetActorLabel(FamilyMember > 0
+		? FString::Printf(TEXT("Bubble_S%03d_I%03d_F%d"), SeatIndex, IndividualId, FamilyMember)
+		: FString::Printf(TEXT("Bubble_S%03d_I%03d"), SeatIndex, IndividualId));
 #endif
 
 	ReceiveSeatAssigned(SeatIndex, IndividualId);
@@ -157,6 +159,12 @@ void AVibH2OBubbleActor::SetMood(const FVibH2OBubbleMood& InMood, float DeltaTim
 	// never jumps. Kept in [0,1), which loses nothing - the striations repeat
 	// with a period of exactly one.
 	StripePhase = FMath::Frac(StripePhase + FMath::Max(DeltaTime, 0.0f) * Mood.StripeSpeed);
+}
+
+void AVibH2OBubbleActor::AssignDaughter(const FVibH2OSeat& Seat, int32 InFamilyMember)
+{
+	FamilyMember = FMath::Max(InFamilyMember, 1);
+	AssignSeat(Seat);
 }
 
 void AVibH2OBubbleActor::SetSeatLabelVisible(bool bVisible)
