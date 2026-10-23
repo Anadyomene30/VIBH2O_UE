@@ -111,6 +111,14 @@ public:
 	FString FocusAmountPrefix = TEXT("/Focus/Amount");
 
 	/**
+	 * Address of the backdrop: "/Fond <presence> [seconds]". 1 brings the
+	 * underwater environment back, 0 fades it to pure black behind the
+	 * bubbles; the optional second argument overrides the fade duration.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Adresses OSC")
+	FString BackdropPrefix = TEXT("/Fond");
+
+	/**
 	 * Attractor prefix: "/Attractor/<name>/ 0..1" sets its activation,
 	 * "/Attractor/<name>/Share/ 0..1" its share of the room.
 	 */

@@ -702,6 +702,18 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 		return true;
 	}
 
+	if (!Settings->BackdropPrefix.IsEmpty() && Message.MatchesPrefix(Settings->BackdropPrefix))
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		OscBackdropTarget = FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f);
+		const float FadeSeconds = Message.Args.Num() > 1 ? FMath::Max(0.0f, Message.GetFloatArg(1, 0.0f)) : -1.0f;
+		OnOscBackdropChanged.Broadcast(OscBackdropTarget, FadeSeconds);
+		return true;
+	}
+
 	if (!Settings->FocusGroupPrefix.IsEmpty() && Message.MatchesPrefix(Settings->FocusGroupPrefix))
 	{
 		if (bIgnoreOscControl)

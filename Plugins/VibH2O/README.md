@@ -74,6 +74,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `AVibH2OSimulatorActor` | Le Max de poche : simule plan et données par le chemin d'injection, et s'efface dès que le vrai réseau parle. |
 | `UVibH2OFlockDriver` | Tableau 2 — vrais boids : séparation, alignement, cohésion, attracteur mouvant. Pilote par défaut. |
 | `AVibH2OWaterMotes` | Les particules en suspension dans l'eau. |
+| `AVibH2OBackdrop` | **Le bouton « fond »** : un fondu de l'environnement sous-marin vers le noir pur, bulles et particules intactes. Bouton dans le panneau Details, touche **B** en Play, adresse OSC `/Fond`, propriété `Presence du fond` animable dans Sequencer. |
 | `AVibH2OLightRig` | Trois projecteurs (face, contre-jour, débouchage) qui suivent les bulles réellement affichées : recul et puissance recalculés à chaque image, quelle que soit la taille de la salle. Éclairage de démonstration, entièrement réglable ou supprimable. |
 | `UVibH2OPositionDriver` | Un tableau : une fonction qui dit où va chaque bulle. |
 | `UVibH2OGridDriver` | Tableau 1 — le plan de salle. |

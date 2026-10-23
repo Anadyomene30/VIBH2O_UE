@@ -13,7 +13,9 @@ public class VibH2O : ModuleRules
 			"Engine",
 			// UVibH2OSettings derives from UDeveloperSettings in a public
 			// header, so the dependency must be public, not private.
-			"DeveloperSettings"
+			"DeveloperSettings",
+			// AVibH2OBackdrop exposes its toggle key (FKey) in a public header.
+			"InputCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]

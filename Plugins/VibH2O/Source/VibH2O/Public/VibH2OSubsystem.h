@@ -24,6 +24,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBeatSignature, int32, Indivi
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, FName, TargetName, float, Value);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBackdropControlSignature, float, TargetPresence, float, FadeSeconds);
 
 /** Operational figures, for the debug overlay and for get-in. */
 USTRUCT(BlueprintType)
@@ -259,6 +260,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
 	FName GetOscFocusGroup() const { return OscFocusGroup; }
 
+	/** Last backdrop presence asked for over OSC: 1 present, 0 removed. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	float GetOscBackdropTarget() const { return OscBackdropTarget; }
+
 	// ---------------------------------------------------------------- Events
 
 	/** Raised after the room plan has been rebuilt. */
@@ -304,6 +309,14 @@ public:
 	/** /Exclusion/<name>/Position/ x y - the zone's live position, -1 to 1. */
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
 	FVibH2ONamedPositionControlSignature OnOscExclusionMoved;
+
+	/**
+	 * Raised on every /Fond message, even a repeated value: an operator who
+	 * presses "remove" again expects the fade to run, whatever the last state
+	 * was. FadeSeconds is negative when the message did not specify one.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OBackdropControlSignature OnOscBackdropChanged;
 
 	// ------------------------------------------------------------- Injection
 
@@ -401,6 +414,7 @@ private:
 	float OscBlendAlpha = 0.0f;
 	float OscFocusAmount = 0.0f;
 	FName OscFocusGroup = NAME_None;
+	float OscBackdropTarget = 1.0f;
 
 	/** Throughput counters, for the debug overlay. */
 	int32 MessagesThisSecond = 0;
