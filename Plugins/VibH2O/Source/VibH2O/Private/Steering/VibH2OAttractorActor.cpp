@@ -6,7 +6,7 @@
 namespace
 {
 	/** Per-bubble state not touched for this many frames is dropped. */
-	constexpr uint64 PruneAfterFrames = 600;
+	constexpr uint64 AttractorPruneAfterFrames = 600;
 }
 
 AVibH2OAttractorActor::AVibH2OAttractorActor()
@@ -153,7 +153,7 @@ void AVibH2OAttractorActor::EndSteeringFrame()
 	for (auto It = BubbleWeights.CreateIterator(); It; ++It)
 	{
 		const FBubbleWeight& Entry = It.Value();
-		const bool bForgotten = FrameNumber > Entry.LastFrame + PruneAfterFrames;
+		const bool bForgotten = FrameNumber > Entry.LastFrame + AttractorPruneAfterFrames;
 		const bool bHome = Entry.Spring.Value == 0.0f && Entry.Spring.Velocity == 0.0f;
 		if (bForgotten || bHome)
 		{

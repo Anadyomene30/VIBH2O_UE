@@ -7,7 +7,7 @@
 
 namespace
 {
-	constexpr uint64 PruneAfterFrames = 600;
+	constexpr uint64 ZonePruneAfterFrames = 600;
 
 	/** Closer than this to a perspective camera, a bubble is left alone. */
 	constexpr float MinPerspectiveDepth = 1.0f;
@@ -309,7 +309,7 @@ void AVibH2OExclusionZoneActor::EndSteeringFrame()
 {
 	for (auto It = BubbleStates.CreateIterator(); It; ++It)
 	{
-		if (FrameNumber > It.Value().LastFrame + PruneAfterFrames)
+		if (FrameNumber > It.Value().LastFrame + ZonePruneAfterFrames)
 		{
 			It.RemoveCurrent();
 		}
