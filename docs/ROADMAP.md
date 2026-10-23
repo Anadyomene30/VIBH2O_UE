@@ -82,6 +82,53 @@ Reste à faire, à l'œil :
    (`ridge_of` dans `make_demo_material.py`). Sur les captures, les bulles se lisent plutôt comme
    des **perles** que comme des bulles : la transparence feinte par Fresnel reste discrète.
 
+### Passe du 23 octobre 2026 — trois états de salle, bulle à stries — **compilée, testée, capturée**
+
+Demande de Dimitri : trois états lisibles (calme, normal, excité) selon l'écart collectif à la
+baseline, distincts de la synchronie ; le look des bulles de `VIBH2o_PPCM`, en mieux ; des couleurs
+réglables dans l'éditeur ; une interface rapide sur place. Détail dans le
+[README du plugin](../Plugins/VibH2O/README.md), section *L'ambiance de la salle*.
+
+| Demande | Réponse |
+|---|---|
+| Trois états | `FVibH2OMoodTracker` : moyenne lissée (1,5 s), hystérésis (±0,04), fondu de 4 s. Seuils réglables, forçage manuel, état tenu sans capteur actif. |
+| Ce qui change | Couleur (palette par état), énergie (lumière, vitesse et agitation des stries), mouvement (flottement, dérive), taille et battement. Les vitesses passent par des **accumulateurs de phase** : un changement d'état ne fait rien sauter. |
+| Synchronie à part | Elle règle la **cohérence** : stries alignées sur la salle, teintes resserrées, halo. Jamais la palette. |
+| Look PPCM en mieux | Relevé en lecture seule dans le projet LUX : `Sphere_BP` → `Bubble_Mat` (Masked, tramage temporel, tout émissif, stries `sin` sur V). Refait en **Subsurface masked deux faces** : éclairé, ombres et caustiques reçues, stries pilotées par l'état, anneau de lumière à chaque battement. |
+| Couleurs dans l'éditeur | Catégorie `VibH2O|Ambiance` en tête ; palettes animables ; presets `UVibH2OMoodPreset` (deux livrés, `Tools/make_mood_presets.py`), bouton d'enregistrement. |
+
+Vérifié le 23 octobre 2026, dans la branche `claude/bulles-look-etats-6977f1` :
+
+| Vérification | Résultat |
+|---|---|
+| UE 5.5 Editor et Shipping | ✅ propre, sans avertissement |
+| Tests d'automation | ✅ **19 / 19** — les 15 d'avant et 4 nouveaux `VibH2O.Ambiance.*` (trois états, pas de clignotement sur une minute de bruit à cheval sur le seuil, fondu de 4 s sans saut, palettes) |
+| `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — après correction : couper la teinte coupe désormais **aussi** la couleur d'état |
+| Les trois états au simulateur | ✅ `VibH2O.DemoSweep` phases 15 à 22, par le vrai chemin de données : calme à 0,09, normal à 0,40, excité à 0,85, puis chaque état synchrone et désynchrone. `VibH2O.DemoSweep ambiance` rejoue ces seules phases en une minute. |
+| Images par seconde, salle de 176 | 🟡 **182 images/s**, contre 303 avant — mesure faite pendant qu'un éditeur 5.8 d'une autre session occupait le même GPU. Large marge, mais à remesurer seul. |
+| UE 5.8, Editor et Shipping (copie au chemin court `C:\VB58bulles`) | ✅ propre, zéro avertissement ; **19 / 19** tests |
+
+Captures avant / après : `Saved/VibH2OSweep_ambiance_2026-10-23/PLANCHE_avant_apres.png` à la
+racine du dépôt principal (hors git). Les choix faits sans Dimitri, à valider, sont dans
+[`DECISIONS_NUIT.md`](DECISIONS_NUIT.md). Non fait : l'essai dans une copie de PPCM, l'éditeur LUX
+étant occupé et son plugin partagé entre branches (décision 10).
+
+Trois pièges rencontrés, notés pour la suite :
+
+1. **Exposition manuelle +10 EV** dans la carte de démo (+10,5 dans PPCM) : un émissif de 1 y est
+   mille fois blanc. Les niveaux du matériau sont donc minuscules (`StripeLight` 0,05). Le nœud
+   `EyeAdaptationInverse`, essayé pour rendre l'émissif indépendant de l'exposition, n'a rien changé
+   de mesurable sous exposition manuelle. Pour une autre scène : `Lumiere des bulles` sur l'acteur.
+2. **Nœud `Sine`** : il a déjà une période de 1, il calcule sin(2π·x). Multiplier encore par 2π
+   donne quatre cents bandes par bulle, qui se fondent en une lueur uniforme.
+3. **Broche d'exposant du nœud `Power`** : refusée sous le nom `Exponent`, et le repli sur l'entrée
+   sans nom branchait… la base. Les stries valaient 9 partout. Le générateur n'a plus de repli
+   silencieux pour cette broche.
+
+Et un problème hors périmètre : dans ce worktree, `make_demo_material.py` plante **après** avoir
+écrit la bulle et les particules, à la recréation des caustiques (assertion Slate dans
+`AssetTools.CreateAsset`). Bulle et particules sont bien écrites ; seule la bulle est commitée.
+
 ### Rejouer les vérifications
 
 ```bash
@@ -390,6 +437,8 @@ première livraison.**
 ## Après cette livraison
 
 - ~~Le **comportement de banc** du tableau 2~~ — fait : vrais boids (séparation, alignement, cohésion, attracteur mouvant), pilote par défaut du tableau 2, la synchronie collective serrant ou dispersant le banc. Reste à le juger en salle.
-- La **direction artistique** des bulles : mesh, matériau subsurface, stries, anneaux.
+- La **direction artistique** des bulles : avancée le 23 octobre — bulle à stries façon PPCM, en
+  subsurface masked, et trois états de salle (voir plus haut). Reste à la juger dans `VIBH2o_PPCM`,
+  sur le tulle, et à la régler en salle.
 - Un éventuel **pilotage MIDI direct**, à brancher sur les fonctions existantes.
 - Les **tableaux suivants**, chacun étant une nouvelle classe de pilote de position.

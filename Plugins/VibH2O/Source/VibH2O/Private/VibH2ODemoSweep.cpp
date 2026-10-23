@@ -6,8 +6,9 @@
 // injection (no network needed), walks through every visual criterion of the
 // recipe - curvature both ways, constant spacing, rake and relief, focus,
 // quiet sensors, a moved stage actor, the vortex morph, a Sequencer playback,
-// the 176-seat room with an FPS measurement - and saves one labelled PNG per
-// phase under Saved/VibH2OSweep/, then quits.
+// the 176-seat room with an FPS measurement, then the room's three moods
+// crossed with synchrony - and saves one labelled PNG per phase under
+// Saved/VibH2OSweep/, then quits.
 //
 // Run it headless:
 //   UnrealEditor.exe <project>.uproject -game -RenderOffscreen
@@ -24,6 +25,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
@@ -50,6 +52,12 @@ class FVibH2ODemoSweep : public TSharedFromThis<FVibH2ODemoSweep>
 {
 public:
 	static void Start(UWorld* InWorld);
+
+	/**
+	 * "ambiance": only the warm-up and the mood phases - about a minute, for
+	 * tuning palettes and the bubble's look without replaying the geometry.
+	 */
+	static void StartWithArgs(const TArray<FString>& Args, UWorld* InWorld);
 
 	~FVibH2ODemoSweep()
 	{
@@ -80,6 +88,9 @@ private:
 
 	bool Tick(float DeltaTime);
 	void BuildPhases();
+	void BuildMoodPhases();
+
+	bool bMoodsOnly = false;
 	void EnterPhase(int32 Index);
 
 	UVibH2OSubsystem* GetSubsystem() const;
@@ -112,11 +123,30 @@ private:
 
 	float SequencerBlendAtStart = 0.0f;
 
+	/**
+	 * Room-level arousal and synchrony for the mood phases. Negative: off, and
+	 * the lively sinusoids of the other phases are fed instead. Each person
+	 * still varies around the room's level, so the palette's individual nuance
+	 * shows too.
+	 */
+	float MoodExcitation = -1.0f;
+	float MoodSynchrony = 0.5f;
+
+	void AddMoodPhase(const TCHAR* Name, float Excitation, float Synchrony, float DistanceMul = 0.9f);
+
 	FTSTicker::FDelegateHandle TickerHandle;
 	static TSharedPtr<FVibH2ODemoSweep> Active;
 };
 
 TSharedPtr<FVibH2ODemoSweep> FVibH2ODemoSweep::Active;
+
+static bool bNextMoodsOnly = false;
+
+void FVibH2ODemoSweep::StartWithArgs(const TArray<FString>& Args, UWorld* InWorld)
+{
+	bNextMoodsOnly = Args.Num() > 0 && Args[0].Equals(TEXT("ambiance"), ESearchCase::IgnoreCase);
+	Start(InWorld);
+}
 
 void FVibH2ODemoSweep::Start(UWorld* InWorld)
 {
@@ -128,6 +158,8 @@ void FVibH2ODemoSweep::Start(UWorld* InWorld)
 
 	TSharedPtr<FVibH2ODemoSweep> Sweep = MakeShared<FVibH2ODemoSweep>();
 	Sweep->World = InWorld;
+	Sweep->bMoodsOnly = bNextMoodsOnly;
+	bNextMoodsOnly = false;
 	Sweep->BuildPhases();
 	Sweep->TickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 		FTickerDelegate::CreateSP(Sweep.ToSharedRef(), &FVibH2ODemoSweep::Tick));
@@ -183,8 +215,13 @@ void FVibH2ODemoSweep::FeedData()
 		}
 
 		const float Bpm = 55.0f + static_cast<float>((Id * 7) % 50);
-		const float Excitation = 0.5f + 0.5f * FMath::Sin(TotalTime * 0.8f + Id * 0.7f);
-		const float Synchrony = 0.5f + 0.5f * FMath::Sin(TotalTime * 0.25f + Id * 0.1f);
+		float Excitation = 0.5f + 0.5f * FMath::Sin(TotalTime * 0.8f + Id * 0.7f);
+		float Synchrony = 0.5f + 0.5f * FMath::Sin(TotalTime * 0.25f + Id * 0.1f);
+		if (MoodExcitation >= 0.0f)
+		{
+			Excitation = FMath::Clamp(MoodExcitation + 0.16f * FMath::Sin(TotalTime * 0.5f + Id * 1.7f), 0.0f, 1.0f);
+			Synchrony = FMath::Clamp(MoodSynchrony + 0.05f * FMath::Sin(Id * 2.3f), 0.0f, 1.0f);
+		}
 
 		FVibH2OOscMessage Message(FString::Printf(TEXT("/BPM/%d/"), Id));
 		Message.Args.Add(FVibH2OOscValue::MakeFloat(Bpm));
@@ -274,6 +311,12 @@ void FVibH2ODemoSweep::BuildPhases()
 				S->FocusAmount = 0.0f;
 			}
 		}, nullptr });
+
+	if (bMoodsOnly)
+	{
+		BuildMoodPhases();
+		return;
+	}
 
 	Phases.Add({ TEXT("02_courbure_positive"), 2.5f, 0.9f, 2.2f,
 		[](FVibH2ODemoSweep& Self) { if (Self.Stage.IsValid()) { Self.Stage->CurvatureAngle = 10.0f; } }, nullptr });
@@ -405,6 +448,66 @@ void FVibH2ODemoSweep::BuildPhases()
 			Self.FpsAccumTime = 0.0f;
 			Self.FpsFrames = 0;
 		}, nullptr });
+
+	BuildMoodPhases();
+}
+
+void FVibH2ODemoSweep::BuildMoodPhases()
+{
+	// The room's moods, through the real path: arousal injected like Max's,
+	// averaged by the subsystem, judged by the thresholds, cross-faded. Each
+	// phase outlasts smoothing plus cross-fade, so the capture shows the mood
+	// itself and not the way to it. Synchrony then varies on its own, to show
+	// it combines with a mood without being mistaken for one.
+	AddMoodPhase(TEXT("15_etat_calme"), 0.06f, 0.15f);
+	AddMoodPhase(TEXT("16_etat_normal"), 0.40f, 0.15f);
+	AddMoodPhase(TEXT("17_etat_excite"), 0.85f, 0.15f);
+	AddMoodPhase(TEXT("18_excite_synchrone"), 0.85f, 0.95f);
+	AddMoodPhase(TEXT("19_calme_synchrone"), 0.06f, 0.95f);
+	AddMoodPhase(TEXT("20_gros_plan_normal"), 0.40f, 0.30f, 0.32f);
+	AddMoodPhase(TEXT("21_gros_plan_excite"), 0.85f, 0.30f, 0.32f);
+	AddMoodPhase(TEXT("22_gros_plan_normal_synchrone"), 0.40f, 0.95f, 0.32f);
+}
+
+void FVibH2ODemoSweep::AddMoodPhase(const TCHAR* Name, float Excitation, float Synchrony, float DistanceMul)
+{
+	Phases.Add({ Name, 7.0f, DistanceMul, 0.5f,
+		[Excitation, Synchrony](FVibH2ODemoSweep& Self)
+		{
+			if (Self.MoodExcitation < 0.0f)
+			{
+				// First mood phase: a mid-sized room, the order the moods
+				// read best at, and the mood left to the room.
+				Self.BuildRoom(12, 5);
+				if (Self.Stage.IsValid())
+				{
+					Self.Stage->SetMoodOverride(EVibH2OMoodOverride::Auto);
+				}
+				// The game mode's default pawn is a grey engine sphere: from
+				// the mood phases' camera it floats right in the frame, a
+				// bubble-sized stranger in every capture.
+				if (Self.World.IsValid())
+				{
+					if (APlayerController* PC = Self.World->GetFirstPlayerController())
+					{
+						if (APawn* Pawn = PC->GetPawn())
+						{
+							Pawn->SetActorHiddenInGame(true);
+						}
+					}
+				}
+			}
+			Self.MoodExcitation = Excitation;
+			Self.MoodSynchrony = Synchrony;
+		},
+		[](FVibH2ODemoSweep& Self, float Progress)
+		{
+			if (Progress >= 1.0f && Self.Stage.IsValid() && !Self.bShotRequested && !Self.bReframed)
+			{
+				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: etat de salle a la capture : %s (excitation lissee %.2f)."),
+					*UEnum::GetDisplayValueAsText(Self.Stage->GetCurrentMood()).ToString(), Self.Stage->RoomExcitation);
+			}
+		} });
 }
 
 void FVibH2ODemoSweep::EnterPhase(int32 Index)
@@ -691,10 +794,10 @@ static FAutoConsoleCommandWithWorld GVibH2OPreviewProbeCommand(
 	TEXT("Mesure si l'acteur de scene tourne dans l'editeur, hors Play."),
 	FConsoleCommandWithWorldDelegate::CreateStatic(&PreviewProbe));
 
-static FAutoConsoleCommandWithWorld GVibH2ODemoSweepCommand(
+static FAutoConsoleCommandWithWorldAndArgs GVibH2ODemoSweepCommand(
 	TEXT("VibH2O.DemoSweep"),
-	TEXT("Deroule la recette visuelle complete et enregistre une capture par phase dans Saved/VibH2OSweep/, puis quitte."),
-	FConsoleCommandWithWorldDelegate::CreateStatic(&FVibH2ODemoSweep::Start));
+	TEXT("Deroule la recette visuelle complete et enregistre une capture par phase dans Saved/VibH2OSweep/, puis quitte. 'ambiance' : seulement les etats de salle."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FVibH2ODemoSweep::StartWithArgs));
 
 } // namespace VibH2ODemoSweepInternal
 

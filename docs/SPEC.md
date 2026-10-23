@@ -131,7 +131,29 @@ mathématiquement pas atteindre la case voisine.
 | `StriationSpeed` | Vitesse d'animation des stries, dérivée de la vitesse réelle de la bulle |
 | `FocusMask` | 1 dans le groupe en focus, 0 assombri |
 | `Staleness` | 1 si le capteur est muet |
-| `TintColor` | Couleur issue du gradient d'excitation |
+| `TintColor` | Couleur tirée de la palette de l'état de salle (voir *Ambiance*) |
+
+S'y ajoutent les paramètres de l'état de salle et de la synchronie — `MoodCalm`, `MoodNormal`,
+`MoodExcited`, `MoodGlow`, `MoodTurbulence`, `StripePhase`, `RoomStripePhase`, `Coherence`,
+`SyncHalo`, `RoomExcitation`, `BubbleBrightness`, `BubbleSeed` — décrits dans le
+[README du plugin](../Plugins/VibH2O/README.md).
+
+### Ambiance : trois états de salle
+
+L'excitation reçue est déjà un écart normalisé à la baseline de chaque personne. **L'écart
+collectif en est la moyenne**, sièges vides et capteurs muets exclus. Il fait passer la salle par
+trois états — **calme, normal, excité** — distingués sur les bulles par la couleur (une palette par
+état), l'énergie (lumière et vitesse des stries, agitation), le mouvement (flottement, dérive) et la
+taille (taille, force du battement).
+
+| Exigence | Réponse |
+|---|---|
+| Lisible | État discret, rendu par trois poids qui somment à 1. |
+| Pas de clignotement | Moyenne lissée, marge d'hystérésis autour de chaque seuil, fondu de 4 s entre états. |
+| Synchronie indépendante | Elle règle la **cohérence** (stries alignées sur la salle, teintes resserrées, halo), jamais la palette d'état. |
+| Réglable vite | Catégorie `VibH2O|Ambiance` en tête du panneau : preset, deux seuils, forçage, lumière, taille, et la moyenne en direct. Le reste sous *avancé*. |
+| Couleurs récupérables | Palettes dans l'acteur (animables) et en presets (`UVibH2OMoodPreset`). |
+| Animable | Seuils, forçage, lumière, taille et chaque valeur des palettes portent `Interp`. |
 
 **Les anneaux concentriques** de la référence artistique n'ont besoin d'aucun état : dans le
 matériau, `frac(BeatPhase * N - Distance * K)` produit un train d'anneaux qui s'étendent en

@@ -254,6 +254,32 @@ void AVibH2OSimulatorActor::ScenarioTargets(int32 Column, int32 Row, int32 Id, f
 		OutSynchrony = 0.4f + OutExcitation * 0.5f;
 		return;
 
+	case EVibH2OSimulatorScenario::MoodWave:
+	{
+		// A 96-second tide in four slots - calm, normal, excited, normal -
+		// each held for three quarters of its slot and ramping into the next
+		// over the last quarter, so every mood stays long enough to be read.
+		// Tools/vibh2o_osc_sim.py --scenario moods plays the very same tide.
+		static const float Levels[] = { 0.08f, 0.40f, 0.85f, 0.40f };
+		const float Slot = FMath::Fmod(T, 96.0f) / 24.0f;
+		const int32 Index = FMath::FloorToInt(Slot) % 4;
+		const float Ramp = FMath::SmoothStep(0.75f, 1.0f, Slot - FMath::FloorToFloat(Slot));
+		const float Room = FMath::Lerp(Levels[Index], Levels[(Index + 1) % 4], Ramp);
+
+		// Each person around the room's level, and a small crest crossing the
+		// room on top: the palette's nuance needs people to differ.
+		const float Personal = 0.12f * FMath::Sin(T * 0.37f + Id * 1.9f);
+		const float Position = (Columns > 1) ? static_cast<float>(Column) / (Columns - 1) : 0.0f;
+		const float Head = FMath::Fmod(T * 0.12f, 1.4f) - 0.2f;
+		const float Crest = 0.25f * FMath::Max(0.0f, 1.0f - FMath::Abs(Position - Head) * 5.0f);
+		OutExcitation = FMath::Clamp(Room + Personal + Crest, 0.0f, 1.0f);
+
+		// Synchrony on a 37-second period, unrelated to the tide's: the two
+		// axes drift past each other and meet in every combination.
+		OutSynchrony = FMath::Clamp(0.5f - 0.42f * FMath::Cos(T * 2.0f * PI / 37.0f) + 0.06f * FMath::Sin(Id * 2.3f), 0.0f, 1.0f);
+		return;
+	}
+
 	case EVibH2OSimulatorScenario::Nominal:
 	case EVibH2OSimulatorScenario::Dropout:
 	default:

@@ -412,6 +412,13 @@ void FEffectIsolation::BuildRoom()
 	S->DriftDirectionSpeed = 0.0f;
 	S->OrganicSpeed = 0.0f;
 
+	// The room's mood scales size, motion and colour. Left to follow the data
+	// it would cross-fade during the first windows, as the constant arousal
+	// below settles in - one more slow drift dressed up as an effect. Forced
+	// and snapped, it holds still.
+	S->SetMoodOverride(EVibH2OMoodOverride::Excited);
+	S->SnapMood();
+
 	// Focus has to have something to dim, or switching it off would prove
 	// nothing at all - the trap this whole command is built to avoid.
 	FVibH2OFocusGroup Group;

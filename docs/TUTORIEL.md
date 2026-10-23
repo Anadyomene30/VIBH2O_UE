@@ -59,6 +59,42 @@ débogage par siège, avec une flèche d'orientation.
 Sélectionner l'acteur **`VibH2O_Stage`** dans l'Outliner. Le panneau Details se remplit de
 catégories `VibH2O|…`. Les plus utiles, dans l'ordre où on s'en sert :
 
+### `VibH2O|Ambiance` — calme, normal, excité : le réglage rapide
+
+C'est la première catégorie, et sur place c'est souvent la seule à ouvrir. La salle passe par
+**trois états** selon l'excitation moyenne de tout le public par rapport à son repos : **calme**,
+**normal**, **excité**. Chaque état a sa palette (froide, aqua, chaude par défaut), son énergie
+(stries plus ou moins lumineuses et rapides, surface plus ou moins agitée), son mouvement et sa
+taille. Le passage d'un état à l'autre est un fondu de quatre secondes ; une marge autour de chaque
+seuil empêche tout clignotement quand la salle hésite à la frontière.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Preset d'ambiance`** | Glisser un preset depuis le Content Browser : les palettes se chargent aussitôt. Deux sont livrés dans le contenu du plugin : `DA_VibH2O_Ambiance_FroidChaud` et `DA_VibH2O_Ambiance_Aqua`. |
+| **`Seuil calme`** / **`Seuil excite`** | Les deux frontières. |
+| **`Forcer l'etat`** | Laisser en *Automatique* pour que la salle décide ; imposer un état pour une répétition ou un moment de conduite. |
+| `Etat actuel` | Ce que la salle est en train de montrer. |
+| **`Excitation de la salle`** | La moyenne en direct, telle que la jugent les seuils. |
+| `Lumiere des bulles` / `Taille des bulles` | Lumière et taille de toutes les bulles. |
+
+> **Poser les seuils, en salle.** On ne sait pas encore exactement quelle plage Max envoie. Pas
+> besoin de le savoir : public au repos, regarder `Excitation de la salle`, mettre `Seuil calme`
+> un peu au-dessus. Pendant un moment fort, regarder à nouveau et poser `Seuil excite` un peu
+> en dessous. C'est tout.
+
+**Changer les couleurs.** Ouvrir la flèche *avancé* de la catégorie : `Palettes par etat` contient
+`Calme`, `Normal` et `Excite`, chacun avec deux couleurs — *plus calme que la salle* et *plus
+excitée que la salle* : chaque bulle se place entre les deux selon l'écart de sa personne à la
+moyenne. On y règle aussi la lumière et la vitesse des stries, l'agitation, le flottement, la
+dérive, la taille et la force du battement de chaque état. Le changement se voit tout de suite,
+viewport en temps réel. Pour garder un réglage : choisir un preset, puis cliquer **`Enregistrer
+dans le preset`** et sauvegarder l'asset. Pour en créer un nouveau : clic droit dans le Content
+Browser → *Miscellaneous* → *Data Asset* → `VibH2O - Preset d'ambiance`.
+
+**La synchronie se voit à part**, sans changer la couleur d'état : synchrones, les stries de toutes
+les bulles s'alignent en une même vague qui traverse la salle, les teintes se resserrent et un
+halo s'allume au bord ; désynchrones, chaque bulle suit ses propres stries.
+
 ### `VibH2O|Geometrie` — la forme de la salle
 
 | Réglage | Ce qu'il fait |
@@ -83,8 +119,8 @@ une bulle s'écarte de sa place. **Elle ne peut mathématiquement pas atteindre 
 
 ### `VibH2O|Bulles` — l'aspect
 
-`Base Scale`, `Scale Per Excitation` et `Beat Pop Amount` règlent la taille et le sursaut au
-battement. `Organic Deform` et `Organic Speed` règlent la respiration de la silhouette : chaque
+La taille générale est passée dans `Ambiance` (`Taille des bulles`). Sous *avancé* :
+`Scale Per Excitation` et `Beat Pop Amount` règlent la croissance et le sursaut au battement. `Organic Deform` et `Organic Speed` règlent la respiration de la silhouette : chaque
 bulle se déforme sur trois axes à des cadences légèrement différentes, avec une phase qui lui est
 propre — aucune n'est jamais une sphère.
 
@@ -124,9 +160,8 @@ sous l'eau. Il tombe sur les bulles et sur le fond marin. Le réglage d'expositi
 **`Show Seat Numbers`** écrit le numéro de chaque personne au-dessus de sa bulle. C'est ainsi qu'on
 vérifie un plan de salle d'un coup d'œil.
 
-La couleur suit l'excitation sur **trois** paliers — bleu profond au repos, sarcelle en transition,
-ambre à pleine excitation. Pour la voir travailler, mettre le simulateur en scénario
-*Vague d'excitation*.
+La couleur suit l'**état de la salle** (voir `VibH2O|Ambiance` plus haut). Pour voir passer les
+trois états, mettre le simulateur en scénario *Vague collective : calme, normal, excite*.
 
 ### `VibH2O|Tableaux` — passer au vortex
 
@@ -165,6 +200,7 @@ redimensionne sous le curseur. `Aisle Columns` vide des colonnes entières — l
 | **Balayage de synchronie** | La synchronie collective monte et redescend. **À combiner avec `Blend Alpha` à 1** : le vortex se resserre puis se disperse. |
 | **Pic collectif** | Toute la salle monte ensemble, puis retombe. |
 | **Coupure de capteurs** | Des capteurs se taisent : les bulles concernées se désaturent et cessent de battre. |
+| **Vague collective : calme, normal, excite** | Toute la salle passe par les trois états, chacun tenu une vingtaine de secondes (cycle de 96 s) ; la synchronie monte et descend sur sa propre période (37 s), pour voir chaque état synchrone et désynchrone. Équivalent réseau : `python Tools/vibh2o_osc_sim.py --scenario moods`. |
 
 `Send Rate Hz` règle la cadence d'envoi, `Base Bpm Min`/`Max` la plage de rythmes cardiaques.
 
@@ -245,7 +281,12 @@ Créez des paramètres portant exactement ces noms ; le plugin les remplit tout 
 | `FocusMask` | 1 dans le groupe en focus, moins en dehors. |
 | `Staleness` | 1 si le capteur s'est tu. |
 | `BlendAlpha` | Position entre les deux tableaux. |
-| `TintColor` | Couleur (paramètre vectoriel). |
+| `TintColor` | Couleur (paramètre vectoriel), tirée de la palette de l'état de salle. |
+| `MoodCalm` / `MoodNormal` / `MoodExcited` | Poids des trois états, somme égale à 1, en fondu. |
+| `MoodGlow` / `MoodTurbulence` | Lumière des stries et agitation, selon l'état. |
+| `StripePhase` / `RoomStripePhase` | Phase des stries de la bulle, et celle commune à la salle. Continues. |
+| `Coherence` | 0→1 : à quel point la bulle se cale sur la salle (synchronie). |
+| `SyncHalo` / `BubbleBrightness` / `BubbleSeed` | Halo de synchronie, lumière générale, aléa stable par bulle. |
 
 **L'astuce des anneaux concentriques**, dans le matériau :
 
@@ -257,8 +298,10 @@ produit un train d'anneaux qui s'étendent en permanence, calés sur le vrai cœ
 glitcheront jamais lors d'un changement de rythme — c'est toute la raison pour laquelle
 `BeatPhase` est continu.
 
-Le matériau `M_VibH2ODemoBubble` livré avec le plugin montre les onze paramètres en action.
-Regardez-le, il n'est pas long.
+Le matériau `M_VibH2ODemoBubble` livré avec le plugin montre ces paramètres en action : stries
+lumineuses à la manière de la scène principale, alignées par `Coherence`, cadencées par
+`StripePhase`, et un anneau qui court d'un pôle à l'autre sur `BeatPhase`. Regardez-le, il n'est
+pas long.
 
 ### Les événements Blueprint
 

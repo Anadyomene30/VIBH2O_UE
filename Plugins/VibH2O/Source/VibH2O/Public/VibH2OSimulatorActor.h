@@ -36,7 +36,14 @@ enum class EVibH2OSimulatorScenario : uint8
 	Peak UMETA(DisplayName = "Pic collectif"),
 
 	/** Some sensors stop talking after a delay - the staleness path. */
-	Dropout UMETA(DisplayName = "Coupure de capteurs")
+	Dropout UMETA(DisplayName = "Coupure de capteurs"),
+
+	/**
+	 * The room's three moods in turn: a collective tide holding calm, then
+	 * normal, then excited, then back, with synchrony on a period of its own
+	 * so every mood is seen in step and out of step.
+	 */
+	MoodWave UMETA(DisplayName = "Vague collective : calme, normal, excite")
 };
 
 /**

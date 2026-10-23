@@ -11,28 +11,30 @@ Four materials, all disposable and regenerable:
   M_VibH2OCaustics     light function: the rippling net of light under water
   M_VibH2OSeabed       the floor that catches the caustics and the shadows
 
-The bubble aims at ORGANIC, not geometric. Three things do that work:
+The bubble follows the main scene's (VIBH2o_PPCM, Bubble_Mat): bands of light
+running across a sphere you can partly see through. Three things make it
+better than that original:
 
-  * the silhouette breathes. World position offset swells the mesh along its
-    normal with two out-of-phase noise waves plus the heartbeat, so no bubble
-    is ever a clean sphere and no two are deformed alike.
-  * the light passes through. The bubble is a SUBSURFACE material: lights
-    from behind make it glow from within, lights from the front give it a wet,
-    tight highlight. It is lit by the scene rather than lit from inside, so the
-    rig's lights and the caustics actually show on it - an emissive bubble
-    looks the same in any light, which is what made it read as a sticker.
-  * nothing is uniform. Every bubble gets a hue and a rate of its own, drawn
-    from its position, so a room of two hundred never looks stamped.
+  * it is LIT. A subsurface material: the rig's lights and the caustics land
+    on it, back light glows through it in its own hue - where the original
+    glowed the same white disc in any light and burned out under exposure.
+  * it answers to the ROOM. The stage sends the mood's colour (TintColor) and
+    energy (MoodGlow, the speed of StripePhase, MoodTurbulence); synchrony
+    lines the bands up from bubble to bubble (Coherence) and lights a halo,
+    without touching the colour; a ring of light runs pole to pole on each
+    heartbeat (BeatPhase).
+  * nothing is uniform. Each bubble has a stable seed of its own (BubbleSeed)
+    that bends its bands differently and starts them at a different phase.
 
-Arousal drives a three-stop gradient rather than a two-colour lerp: deep blue
-when calm, teal through the middle, hot amber when excited. A straight lerp
-between two ends passes through a dead grey in the middle, which is exactly
-where most of the audience sits.
+The material is Masked / Subsurface, per the spec: a translucent material
+would receive neither shadows nor caustics properly. The see-through is a
+temporal dither on the mask, the same trick as the original, thinning the
+shell between the bands; the face turned to the viewer is also darker - deep
+water seen through the bubble - and the grazing edge brighter. Transparency at
+zero gives a solid bubble.
 
-The material is Opaque / Subsurface, per the spec: a translucent material
-would receive neither shadows nor caustics properly. Transparency is feigned:
-the face turned to the viewer is darker - deep water seen through the bubble -
-and the grazing edge brighter, as on a real wet membrane.
+Colour is not computed here any more: the three-mood palettes live on the
+stage (and in its presets), where they can be tuned in the Details panel.
 """
 
 import unreal
@@ -162,167 +164,221 @@ class Graph:
 # ===========================================================================
 # The bubble
 # ===========================================================================
+#
+# After the main scene's bubbles (VIBH2o_PPCM: Sphere_BP / Bubble_Mat): bands
+# of light running across a sphere you can partly see through. What changes is
+# that they are LIT - subsurface, so the rig's lights and the caustics land on
+# them instead of every bubble glowing the same white disc - and that every
+# band, colour and speed now answers to the room.
+#
+# Three readings, kept apart on purpose:
+#
+#   * the MOOD (calm, normal, excited) is the colour the stage sends in
+#     TintColor and the energy in MoodGlow / StripePhase speed / MoodTurbulence;
+#   * SYNCHRONY is coherence, never colour: in step, the bands leave each
+#     bubble's own frame for the room's (world height, shared phase) so they
+#     line up from one bubble to the next like a single wave crossing the
+#     room, and a halo lights the rims; out of step, every bubble runs its own;
+#   * the HEART is a ring of light sliding pole to pole once per beat, on
+#     BeatPhase, so a change of BPM never makes it jump.
 
 bubble, bubble_path = fresh_material('M_VibH2ODemoBubble')
-# Subsurface, opaque: lit by the scene, glowing where light passes through.
+# Subsurface, MASKED rather than translucent: drawn in the opaque pass, so it
+# receives shadows and caustics like any solid - the reason the spec rules
+# translucency out. The see-through comes from a temporal dither on the mask,
+# as in the main scene's Bubble_Mat; Transparency at zero makes it solid.
 bubble.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_SUBSURFACE)
+bubble.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
+# Two-sided: through the front, the bands on the far side show, which is what
+# gives a shell its volume.
+bubble.set_editor_property('two_sided', True)
 g = Graph(bubble)
 
-# --- the contract, plus the two extras
+# --- the contract, and the mood
 beat_phase = g.scalar('BeatPhase', 0.0)
 beat_pulse = g.scalar('BeatPulse', 0.0)
-bpm = g.scalar('Bpm', 60.0)
+g.scalar('Bpm', 60.0)
 excitation = g.scalar('Excitation', 0.0)
-synchrony = g.scalar('Synchrony', 0.5)
-collective = g.scalar('CollectiveSynchrony', 0.5)
+g.scalar('Synchrony', 0.5)
+g.scalar('CollectiveSynchrony', 0.5)
 striation_speed = g.scalar('StriationSpeed', 0.0)
 focus_mask = g.scalar('FocusMask', 1.0)
 staleness = g.scalar('Staleness', 0.0)
-blend_alpha = g.scalar('BlendAlpha', 0.0)
+g.scalar('BlendAlpha', 0.0)
 tint = g.n(unreal.MaterialExpressionVectorParameter, -2600,
            parameter_name='TintColor',
-           default_value=unreal.LinearColor(0.05, 0.35, 0.75, 1.0))
+           default_value=unreal.LinearColor(0.015, 0.26, 0.36, 1.0))
+
+g.scalar('MoodCalm', 0.0)
+g.scalar('MoodNormal', 1.0)
+g.scalar('MoodExcited', 0.0)
+g.scalar('RoomExcitation', 0.0)
+glow_mood = g.scalar('MoodGlow', 1.0)
+turbulence = g.scalar('MoodTurbulence', 1.0)
+stripe_phase = g.scalar('StripePhase', 0.0)
+room_phase = g.scalar('RoomStripePhase', 0.0)
+coherence = g.scalar('Coherence', 0.0)
+sync_halo = g.scalar('SyncHalo', 1.0)
+brightness = g.scalar('BubbleBrightness', 1.0)
+seed = g.scalar('BubbleSeed', 0.0)
+
+# --- the artist's dials: the look itself, not data
+stripe_count = g.scalar('StripeCount', 11.0)
+stripe_sharpness = g.scalar('StripeSharpness', 3.0)
+world_spacing = g.scalar('StripeWorldSpacing', 14.0)
+transparency = g.scalar('Transparency', 0.6)
+# Emissive levels, in scene light. They look tiny, and must: the demo map
+# runs a manual exposure of +10 EV (the main scene +10.5), and at such a
+# setting a value of 1 burns the whole room into one glare - which the first
+# version of this bubble did. An EyeAdaptationInverse node was tried to make
+# them exposure-proof and changed nothing measurable under manual exposure,
+# so the levels are set here for those scenes, and BubbleBrightness on the
+# stage scales them for any other.
+stripe_light = g.scalar('StripeLight', 0.05)
+rim_light = g.scalar('RimLight', 0.008)
+body_light = g.scalar('BodyLight', 0.0006)
+heart_light = g.scalar('HeartLight', 0.02)
 
 time = g.n(unreal.MaterialExpressionTime, -2600)
-
-# --- per-bubble identity
-#
-# Object position seeds a value that differs from one bubble to the next, so
-# noise, hue and rate are never in step across the room. Without this the whole
-# room breathes as one animal.
-obj_pos = g.n(unreal.MaterialExpressionObjectPositionWS, -2600)
-seed_dot = g.n(unreal.MaterialExpressionDotProduct, -2400)
-seed_vec = g.rgb(0.017, 0.031, 0.011, -2600)
-g.link(obj_pos, '', seed_dot, 'A')
-g.link(seed_vec, '', seed_dot, 'B')
-seed = g.frac(seed_dot, -2200)
-
-# ------------------------------------------------------------ organic noise
-#
-# The silhouette is deformed in C++, on the actor's scale: Unreal 5.5 does not
-# expose the material's world position offset input to Python, so a generated
-# material cannot reach it. What the material does instead is break the
-# GEOMETRY of the pattern - a perfectly concentric ring on a perfect sphere is
-# the single thing that most makes a bubble read as a manufactured object.
 world_pos = g.n(unreal.MaterialExpressionWorldPosition, -2600)
+uv = g.n(unreal.MaterialExpressionTextureCoordinate, -2600)
+v = g.n(unreal.MaterialExpressionComponentMask, -2400, r=False, g=True, b=False, a=False)
+g.link(uv, '', v, '')
 
+# ------------------------------------------------------------- the warp
+#
+# The bands are never ruled lines: a slow noise bends them, more so as the
+# mood stirs. The seed shifts each bubble's noise so no two bend alike, and a
+# second field drifts with time so the bending crawls along the bands.
+seed_shift = g.mulc(seed, 517.0, -2400)
+pos_seeded = g.add(world_pos, seed_shift, -2300)
 noise_a = g.n(unreal.MaterialExpressionNoise, -2200,
-              scale=0.05, quality=1, turbulence=True, levels=2,
+              scale=0.035, quality=1, turbulence=True, levels=2,
               output_min=-1.0, output_max=1.0)
-g.link(world_pos, '', noise_a, 'Position')
+g.link(pos_seeded, '', noise_a, 'Position')
 
-# The second field is offset in space over time, so the distortion crawls
-# across the surface instead of sitting still on it.
-drift = g.mulc(time, 11.0, -2400)
+drift = g.mulc(time, 9.0, -2400)
 drift_xy = g.n(unreal.MaterialExpressionAppendVector, -2300)
 g.link(drift, '', drift_xy, 'A')
 g.link(drift, '', drift_xy, 'B')
 drift_xyz = g.n(unreal.MaterialExpressionAppendVector, -2200)
 g.link(drift_xy, '', drift_xyz, 'A')
 g.link(drift, '', drift_xyz, 'B')
-pos_drift = g.add(world_pos, drift_xyz, -2100)
-
 noise_b = g.n(unreal.MaterialExpressionNoise, -2000,
-              scale=0.14, quality=1, turbulence=True, levels=2,
+              scale=0.11, quality=1, turbulence=True, levels=2,
               output_min=-1.0, output_max=1.0)
-g.link(pos_drift, '', noise_b, 'Position')
+g.link(g.add(pos_seeded, drift_xyz, -2100), '', noise_b, 'Position')
 
-# Arousal deepens the distortion: a stirred bubble is visibly less regular
-# than a calm one, before a single colour has changed.
-warp_amt = g.addc(g.mulc(excitation, 0.075, -1900), 0.030, -1800)
+warp = g.mul(g.add(g.mulc(noise_a, 0.30, -1900), g.mulc(noise_b, 0.12, -1900), -1850), turbulence, -1800)
 
-# ------------------------------------------------------------------- pattern
-uv = g.n(unreal.MaterialExpressionTextureCoordinate, -2600)
-centre = g.n(unreal.MaterialExpressionConstant2Vector, -2600, r=0.5, g=0.5)
-radial = g.n(unreal.MaterialExpressionDistance, -2400)
-g.link(uv, '', radial, 'A')
-g.link(centre, '', radial, 'B')
 
-# Rings: frac(BeatPhase * N - r * K), N following the heart rate so a fast
-# heart packs more of them.
-ring_n = g.addc(g.mulc(bpm, 0.07, -2200), 3.5, -2100)
-radial_warp = g.add(radial, g.mul(noise_a, warp_amt, -2100), -2050)
-r_scaled = g.mul(radial_warp, ring_n, -2000)
-ring_in = g.sub(beat_phase, r_scaled, -1900)
-rings = g.power(g.frac(ring_in, -1800), 5.0, -1700)
+def power_by(base, exponent, x):
+    """Power with the exponent from a node, not a constant.
 
-# Striations: fine radial stripes scrolling at the bubble's measured speed.
-u = g.n(unreal.MaterialExpressionComponentMask, -2400, r=True, g=False, b=False, a=False)
-g.link(uv, '', u, '')
-scroll = g.mul(time, striation_speed, -2200)
-stripe_in = g.add(g.add(g.mulc(u, 34.0, -2100), scroll, -2000),
-                  g.mulc(noise_b, 2.6, -2000), -1950)
-stripes = g.power(g.addc(g.mulc(g.sine(stripe_in, -1900), 0.5, -1800), 0.5, -1700), 4.0, -1600)
+    No fallback to the unnamed input here: on a Power node the unnamed input
+    is the BASE, so a refused exponent pin silently overwrote the base with
+    the exponent - every band read 3 squared, and the bubbles came out as
+    uniform white discs. Named pins only, or fail loudly.
+    """
+    e = g.n(unreal.MaterialExpressionPower, x)
+    g.link(base, '', e, 'Base')
+    for pin in ('Exp', 'Exponent'):
+        if MEL.connect_material_expressions(exponent, '', e, pin):
+            return e
+    raise AssertionError('connexion refusee: exposant de Power')
 
-# Fresnel: the grazing edge. It sets the feigned transparency - dim where the
-# eye looks straight through, bright at the rim - and carries the synchrony.
-fresnel = g.n(unreal.MaterialExpressionFresnel, -1800, exponent=3.2, base_reflect_fraction=0.04)
-sync_sum = g.add(g.mulc(synchrony, 0.55, -1900), g.mulc(collective, 0.45, -1900), -1800)
-rim = g.mul(fresnel, g.addc(sync_sum, 0.35, -1700), -1600)
 
-# ------------------------------------------------------------------- colour
+def bands(arg, x):
+    """0.5 + 0.5 sin(2 pi arg), sharpened: bright thin bands, dark gaps.
+
+    Unreal's Sine node already has a Period of 1 - it computes sin(2 pi x) -
+    so the argument goes in as it is. Multiplied by 2 pi once more, the first
+    version packed some four hundred bands on a bubble, which averaged out to
+    an even glow with no band in sight.
+    """
+    wave = g.sine(arg, x - 150)
+    return power_by(g.addc(g.mulc(wave, 0.5, x - 100), 0.5, x - 50), stripe_sharpness, x)
+
+# Own frame: latitude bands on the bubble, at its own phase. The phase arrives
+# accumulated from C++ (never time * speed), so a change of mood changes how
+# fast the bands run and never where they are.
+local_arg = g.sub(g.add(g.mul(v, stripe_count, -1700), warp, -1650), stripe_phase, -1600)
+local_bands = bands(local_arg, -1400)
+
+# The room's frame: bands set by world height, at the phase the whole room
+# shares. Every bubble cuts the same slices of the same wave.
+world_z = g.n(unreal.MaterialExpressionComponentMask, -2400, r=False, g=False, b=True, a=False)
+g.link(world_pos, '', world_z, '')
+z_div = g.n(unreal.MaterialExpressionDivide, -1700)
+g.link(world_z, '', z_div, 'A')
+g.link(world_spacing, '', z_div, 'B')
+world_arg = g.sub(g.add(z_div, g.mulc(warp, 0.5, -1650), -1620), room_phase, -1600)
+world_bands = bands(world_arg, -1400)
+
+stripes = g.lerp(local_bands, world_bands, coherence, -1200)
+
+# ------------------------------------------------------------- the heart
 #
-# A three-stop arousal ramp. A two-colour lerp would pass through grey exactly
-# where most of the audience sits, so the middle gets a colour of its own.
-calm = g.rgb(0.012, 0.09, 0.28, -2600)
-mid = g.rgb(0.03, 0.42, 0.40, -2600)
-hot = g.rgb(0.85, 0.20, 0.045, -2600)
+# One ring of light from pole to pole per beat: BeatPhase is the ring's
+# latitude. The pulse envelope makes it flare as it leaves.
+heart_dist = g.n(unreal.MaterialExpressionAbs, -1700)
+g.link(g.sub(v, beat_phase, -1750), '', heart_dist, '')
+heart_ring = g.power(g.saturate(g.one_minus(g.mulc(heart_dist, 7.0, -1650), -1600), -1550), 3.0, -1500)
+heart = g.mul(heart_ring, g.addc(g.mulc(beat_pulse, 1.5, -1500), 0.35, -1450), -1400)
 
-exc = g.saturate(excitation, -2200)
-low_ramp = g.saturate(g.mulc(exc, 2.0, -2100), -2000)
-high_ramp = g.saturate(g.addc(g.mulc(exc, 2.0, -2100), -1.0, -2000), -1900)
-ramp = g.lerp(g.lerp(calm, mid, low_ramp, -1800), hot, high_ramp, -1700)
+# ------------------------------------------------------------- the rim
+fresnel = g.n(unreal.MaterialExpressionFresnel, -1800, exponent=2.6, base_reflect_fraction=0.03)
+# A faint rim always, the synchrony halo on top of it.
+halo = g.mul(fresnel, g.addc(g.mul(coherence, sync_halo, -1600), 0.35, -1550), -1500)
 
-# The artist's TintColor still has a say - it tilts the ramp rather than being
-# ignored, so changing it in the Details panel does something visible.
-base_hue = g.lerp(ramp, tint, g.const(0.25, -2200), -1600)
-
-# Per-bubble hue drift, so two hundred bubbles at the same arousal are not two
-# hundred copies.
-hue_jitter = g.mulc(g.addc(seed, -0.5, -2100), 0.22, -2000)
-jitter_col = g.rgb(0.10, 0.34, 0.55, -2200)
-hue = g.add(base_hue, g.mul(jitter_col, hue_jitter, -1900), -1500)
-
-# Vortex tilt: the school reads greener than the seated room.
-vortex_hue = g.rgb(0.06, 0.62, 0.45, -2200)
-hue_blend = g.lerp(hue, vortex_hue, g.mulc(blend_alpha, 0.55, -1800), -1400)
-
-# Quiet sensor: the colour drains out and the pattern dies with it.
-grey = g.rgb(0.16, 0.18, 0.20, -2200)
-colour = g.lerp(hue_blend, grey, staleness, -1300)
-
-# ------------------------------------------------------------------ assembly
+# ------------------------------------------------------------- colour
 alive = g.one_minus(staleness, -1700)
+grey = g.rgb(0.16, 0.18, 0.20, -2200)
+colour = g.lerp(tint, grey, staleness, -1500)
+# The bands burn a little whiter in their cores, as light-filled water does.
+band_colour = g.add(colour, g.mulc(g.power(stripes, 3.0, -1300), 0.18, -1250), -1200)
 
-# Feigned transparency: the face is the deep water seen through the bubble,
-# the edge is the membrane seen edge-on. This is what makes an opaque sphere
-# read as a body you could see into.
-body_shade = g.lerp(g.const(0.22, -1300), g.const(0.75, -1300), fresnel, -1200)
+# The bands' light: the mood's glow, a touch more for an aroused person, and
+# a touch more when the bubble moves fast through the water.
+moving = g.saturate(g.mulc(striation_speed, 0.5, -1500), -1450)
+band_gain = g.mul(g.mul(glow_mood, stripe_light, -1400),
+                  g.addc(g.add(g.mulc(excitation, 0.35, -1400), g.mulc(moving, 0.25, -1400), -1350), 0.8, -1300), -1250)
+
+emit_bands = g.mul(band_colour, g.mul(stripes, band_gain, -1100), -1000)
+emit_rim = g.mul(colour, g.mul(halo, rim_light, -1100), -1000)
+emit_heart = g.mul(colour, g.mul(heart, heart_light, -1100), -1000)
+emit_body = g.mul(colour, body_light, -1000)
+emissive_raw = g.add(g.add(emit_bands, emit_rim, -900), g.add(emit_heart, emit_body, -900), -850)
+emissive = g.mul(g.mul(g.mul(emissive_raw, brightness, -800), focus_mask, -700), alive, -650)
+
+# Lit body: dark through the middle (the deep water seen through the shell),
+# brighter towards the rim. Subsurface colour richer, so back light glows in
+# the bubble's own hue.
+body_shade = g.lerp(g.const(0.03, -1300), g.const(0.30, -1300), fresnel, -1200)
 base_colour = g.mul(g.mul(colour, body_shade, -900), focus_mask, -600)
+sss_colour = g.mul(g.mulc(colour, 0.9, -900), focus_mask, -600)
 
-# Subsurface: the colour light takes on its way through. Brighter and a touch
-# more saturated than the surface, so a back-lit bubble glows in its own hue.
-sss_colour = g.mul(g.mulc(colour, 1.6, -900), focus_mask, -600)
-# Opacity drives the scattering of a subsurface material: a little more when
-# aroused, so an excited bubble lets more light through and "warms up".
-sss_amount = g.addc(g.mulc(excitation, 0.25, -1000), 0.45, -900)
+# See-through: the shell is solid on the bands, at the rim and on the heart
+# ring, and thins out between them - then dithered, frame to frame, into the
+# illusion of a partial veil.
+coverage = g.saturate(g.add(g.add(g.mulc(stripes, 0.9, -1100), g.mulc(fresnel, 1.4, -1100), -1050),
+                            g.addc(g.mulc(heart_ring, 0.6, -1050), 0.10, -1000), -950), -900)
+mask_value = g.lerp(g.const(1.0, -1000), coverage, transparency, -800)
+dither = g.n(unreal.MaterialExpressionMaterialFunctionCall, -600)
+dither.set_editor_property(
+    'material_function',
+    unreal.load_asset('/Engine/Functions/Engine_MaterialFunctions02/Utility/DitherTemporalAA'))
+g.link(mask_value, '', dither, 'Alpha Threshold')
 
-# The heartbeat stays readable, but as a soft inner pulse rather than a lamp:
-# emissive is kept low so the scene's light, not the material, does the work.
-glow = g.addc(g.add(g.mulc(beat_pulse, 0.9, -1600), g.mulc(excitation, 0.25, -1600), -1500), 0.05, -1400)
-pattern = g.add(g.add(g.mul(rings, glow, -1300), g.mulc(stripes, 0.06, -1300), -1200),
-                g.mulc(rim, 0.12, -1200), -1100)
-pattern_live = g.mul(g.mulc(pattern, 0.35, -1050), alive, -1000)
-emissive = g.mul(g.mul(colour, pattern_live, -800), focus_mask, -600)
-
-# Wet and tight: low roughness gives the small sharp highlight that says
-# "liquid". A quiet sensor goes matt, so a dead bubble even reads as duller.
-roughness = g.lerp(g.const(0.08, -1200), g.const(0.45, -1200), staleness, -1000)
-specular = g.const(0.65, -1200)
+# Wet and tight: a small sharp highlight says "liquid". A quiet sensor goes
+# matt, so a dead bubble even reads as duller.
+roughness = g.lerp(g.const(0.07, -1200), g.const(0.45, -1200), staleness, -1000)
+specular = g.const(0.6, -1200)
 
 g.out(base_colour, unreal.MaterialProperty.MP_BASE_COLOR)
 g.out(sss_colour, unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
-g.out(sss_amount, unreal.MaterialProperty.MP_OPACITY)
+g.out(g.const(0.5, -600), unreal.MaterialProperty.MP_OPACITY)
+g.out(dither, unreal.MaterialProperty.MP_OPACITY_MASK)
 g.out(emissive, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 g.out(roughness, unreal.MaterialProperty.MP_ROUGHNESS)
 g.out(specular, unreal.MaterialProperty.MP_SPECULAR)
