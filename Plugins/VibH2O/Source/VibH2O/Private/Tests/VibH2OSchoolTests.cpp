@@ -343,6 +343,10 @@ bool FVibH2ODivisionStageTest::RunTest(const FString& Parameters)
 	Stage->OrganicDeform = 0.0f;
 	Stage->ScalePerExcitation = 0.0f;
 	Stage->BeatPopAmount = 0.0f;
+	// The room's mood resizes every bubble, and with no arousal injected it
+	// drifts to calm over a few seconds. Held at normal (size 1), so a size
+	// read here belongs to the division alone.
+	Stage->SetMoodOverride(EVibH2OMoodOverride::Normal);
 	Stage->DaughtersPerBubble = 3;
 
 	// A 4 x 3 room with one empty seat: eleven spectators.

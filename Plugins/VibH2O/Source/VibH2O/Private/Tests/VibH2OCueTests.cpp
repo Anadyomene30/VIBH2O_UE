@@ -25,6 +25,9 @@
 #include "Misc/ScopeExit.h"
 #include "MovieScene.h"
 #include "Osc/VibH2OOscTypes.h"
+// GetTransientPackage() returns a UPackage*: without its full type the 5.8
+// Game target, whose PCH does not bring it in, cannot pass it to NewObject.
+#include "UObject/Package.h"
 #include "UObject/StrongObjectPtr.h"
 #include "VibH2OSettings.h"
 #include "VibH2OSubsystem.h"
