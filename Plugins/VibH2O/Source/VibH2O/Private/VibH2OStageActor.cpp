@@ -14,6 +14,7 @@
 #include "Steering/VibH2OAttractorActor.h"
 #include "Steering/VibH2OExclusionZoneActor.h"
 #include "Steering/VibH2OSteeringMath.h"
+#include "VibH2OBackdrop.h"
 #include "VibH2OBubbleActor.h"
 #include "VibH2OMood.h"
 #include "VibH2OModule.h"
@@ -980,6 +981,18 @@ FString AVibH2OStageActor::BuildRemoteStateJson() const
 		Root->SetBoolField(TEXT("oscIgnored"), Subsystem->bIgnoreOscControl);
 	}
 	Root->SetArrayField(TEXT("effects"), Effects);
+
+	// The backdrop lives in its own actor; the pad shows where its fade is
+	// heading, so a press reads as done at once. Absent: the field is left
+	// out and the pad keeps its own memory.
+	if (const UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AVibH2OBackdrop> It(World); It; ++It)
+		{
+			Root->SetNumberField(TEXT("backdrop"), It->GetTargetPresence());
+			break;
+		}
+	}
 
 	FString Out;
 	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
