@@ -204,13 +204,14 @@ float AVibH2OBackdrop::GetBlackPostProcessWeight() const
 	return BlackPostProcessComponent != nullptr ? BlackPostProcessComponent->BlendWeight : 0.0f;
 }
 
-float AVibH2OBackdrop::LightFactor(float InPresence)
+float AVibH2OBackdrop::LightFactor(float InPresence) const
 {
-	// The eye reads brightness roughly as a cube root, so fading light
-	// linearly looks like nothing happens for most of the fade and then a
-	// sudden drop at the end. Raising presence to the display gamma makes
-	// the perceived darkening follow the fade evenly.
-	return FMath::Pow(FMath::Clamp(InPresence, 0.0f, 1.0f), 2.2f);
+	// A power curve, because no fixed one is right: the eye compresses
+	// brightness, which argues for darkening late, while the tonemapper's
+	// toe swallows dim light, which argues for darkening early. Measured in
+	// VIBH2o_PPCM_Fond: 2.2 put the image almost black at mid-fade, 1 still
+	// darkened too late, 0.6 reads even (see FadeCurve).
+	return FMath::Pow(FMath::Clamp(InPresence, 0.0f, 1.0f), FMath::Max(FadeCurve, 0.1f));
 }
 
 void AVibH2OBackdrop::ApplyPresence()
@@ -260,11 +261,12 @@ void AVibH2OBackdrop::ApplyPresence()
 		}
 	}
 
-	if (!bNewComponent && AppliedPresence == Presence)
+	if (!bNewComponent && AppliedPresence == Presence && AppliedCurve == FadeCurve)
 	{
 		return;
 	}
 	AppliedPresence = Presence;
+	AppliedCurve = FadeCurve;
 
 	const float Factor = LightFactor(Presence);
 	const bool bAtBlack = Presence <= VibH2OBackdropInternal::BlackThreshold;

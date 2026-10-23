@@ -103,6 +103,16 @@ public:
 	float FadeSeconds = 4.0f;
 
 	/**
+	 * Shape of the fade: the environment's light is scaled by
+	 * Presence ^ Courbe. 1 is linear in light, and looks wrong: the
+	 * tonemapper's toe swallows dim light, so the image holds, then drops.
+	 * Measured in VIBH2o_PPCM_Fond, 0.6 makes the displayed background
+	 * follow Presence almost linearly (0.5 a little above, 1 far below).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Courbe du fondu", ClampMin = "0.1", ClampMax = "4.0"))
+	float FadeCurve = 0.6f;
+
+	/**
 	 * What makes up the environment. Fogs and sky atmospheres are faded;
 	 * meshes are hidden once black is reached; lights (sky light included)
 	 * only if "Eteindre les lumieres" is ticked. Particle systems are never
@@ -198,7 +208,7 @@ private:
 	 * Presence is what the operator and Sequencer move; this decides how the
 	 * fade FEELS on screen.
 	 */
-	static float LightFactor(float InPresence);
+	float LightFactor(float InPresence) const;
 
 	void Capture(UActorComponent* Component);
 	void ApplyTo(const FVibH2OBackdropSnapshot& Snapshot, float Factor, bool bAtBlack) const;
@@ -229,4 +239,5 @@ private:
 
 	/** Last value pushed, so a still backdrop costs nothing per frame. */
 	float AppliedPresence = 1.0f;
+	float AppliedCurve = -1.0f;
 };

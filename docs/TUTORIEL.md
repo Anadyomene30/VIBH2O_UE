@@ -108,7 +108,10 @@ L'acteur **`VibH2O — Fond`** s'en charge, par quatre chemins qui font la même
 | iPad ou Max | `/Fond 0` enlève, `/Fond 1` remet ; 2e argument facultatif = durée en secondes. |
 | Sequencer | Piste `Presence du fond`, de 1 (l'eau) à 0 (noir). |
 
-Le fondu dure `Duree du fondu` (4 s par défaut), adouci aux deux bouts. Ce qui s'éteint : la
+Le fondu dure `Duree du fondu` (4 s par défaut), adouci aux deux bouts. `Courbe du fondu` (0,6)
+règle sa forme : mesurée dans la carte du spectacle, c'est la valeur pour laquelle l'image
+s'assombrit régulièrement ; à 1, elle tient puis chute d'un coup à la fin (le tonemapper écrase
+les basses lumières). Ce qui s'éteint : la
 lumière que **diffuse** le brouillard (sa couleur, le terme directionnel, l'albédo et l'émission du
 brouillard volumétrique) et l'atmosphère. La **densité** du brouillard reste : les bulles lointaines
 sombrent toujours dans la profondeur, mais vers le noir. Les maillages de décor (sphère de ciel,
