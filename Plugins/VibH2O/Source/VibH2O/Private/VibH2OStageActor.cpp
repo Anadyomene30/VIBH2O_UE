@@ -331,6 +331,17 @@ bool AVibH2OStageActor::TickEditorLive(float DeltaSeconds)
 	BindToSubsystem(Subsystem);
 	Subsystem->TickEditorPreview(DeltaSeconds);
 
+	// Catch-up on the generation, not only the event: in a heavy map opened
+	// under 5.8 the room settled without the stage ever receiving
+	// OnRoomChanged, and the editor stayed empty. Comparing generations costs
+	// one integer per frame and makes a missed broadcast harmless.
+	if (Subsystem->HasRoom() && Subsystem->GetRoomRef().Generation != Room.Generation)
+	{
+		UE_LOG(LogVibH2O, Log, TEXT("VibH2O: plan de salle rattrape dans l'editeur (generation %d)."),
+			Subsystem->GetRoomRef().Generation);
+		ReconcileBubbles(Subsystem->GetRoomRef());
+	}
+
 	if (Bubbles.Num() == 0)
 	{
 		return false;

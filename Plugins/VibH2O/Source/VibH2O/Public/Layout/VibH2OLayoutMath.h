@@ -8,6 +8,10 @@
 #include "CoreMinimal.h"
 #include "VibH2OTypes.h"
 
+// Forward-declared, not included: the editor's shared PCH happens to pull it
+// in, the Game target's does not - 5.8 Game builds broke on it.
+struct FRichCurve;
+
 /** Position and orientation of a bubble, in local space under the stage root. */
 struct VIBH2O_API FVibH2OSeatLayout
 {

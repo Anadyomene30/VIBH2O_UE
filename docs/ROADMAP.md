@@ -62,6 +62,8 @@ Vérifié le 22 octobre 2026 :
 |---|---|
 | Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
 | Compilation UE 5.8, Editor (copie au chemin court) | ✅ propre |
+| Compilation UE 5.8, **Game et Shipping** (`RunUAT BuildPlugin`) | ✅ après deux includes manquants — `FRichCurve`, `UStaticMesh` — que le PCH de l'éditeur masquait. Vérifié le 22 octobre, le soir. |
+| Salle vivante dans l'éditeur, carte lourde sous 5.8 | ✅ après correctif : le plan de salle pouvait s'établir sans que la scène reçoive `OnRoomChanged`, l'éditeur restait vide. La scène rattrape désormais la génération du plan. |
 | Tests d'automation | ✅ **15 / 15** sous 5.5 **et** sous 5.8, dont `VibH2O.Integration.PrevisualisationEditeur` |
 | `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — la déformation réduite reste mesurable |
 | Matériaux, carte et séquence régénérés | ✅ après correction de `make_demo_map.py` (voir ci-dessous) |
@@ -101,7 +103,9 @@ python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
 Pour la contrainte « un seul code source pour 5.5 et 5.8 », copier le projet dans un dossier au
 chemin **court** — au-dela de 260 caracteres, UnrealBuildTool refuse de compiler — puis pointer le
 `Build.bat` de 5.8 dessus. La verification a ete faite ainsi : compilation propre, 15 tests au
-vert.
+vert. Elle ne couvrait que l'editeur : la cible Game de 5.8 se verifie a part, par
+`RunUAT.bat BuildPlugin -Plugin=<uplugin> -Package=<dossier court> -TargetPlatforms=Win64 -Rocket`,
+qui compile Editor, Game et Shipping d'un coup.
 
 Et la cible qui compte vraiment pour la representation n'est pas l'editeur :
 
