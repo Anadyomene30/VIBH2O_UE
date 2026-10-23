@@ -8,6 +8,7 @@ puis un flux continu de BPM, d'excitation et de synchronie.
     python vibh2o_osc_sim.py --preset 7x3           # LE test de transposition
     python vibh2o_osc_sim.py --preset ales          # le vrai plan d'Ales, 23x4 avec allees
     python vibh2o_osc_sim.py --preset 176 --scenario wave
+    python vibh2o_osc_sim.py --preset ales --scenario moods   # calme, normal, excite
     python vibh2o_osc_sim.py --dry-run --duration 2 # affiche au lieu d'emettre
 
 Pourquoi ce fichier et pas une extension de Scripts/OSC_SIMULATOR.py du depot
@@ -214,8 +215,33 @@ class Individual:
 # ---------------------------------------------------------------------------
 
 
-def scenario_targets(scenario: str, elapsed: float, room: Room, column: int, row: int) -> tuple[float, float]:
+def scenario_targets(scenario: str, elapsed: float, room: Room, column: int, row: int,
+                     individual_id: int = 0) -> tuple[float, float]:
     """Renvoie (excitation, synchronie) cibles pour une place, a un instant donne."""
+    if scenario == "moods":
+        # Les trois etats de la salle tour a tour : une maree collective de
+        # 96 s en quatre paliers - calme, normal, excite, normal - chacun tenu
+        # trois quarts de son creneau. Meme maree que le scenario MoodWave du
+        # simulateur integre (VibH2OSimulatorActor.cpp).
+        levels = (0.08, 0.40, 0.85, 0.40)
+        slot = (elapsed % 96.0) / 24.0
+        index = int(slot) % 4
+        local = slot - math.floor(slot)
+        t = min(1.0, max(0.0, (local - 0.75) / 0.25))
+        ramp = t * t * (3.0 - 2.0 * t)
+        level = levels[index] + (levels[(index + 1) % 4] - levels[index]) * ramp
+        # Chacun autour du niveau de la salle, et une petite crete qui la
+        # traverse : la nuance individuelle de la palette a besoin d'ecarts.
+        personal = 0.12 * math.sin(elapsed * 0.37 + individual_id * 1.9)
+        position = column / max(room.columns - 1, 1)
+        head = (elapsed * 0.12) % 1.4 - 0.2
+        crest = 0.25 * max(0.0, 1.0 - abs(position - head) * 5.0)
+        excitation = max(0.0, min(1.0, level + personal + crest))
+        # La synchronie sur sa propre periode (37 s) : les deux axes se
+        # croisent dans toutes les combinaisons.
+        synchrony = 0.5 - 0.42 * math.cos(elapsed * math.tau / 37.0) + 0.06 * math.sin(individual_id * 2.3)
+        return excitation, max(0.0, min(1.0, synchrony))
+
     if scenario == "wave":
         # Une vague d'excitation qui traverse la salle de gauche a droite.
         position = column / max(room.columns - 1, 1)
@@ -317,7 +343,7 @@ def main() -> int:
     parser.add_argument(
         "--scenario",
         default="nominal",
-        choices=("nominal", "wave", "sync-sweep", "peak", "dropout"),
+        choices=("nominal", "wave", "sync-sweep", "peak", "dropout", "moods"),
         help="Comportement simule.",
     )
     parser.add_argument("--rate", type=float, default=10.0, help="Frequence d'envoi des donnees par individu, en Hz (defaut 10).")
@@ -379,7 +405,7 @@ def main() -> int:
         elapsed = 0.0
         for individual in individuals.values():
             column, row = seat_of[individual.id]
-            excitation, synchrony = scenario_targets(args.scenario, elapsed, room, column, row)
+            excitation, synchrony = scenario_targets(args.scenario, elapsed, room, column, row, individual.id)
             individual.update(elapsed, 0.1, excitation, synchrony)
             sender.send(f"{args.bpm_prefix}/{individual.id}/", float(individual.bpm))
             sender.send(f"{args.excitation_prefix}/{individual.id}/", float(individual.excitation))
@@ -419,7 +445,7 @@ def main() -> int:
                 if individual.id == muted_id:
                     continue
                 column, row = seat_of[individual.id]
-                excitation, synchrony = scenario_targets(args.scenario, elapsed, room, column, row)
+                excitation, synchrony = scenario_targets(args.scenario, elapsed, room, column, row, individual.id)
                 individual.update(elapsed, dt, excitation, synchrony)
 
                 sender.send(f"{args.bpm_prefix}/{individual.id}/", float(individual.bpm))

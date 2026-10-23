@@ -1,12 +1,12 @@
 #include "VibH2OStageActor.h"
 
 #include "Curves/CurveFloat.h"
-#include "Curves/CurveLinearColor.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Layout/VibH2OLayoutMath.h"
 #include "VibH2OBubbleActor.h"
+#include "VibH2OMood.h"
 #include "VibH2OModule.h"
 #include "VibH2OSubsystem.h"
 
@@ -128,6 +128,12 @@ void AVibH2OStageActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(AVibH2OStageActor, ActiveFocusGroup))
 	{
 		OnFocusGroupChanged.Broadcast(ActiveFocusGroup);
+	}
+	else if (PropertyName == GET_MEMBER_NAME_CHECKED(AVibH2OStageActor, MoodPreset))
+	{
+		// Dropping a preset loads it straight away: that one gesture is the
+		// whole point of having presets on the get-in.
+		ApplyMoodPreset(MoodPreset);
 	}
 	else if (PropertyName == GET_MEMBER_NAME_CHECKED(AVibH2OStageActor, bLiveInEditor) && !bLiveInEditor)
 	{
@@ -374,7 +380,14 @@ FVibH2OGridParams AVibH2OStageActor::MakeGridParams(int32 Columns, int32 Rows) c
 void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 {
 	UVibH2OSubsystem* Subsystem = GetSubsystem();
-	if (Subsystem == nullptr || Bubbles.Num() == 0)
+	if (Subsystem == nullptr)
+	{
+		return;
+	}
+
+	UpdateMood(Subsystem, DeltaSeconds);
+
+	if (Bubbles.Num() == 0)
 	{
 		return;
 	}
@@ -429,14 +442,17 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		}
 	}
 
+	// The mood scales the motion. Amplitudes only: speeds go through the
+	// float clock, which the mood advances faster or slower, so that nothing
+	// ever jumps when the mood changes.
 	FVibH2OFloatParams FloatParams;
-	FloatParams.Amplitude = FloatAmplitude;
+	FloatParams.Amplitude = FloatAmplitude * BlendedLook.FloatScale;
 	FloatParams.Speed = FloatSpeed;
 	FloatParams.RotationAmount = FloatRotationAmount;
 
 	FVibH2ODriftParams DriftParams;
 	DriftParams.Threshold = DriftThreshold;
-	DriftParams.Intensity = DriftIntensity;
+	DriftParams.Intensity = DriftIntensity * BlendedLook.DriftScale;
 	DriftParams.DirectionSpeed = DriftDirectionSpeed;
 	DriftParams.MaxRatio = DriftMaxRatio;
 
@@ -496,18 +512,18 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		// The float is added AFTER the blend, and not inside the grid driver:
 		// it is a property of the bubble - it is underwater, so it floats - and
 		// not of the tableau. That is how it survives the move to the vortex.
-		if (bFloatEnabled && FloatAmplitude > 0.0f)
+		if (bFloatEnabled && FloatParams.Amplitude > 0.0f)
 		{
-			Location += FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, Context.Seed, StageTime);
+			Location += FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, Context.Seed, FloatClock);
 		}
 		if (bFloatEnabled && FloatRotationAmount > 0.0f)
 		{
-			Rotation = Rotation * FVibH2OLayoutMath::EvaluateFloatRotation(FloatParams, Context.Seed, StageTime).Quaternion();
+			Rotation = Rotation * FVibH2OLayoutMath::EvaluateFloatRotation(FloatParams, Context.Seed, FloatClock).Quaternion();
 		}
 
 		// The drift belongs to the person too, not to the tableau: it follows
 		// arousal, and stays bounded by construction.
-		if (bDriftEnabled && DriftIntensity > 0.0f)
+		if (bDriftEnabled && DriftParams.Intensity > 0.0f)
 		{
 			Location += FVibH2OLayoutMath::EvaluateDriftOffset(DriftParams, Context.Seed, StageTime, State.Excitation, MinSpacing);
 		}
@@ -515,7 +531,10 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		float Scale = BaseScale;
 		if (bScaleEnabled)
 		{
-			Scale *= 1.0f + State.Excitation * ScalePerExcitation + State.BeatPulse * BeatPopAmount;
+			// The mood sets the size of the whole room and how hard it beats;
+			// the person's own arousal still swells their bubble within that.
+			Scale *= BlendedLook.SizeScale
+				* (1.0f + State.Excitation * ScalePerExcitation + State.BeatPulse * BeatPopAmount * BlendedLook.PulseScale);
 		}
 
 		// Three axes, three slightly different rates, a phase of its own: the
@@ -527,7 +546,7 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		{
 			// Arousal adds to the restlessness without doubling it: excited is
 			// livelier, not a different material.
-			const float Amount = OrganicDeform * (0.7f + State.Excitation * 0.6f);
+			const float Amount = OrganicDeform * (0.7f + State.Excitation * 0.6f) * BlendedLook.Turbulence;
 			const float W = StageTime * OrganicSpeed * 2.0f * PI;
 			const float P0 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 1) * 2.0f * PI;
 			const float P1 = FVibH2ONoise::UnitFloat(Context.Seed * 23 + 2) * 2.0f * PI;
@@ -544,7 +563,39 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		Bubble->SetActorRelativeScale3D(ScaleVector);
 
 		const float Mask = bFocusEnabled ? ComputeFocusMask(Seat) : 1.0f;
-		const FLinearColor Tint = bTintEnabled ? ComputeTint(State.Excitation) : CalmColor;
+
+		// Synchrony is its own axis: it decides how far this bubble falls in
+		// step with the room - shared striations, shared hue, a shared halo -
+		// and never which mood's palette it wears.
+		const float Coherence = FMath::Clamp(
+			FMath::Lerp(CollectiveSynchrony, State.Synchrony, IndividualCoherenceShare), 0.0f, 1.0f);
+
+		// Where the person stands against the ROOM, not against an absolute
+		// scale: the room's mean sits mid-palette, so each mood's palette is
+		// used in full whatever its level. In step, the gap closes.
+		const float Gap = (State.Excitation - RoomExcitation) * (1.0f - Coherence * MoodPalette.SyncHueTightening);
+		// Tint switched off means no colour response at all - neither the
+		// room's mood nor the person's nuance: one fixed colour, the middle of
+		// the normal palette. Keeping the mood's colour would leave the toggle
+		// doing nothing whenever the room is uniform, which the isolation
+		// harness caught.
+		const FLinearColor Tint = bTintEnabled
+			? BlendedLook.ColorAt(0.5f + Gap * MoodPalette.IndividualContrast)
+			: MoodPalette.Normal.ColorAt(0.5f);
+
+		FVibH2OBubbleMood BubbleMood;
+		BubbleMood.Weights = MoodTracker.GetWeights();
+		BubbleMood.Mood = CurrentMood;
+		BubbleMood.Glow = BlendedLook.Glow;
+		BubbleMood.Turbulence = BlendedLook.Turbulence;
+		// An aroused person's striations run a little faster than the room's.
+		BubbleMood.StripeSpeed = BlendedLook.StripeSpeed * (0.75f + 0.5f * FMath::Clamp(State.Excitation, 0.0f, 1.0f));
+		BubbleMood.RoomStripePhase = RoomStripePhase;
+		BubbleMood.Coherence = Coherence;
+		BubbleMood.SyncHalo = MoodPalette.SyncHalo;
+		BubbleMood.RoomExcitation = RoomExcitation;
+		BubbleMood.Brightness = BubbleBrightness;
+		Bubble->SetMood(BubbleMood, DeltaSeconds);
 
 		Bubble->SetSeatLabelVisible(bShowSeatNumbers);
 		if (bShowSeatNumbers)
@@ -720,14 +771,90 @@ float AVibH2OStageActor::GetFocusFitDistance(float HorizontalFOV) const
 
 // ------------------------------------------------------------------ Sundry
 
-FLinearColor AVibH2OStageActor::ComputeTint(float Excitation) const
+// -------------------------------------------------------------------- Mood
+
+FVibH2OMoodTrackerSettings AVibH2OStageActor::MakeMoodSettings() const
 {
-	const float T = FMath::Clamp(Excitation, 0.0f, 1.0f);
-	if (ExcitationGradient != nullptr)
+	FVibH2OMoodTrackerSettings Settings;
+	Settings.CalmThreshold = CalmThreshold;
+	Settings.ExcitedThreshold = ExcitedThreshold;
+	Settings.Hysteresis = MoodHysteresis;
+	Settings.DetectionSmoothingSeconds = MoodDetectionSmoothing;
+	Settings.TransitionSeconds = MoodTransitionSeconds;
+	Settings.Override = MoodOverride;
+	return Settings;
+}
+
+void AVibH2OStageActor::UpdateMood(const UVibH2OSubsystem* Subsystem, float DeltaSeconds)
+{
+	const FVibH2OMoodTrackerSettings Settings = MakeMoodSettings();
+	// The mean the subsystem keeps already leaves out empty seats and quiet
+	// sensors. With nobody counting, there is no room to judge.
+	const bool bHasData = Subsystem != nullptr && Subsystem->GetActiveIndividualCount() > 0;
+	const float Mean = Subsystem != nullptr ? Subsystem->GetAverageExcitation() : 0.0f;
+
+	const EVibH2OMood Previous = MoodTracker.GetMood();
+	const bool bChanged = MoodTracker.Update(Mean, bHasData, DeltaSeconds, Settings);
+	CurrentMood = MoodTracker.GetMood();
+	RoomExcitation = MoodTracker.GetSmoothedExcitation();
+	if (bChanged)
 	{
-		return ExcitationGradient->GetLinearColorValue(T);
+		UE_LOG(LogVibH2O, Log, TEXT("VibH2O: la salle passe de '%s' a '%s' (excitation %.2f)."),
+			*UEnum::GetDisplayValueAsText(Previous).ToString(),
+			*UEnum::GetDisplayValueAsText(CurrentMood).ToString(),
+			RoomExcitation);
+		OnMoodChanged.Broadcast(CurrentMood, Previous);
 	}
-	return FMath::Lerp(CalmColor, ExcitedColor, T);
+
+	BlendedLook = MoodPalette.Blend(MoodTracker.GetWeights());
+
+	const float Dt = FMath::Max(DeltaSeconds, 0.0f);
+	FloatClock += Dt * BlendedLook.FloatSpeedScale;
+	RoomStripePhase = FMath::Frac(RoomStripePhase + Dt * BlendedLook.StripeSpeed);
+}
+
+void AVibH2OStageActor::ApplyMoodPreset(UVibH2OMoodPreset* Preset)
+{
+	if (Preset == nullptr)
+	{
+		return;
+	}
+	MoodPreset = Preset;
+	MoodPalette = Preset->Palette;
+	UE_LOG(LogVibH2O, Log, TEXT("VibH2O: preset d'ambiance '%s' charge."), *Preset->GetName());
+}
+
+void AVibH2OStageActor::SetMoodOverride(EVibH2OMoodOverride NewOverride)
+{
+	MoodOverride = NewOverride;
+}
+
+void AVibH2OStageActor::SnapMood()
+{
+	const UVibH2OSubsystem* Subsystem = GetSubsystem();
+	const float Mean = Subsystem != nullptr ? Subsystem->GetAverageExcitation() : RoomExcitation;
+	MoodTracker.Snap(Mean, MakeMoodSettings());
+	CurrentMood = MoodTracker.GetMood();
+	RoomExcitation = MoodTracker.GetSmoothedExcitation();
+	BlendedLook = MoodPalette.Blend(MoodTracker.GetWeights());
+}
+
+void AVibH2OStageActor::SaveMoodPreset()
+{
+	if (MoodPreset == nullptr)
+	{
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: aucun preset d'ambiance choisi, rien a enregistrer."));
+		return;
+	}
+	MoodPreset->Modify();
+	MoodPreset->Palette = MoodPalette;
+	MoodPreset->MarkPackageDirty();
+	UE_LOG(LogVibH2O, Log, TEXT("VibH2O: palettes enregistrees dans '%s' (a sauvegarder avec l'asset)."), *MoodPreset->GetName());
+}
+
+void AVibH2OStageActor::ReloadMoodPreset()
+{
+	ApplyMoodPreset(MoodPreset);
 }
 
 AVibH2OBubbleActor* AVibH2OStageActor::GetBubbleAtSeat(int32 InSeatIndex) const

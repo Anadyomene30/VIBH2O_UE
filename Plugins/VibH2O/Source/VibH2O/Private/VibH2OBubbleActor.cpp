@@ -4,6 +4,7 @@
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Layout/VibH2OLayoutMath.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -127,6 +128,13 @@ void AVibH2OBubbleActor::AssignSeat(const FVibH2OSeat& Seat)
 	MeasuredSpeed = 0.0f;
 	LastBeatCount = 0;
 
+	// From the seat, so it is the same bubble after a rebuild or a relaunch,
+	// and does not crawl as the bubble floats.
+	Seed = FVibH2ONoise::UnitFloat(SeatIndex * 131 + 7);
+	// Each bubble starts its striations somewhere of its own: out of step is
+	// the resting state, synchrony is what brings them together.
+	StripePhase = Seed;
+
 	// WITH_EDITOR, and not a build-configuration macro: SetActorLabel only
 	// exists when the editor is compiled in. A Development Game build - the one
 	// used in rehearsal - has no editor and would not link.
@@ -140,6 +148,15 @@ void AVibH2OBubbleActor::AssignSeat(const FVibH2OSeat& Seat)
 #endif
 
 	ReceiveSeatAssigned(SeatIndex, IndividualId);
+}
+
+void AVibH2OBubbleActor::SetMood(const FVibH2OBubbleMood& InMood, float DeltaTime)
+{
+	Mood = InMood;
+	// Accumulated, like the beat phase: the speed follows the mood, the phase
+	// never jumps. Kept in [0,1), which loses nothing - the striations repeat
+	// with a period of exactly one.
+	StripePhase = FMath::Frac(StripePhase + FMath::Max(DeltaTime, 0.0f) * Mood.StripeSpeed);
 }
 
 void AVibH2OBubbleActor::SetSeatLabelVisible(bool bVisible)
@@ -227,6 +244,19 @@ void AVibH2OBubbleActor::PushMaterialParameters(const FLinearColor& Tint, float 
 	SetScalar(ParameterNames.Staleness, State.bStale ? 1.0f : 0.0f);
 	SetScalar(ParameterNames.CollectiveSynchrony, CollectiveSynchrony);
 	SetScalar(ParameterNames.BlendAlpha, BlendAlpha);
+
+	SetScalar(ParameterNames.MoodCalm, Mood.Weights.Calm);
+	SetScalar(ParameterNames.MoodNormal, Mood.Weights.Normal);
+	SetScalar(ParameterNames.MoodExcited, Mood.Weights.Excited);
+	SetScalar(ParameterNames.Glow, Mood.Glow);
+	SetScalar(ParameterNames.Turbulence, Mood.Turbulence);
+	SetScalar(ParameterNames.StripePhase, StripePhase);
+	SetScalar(ParameterNames.RoomStripePhase, Mood.RoomStripePhase);
+	SetScalar(ParameterNames.Coherence, Mood.Coherence);
+	SetScalar(ParameterNames.SyncHalo, Mood.SyncHalo);
+	SetScalar(ParameterNames.RoomExcitation, Mood.RoomExcitation);
+	SetScalar(ParameterNames.Brightness, Mood.Brightness);
+	SetScalar(ParameterNames.BubbleSeed, Seed);
 
 	if (!ParameterNames.TintColor.IsNone())
 	{

@@ -10,17 +10,19 @@
 #include "GameFramework/Actor.h"
 #include "Layout/VibH2OLayoutMath.h"
 #include "Layout/VibH2OPositionDriver.h"
+#include "VibH2OMood.h"
 #include "VibH2OTypes.h"
 
 #include "VibH2OStageActor.generated.h"
 
 class AVibH2OBubbleActor;
 class UCurveFloat;
-class UCurveLinearColor;
+class UVibH2OMoodPreset;
 class UVibH2OSubsystem;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OStageFocusChangedSignature, FName, GroupName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OStageRoomBuiltSignature, int32, BubbleCount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OStageMoodChangedSignature, EVibH2OMood, NewMood, EVibH2OMood, PreviousMood);
 
 /**
  * The room, and the tableaux that move it about.
@@ -43,38 +45,127 @@ public:
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
+	// =====================================================  Mood (quick settings)
+	//
+	// What the get-in needs, and nothing else, first in the Details panel. The
+	// rest of the category is under the advanced arrow.
+
+	/**
+	 * Palettes and energy for the three moods. Dropping a preset here loads it
+	 * into the stage's own copy below; "Save to preset" writes a tuning back.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VibH2O|Ambiance", meta = (DisplayName = "Preset d'ambiance"))
+	TObjectPtr<UVibH2OMoodPreset> MoodPreset;
+
+	/**
+	 * Below this mean arousal the room turns calm. Read against "Room arousal"
+	 * just below, which shows the live value to set it from.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Ambiance", meta = (DisplayName = "Seuil calme", ClampMin = "0.0", ClampMax = "1.0"))
+	float CalmThreshold = 0.25f;
+
+	/** Above this mean arousal the room turns excited. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Ambiance", meta = (DisplayName = "Seuil excite", ClampMin = "0.0", ClampMax = "1.0"))
+	float ExcitedThreshold = 0.55f;
+
+	/** Lets the operator force a mood - rehearsal, or a cue in the show. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Ambiance", meta = (DisplayName = "Forcer l'etat"))
+	EVibH2OMoodOverride MoodOverride = EVibH2OMoodOverride::Auto;
+
+	/** The mood the room is in, or fading towards. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "VibH2O|Ambiance", meta = (DisplayName = "Etat actuel"))
+	EVibH2OMood CurrentMood = EVibH2OMood::Normal;
+
+	/**
+	 * Mean arousal of the room, smoothed as the thresholds see it: the number
+	 * to watch while setting them, since the range Max sends is not known in
+	 * advance.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "VibH2O|Ambiance", meta = (DisplayName = "Excitation de la salle"))
+	float RoomExcitation = 0.0f;
+
+	/** Overall light of the bubbles. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Ambiance", meta = (DisplayName = "Lumiere des bulles", ClampMin = "0.0", UIMax = "4.0"))
+	float BubbleBrightness = 1.0f;
+
+	/** Base scale of a bubble at rest. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Ambiance", meta = (DisplayName = "Taille des bulles", ClampMin = "0.01", UIMax = "4.0"))
+	float BaseScale = 1.0f;
+
+	/**
+	 * The palettes and energy the stage actually plays: colour, striations,
+	 * motion and size for each mood. Animatable in Sequencer.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Ambiance", meta = (DisplayName = "Palettes par etat"))
+	FVibH2OMoodPalette MoodPalette;
+
+	/** How long the room takes to cross over from one mood to the next. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Ambiance", meta = (DisplayName = "Duree de bascule", ClampMin = "0.0", UIMax = "20.0", ForceUnits = "s"))
+	float MoodTransitionSeconds = 4.0f;
+
+	/**
+	 * Dead band around each threshold. Leaving a mood takes crossing its
+	 * threshold by this much, so a room hovering at the border cannot flicker.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Ambiance", meta = (DisplayName = "Marge anti-clignotement", ClampMin = "0.0", ClampMax = "0.25"))
+	float MoodHysteresis = 0.04f;
+
+	/** Time constant smoothing the room's arousal before it is judged. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Ambiance", meta = (DisplayName = "Lissage de la mesure", ClampMin = "0.0", UIMax = "10.0", ForceUnits = "s"))
+	float MoodDetectionSmoothing = 1.5f;
+
+	/**
+	 * How much a bubble's own synchrony counts against the room's, when it
+	 * falls in step. Zero: the room's synchrony alone. One: each person's own.
+	 * In between, a person out of step stands out in a synchronous room.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Ambiance", meta = (DisplayName = "Part de la synchronie individuelle", ClampMin = "0.0", ClampMax = "1.0"))
+	float IndividualCoherenceShare = 0.5f;
+
+	/** Loads a preset into the palettes the stage plays. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Ambiance")
+	void ApplyMoodPreset(UVibH2OMoodPreset* Preset);
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Ambiance")
+	void SetMoodOverride(EVibH2OMoodOverride NewOverride);
+
+	/** Jumps to the mood the room implies right now, without cross-fade. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Ambiance")
+	void SnapMood();
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Ambiance")
+	EVibH2OMood GetCurrentMood() const { return CurrentMood; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Ambiance")
+	FVibH2OMoodWeights GetMoodWeights() const { return MoodTracker.GetWeights(); }
+
+	/** Writes the palettes the stage plays back into the preset asset. */
+	UFUNCTION(CallInEditor, Category = "VibH2O|Ambiance", meta = (DisplayName = "Enregistrer dans le preset"))
+	void SaveMoodPreset();
+
+	/** Reloads the preset, dropping any tuning not saved into it. */
+	UFUNCTION(CallInEditor, Category = "VibH2O|Ambiance", meta = (DisplayName = "Recharger le preset"))
+	void ReloadMoodPreset();
+
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OStageMoodChangedSignature OnMoodChanged;
+
 	// =====================================================  Bubbles
 
 	/** Class instanced for each occupied seat. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Bulles")
 	TSubclassOf<AVibH2OBubbleActor> BubbleClass;
 
-	/** Base scale of a bubble at rest. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.01"))
-	float BaseScale = 1.0f;
-
 	/** Extra growth at full arousal. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float ScalePerExcitation = 0.35f;
 
 	/**
 	 * Amplitude of the "pop" on each beat. Kept small: a living thing swells
 	 * with its pulse, it does not bounce like a cartoon.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float BeatPopAmount = 0.10f;
-
-	/** Colour at rest, when no gradient is supplied. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles")
-	FLinearColor CalmColor = FLinearColor(0.05f, 0.35f, 0.75f, 1.0f);
-
-	/** Colour at full arousal. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles")
-	FLinearColor ExcitedColor = FLinearColor(0.95f, 0.35f, 0.20f, 1.0f);
-
-	/** Arousal gradient. When supplied it replaces the two colours above. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Bulles")
-	TObjectPtr<UCurveLinearColor> ExcitationGradient;
 
 	/**
 	 * How much each bubble deforms out of a perfect sphere, 0 to 1.
@@ -92,15 +183,15 @@ public:
 	 * expose the world position offset input to Python, so a generated material
 	 * cannot reach it.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.6"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.6"))
 	float OrganicDeform = 0.035f;
 
 	/** How fast that deformation breathes, in cycles per second. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float OrganicSpeed = 0.42f;
 
 	/** Converts the measured speed (cm/s) into striation speed. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0"))
 	float StriationSpeedScale = 0.01f;
 
 	// =====================================================  Geometry
@@ -174,7 +265,7 @@ public:
 	float FloatSpeed = 0.35f;
 
 	/** Amplitude of the slow pitch that accompanies the float, in degrees. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0"))
 	float FloatRotationAmount = 6.0f;
 
 	/** Below this arousal threshold, complete stillness. */
@@ -185,7 +276,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0", ForceUnits = "cm"))
 	float DriftIntensity = 45.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0"))
 	float DriftDirectionSpeed = 0.12f;
 
 	/**
@@ -193,7 +284,7 @@ public:
 	 * deliberately capped at 0.49: below half a cell, a bubble mathematically
 	 * cannot reach its neighbour.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0", ClampMax = "0.49"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "VibH2O|Mouvement", meta = (ClampMin = "0.0", ClampMax = "0.49"))
 	float DriftMaxRatio = 0.35f;
 
 	// =====================================================  Tableaux
@@ -469,7 +560,14 @@ private:
 	FVibH2OGridParams MakeGridParams(int32 Columns, int32 Rows) const;
 	const FVibH2OFocusGroup* FindFocusGroup(FName GroupName) const;
 	float ComputeFocusMask(const FVibH2OSeat& Seat) const;
-	FLinearColor ComputeTint(float Excitation) const;
+	/**
+	 * Advances the mood from the room's mean arousal and blends the three
+	 * looks into this frame's. Runs every tick, bubbles or not, so the panel
+	 * and OnMoodChanged stay live.
+	 */
+	void UpdateMood(const UVibH2OSubsystem* Subsystem, float DeltaSeconds);
+
+	FVibH2OMoodTrackerSettings MakeMoodSettings() const;
 
 	UVibH2OSubsystem* GetSubsystem() const;
 
@@ -501,4 +599,20 @@ private:
 	 * may already have replaced.
 	 */
 	TWeakObjectPtr<UVibH2OSubsystem> BoundSubsystem;
+
+	/** Turns the room's arousal into a mood. Plain C++, tested on its own. */
+	FVibH2OMoodTracker MoodTracker;
+
+	/** This frame's look, blended across the three moods by their weights. */
+	FVibH2OMoodLook BlendedLook;
+
+	/**
+	 * Clock of the permanent float. It advances at the mood's float speed
+	 * rather than reading StageTime * speed: a change of mood then changes
+	 * how fast the bubbles bob, never where they are.
+	 */
+	float FloatClock = 0.0f;
+
+	/** Striation phase shared by the whole room, 0 to 1. */
+	float RoomStripePhase = 0.0f;
 };

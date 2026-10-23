@@ -20,7 +20,7 @@ Le plugin est autonome : il ne dépend d'aucun autre plugin, pas même de l'OSC 
 4. Le plugin apparaît activé dans *Edit → Plugins → Installation*.
 
 **Compilé et testé sous Unreal 5.5 et Unreal 5.8**, à partir du même code source, sur les cibles
-Editor, Game et Shipping — les quatorze tests d'automation passent sous les deux moteurs. Aucune
+Editor, Game et Shipping — les tests d'automation passent sous les deux moteurs. Aucune
 `EngineVersion` n'est figée dans le `.uplugin`, et aucune API instable n'est utilisée.
 
 > Le plugin OSC d'Epic n'est **pas** employé : son statut et son API bougent d'une version à
@@ -43,7 +43,8 @@ Dans un autre niveau, deux gestes suffisent :
    d'Alès, `22x8` une salle de 176, `off` l'arrête.
 
 Ses scénarios se règlent dans le panneau Details : nominal, vague d'excitation, balayage de
-synchronie (pour voir respirer le vortex avec `BlendAlpha`), pic collectif, coupure de capteurs.
+synchronie (pour voir respirer le vortex avec `BlendAlpha`), pic collectif, coupure de capteurs, et
+**vague collective** — calme, normal, excité tour à tour, la synchronie variant à part.
 
 **Le jour où le vrai Max émet, il n'y a rien à faire** : dès que des paquets arrivent sur le
 socket, le simulateur se met en pause tout seul, et reprend après trois secondes de silence
@@ -103,13 +104,28 @@ désigné par `TargetMeshComponent` — et y pousse ces valeurs à chaque frame.
 | `StriationSpeed` | scalaire | Vitesse mesurée de la bulle × `StriationSpeedScale`. |
 | `FocusMask` | scalaire | 1 dans le groupe en focus, moins en dehors. |
 | `Staleness` | scalaire | 1 si le capteur est muet. |
-| `TintColor` | vecteur | Couleur issue du gradient d'excitation. |
+| `TintColor` | vecteur | Couleur tirée de la palette de l'état de salle, nuancée par l'écart de la personne à la salle. Voir *L'ambiance de la salle*. |
 
 ### Au-delà du contrat
 
 `CollectiveSynchrony` et `BlendAlpha` sont poussés en plus, parce que le matériau du tableau 2 en a
 besoin et qu'aucun autre chemin ne serait moins coûteux. **Vider le nom dans `ParameterNames`
 suffit à ne pas les envoyer** — comme pour n'importe lequel des neuf.
+
+L'état de salle et la synchronie ajoutent ceux-ci :
+
+| Paramètre | Type | Contenu |
+|---|---|---|
+| `MoodCalm`, `MoodNormal`, `MoodExcited` | scalaires | Poids des trois états, 0→1, **somme toujours égale à 1**. Ils fondent en ~4 s d'un état à l'autre. |
+| `MoodGlow` | scalaire | Lumière des stries, mélangée entre les états. |
+| `MoodTurbulence` | scalaire | Agitation de surface, mélangée entre les états. |
+| `StripePhase` | scalaire | 0→1, phase des stries **propre à la bulle**. Accumulée comme `BeatPhase` : un changement d'état change sa vitesse, jamais sa position. |
+| `RoomStripePhase` | scalaire | 0→1, phase des stries **commune à toute la salle**. |
+| `Coherence` | scalaire | 0→1, à quel point la bulle se cale sur la salle : synchronie collective, mêlée à la sienne (`Part de la synchronie individuelle`). |
+| `SyncHalo` | scalaire | Force du halo de synchronie, réglée dans la palette. |
+| `RoomExcitation` | scalaire | Excitation moyenne de la salle, lissée — celle que jugent les seuils. |
+| `BubbleBrightness` | scalaire | `Lumière des bulles`, réglée sur l'acteur de scène. |
+| `BubbleSeed` | scalaire | 0→1, aléa **stable** tiré du siège. Contrairement à un aléa tiré de la position, il ne dérive pas quand la bulle flotte. |
 
 ### Un point à connaître avant de dessiner la bulle
 
@@ -131,6 +147,71 @@ frac(BeatPhase * N - Distance * K)
 produit un train d'anneaux qui s'étendent en permanence, calés sur le cœur réel. C'est la
 continuité de `BeatPhase` qui garantit qu'ils ne glitchent jamais lors d'un changement de BPM — et
 c'est pourquoi la phase est un accumulateur et non un timer.
+
+---
+
+## L'ambiance de la salle — calme, normal, excité
+
+Max envoie pour chaque personne un **écart à sa propre baseline**. La moyenne de ces écarts, sièges
+vides et capteurs muets exclus, dit où en est la salle entière par rapport à son repos : c'est elle
+que lisent les trois états.
+
+| Ce qui change d'un état à l'autre | Comment |
+|---|---|
+| **Couleur** | Une palette par état — froide au calme, aqua en normal, chaude en excité par défaut. Dans la palette, chaque bulle se place selon son **écart à la salle** : la moyenne tombe au milieu, plus calme que la salle tire vers la première couleur, plus excitée vers la seconde. La palette sert donc en entier, quel que soit le niveau. |
+| **Énergie** | Lumière et vitesse des stries, agitation de la surface. |
+| **Mouvement** | Ampleur et vitesse du flottement, intensité de la dérive. |
+| **Taille** | Taille des bulles, force du battement. |
+
+**La synchronie est un axe à part, qui ne touche pas à la couleur d'état.** Elle règle la
+**cohérence** : synchrones, les stries quittent le repère de chaque bulle pour celui de la salle
+(hauteur dans le monde, phase commune) et s'alignent d'une bulle à l'autre comme une seule vague,
+les teintes se resserrent vers celle de la salle, un halo s'allume au bord. Désynchrones, chacune
+garde ses stries et sa nuance. On peut donc être synchrones dans le calme comme dans l'excitation.
+
+**Pas de clignotement à la frontière.** L'état est discret, avec une **marge** autour de chaque
+seuil : quitter un état demande de franchir son seuil de cette marge. La moyenne est lissée avant
+d'être jugée. Et le rendu, lui, est continu : un **fondu** de `Duree de bascule` (4 s) mène d'un
+état à l'autre, et se retourne en douceur si la salle change d'avis à mi-chemin. Sans aucun
+capteur actif, l'état est tenu : une salle vide ne glisse pas au calme.
+
+### Le panneau `VibH2O|Ambiance`, en tête de l'acteur de scène
+
+Visible tout de suite — ce qu'il faut sur place :
+
+| Réglage | Rôle |
+|---|---|
+| `Preset d'ambiance` | Glisser un preset : il se charge aussitôt. |
+| `Seuil calme` / `Seuil excite` | Les deux frontières, en excitation moyenne de la salle. |
+| `Forcer l'etat` | Automatique, ou calme / normal / excité imposé — répétition, conduite. Animable. |
+| `Etat actuel` | Lecture seule. |
+| `Excitation de la salle` | Lecture seule : **le chiffre à regarder pour poser les seuils**, la plage envoyée par Max n'étant pas connue d'avance. |
+| `Lumiere des bulles` / `Taille des bulles` | Lumière et taille globales. |
+| `Enregistrer dans le preset` / `Recharger le preset` | Boutons. |
+
+Sous la flèche *avancé* : `Palettes par etat` (les trois looks : deux couleurs, lumière et vitesse
+des stries, agitation, flottement, dérive, taille, battement ; plus le contraste individuel, le
+resserrement des teintes et le halo de synchronie), `Duree de bascule`, `Marge anti-clignotement`,
+`Lissage de la mesure`, `Part de la synchronie individuelle`.
+
+Les catégories `Bulles` et `Mouvement` ont, elles aussi, rangé sous *avancé* ce qui ne se touche
+pas en salle.
+
+### Les presets
+
+Un preset (`UVibH2OMoodPreset`, *Data Asset*) contient les trois palettes et leur énergie. **L'acteur
+de scène joue sa propre copie** : c'est elle que Sequencer anime et qu'un réglage dans Details modifie
+à l'instant. Le preset est d'où elle vient et où elle retourne : le glisser la charge,
+`Enregistrer dans le preset` y réécrit le réglage (puis sauvegarder l'asset). Deux presets sont
+livrés, régénérables par `Tools/make_mood_presets.py` :
+
+- `DA_VibH2O_Ambiance_FroidChaud` — bleus profonds, aqua, ambre et corail. Les valeurs par défaut.
+- `DA_VibH2O_Ambiance_Aqua` — les bleus-verts de la scène principale partout ; l'état se lit par la
+  lumière, la saturation et l'énergie.
+
+En Blueprint : `ApplyMoodPreset`, `SetMoodOverride`, `SnapMood`, `GetCurrentMood`, `GetMoodWeights`,
+et l'événement `OnMoodChanged (NewMood, PreviousMood)`. La bulle expose `Mood` (poids, cohérence,
+lumière…) pour un Blueprint d'artiste.
 
 ### Deux pièges de rendu
 
@@ -154,7 +235,7 @@ Sur `AVibH2OBubbleActor`, à surcharger dans la sous-classe Blueprint :
 Sur `UVibH2OSubsystem` : `OnRoomChanged`, `OnBeat`, `OnEffectChanged`, et les trois entrées de
 contrôle OSC.
 
-Sur `AVibH2OStageActor` : `OnFocusGroupChanged`, `OnRoomBuilt`.
+Sur `AVibH2OStageActor` : `OnFocusGroupChanged`, `OnRoomBuilt`, `OnMoodChanged`.
 
 ---
 
@@ -162,7 +243,8 @@ Sur `AVibH2OStageActor` : `OnFocusGroupChanged`, `OnRoomBuilt`.
 
 Tout paramètre pilotable porte le spécificateur `Interp`, ce qui le rend visible dans la liste des
 propriétés animables. Les plus utiles : `BlendAlpha`, `FocusAmount`, `CurvatureAngle`,
-`FloatAmplitude`, `DriftIntensity`, et les dix réglages du vortex.
+`FloatAmplitude`, `DriftIntensity`, les dix réglages du vortex — et toute l'ambiance : seuils,
+`Forcer l'etat`, lumière, taille, et chaque couleur et réglage des `Palettes par etat`.
 
 **Arbitrage OSC / Sequencer.** L'OSC n'écrit qu'à la réception d'un message ; Sequencer réécrit la
 propriété à chaque frame pendant la lecture. Sequencer l'emporte donc naturellement. Pour couper
@@ -256,7 +338,7 @@ rotation ne se voit pas.
 | `VibH2O.Restart` | Redémarre l'écoute avec les réglages courants. |
 | `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
-| `VibH2O.DemoSweep` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/` — puis quitte. Absente des builds Shipping. |
+| `VibH2O.DemoSweep [ambiance]` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/`, dont les trois états de salle croisés avec la synchronie — puis quitte. `ambiance` : seulement les états, en une minute, pour régler palettes et matériau. Absente des builds Shipping. |
 | `VibH2O.EffectIsolation [rester]` | Coupe chaque effet à tour de rôle et mesure sept canaux : verdict `CONFORME` ou `ECART` par effet, plus une capture par étape dans `Saved/VibH2OIsolation/`. Arrête le simulateur et fige les horloges d'animation le temps de la mesure. `rester` empêche le moteur de quitter à la fin. Absente des builds Shipping. |
 
 ---
@@ -268,12 +350,12 @@ Ce que la carte montre, et où le régler :
 | Effet | Où |
 |---|---|
 | **Silhouette organique** | `VibH2O_Stage` → `Organic Deform` / `Organic Speed`. Trois axes, trois cadences, une phase par bulle : aucune n'est une sphère, aucune ne se déforme comme sa voisine, et l'excitation accentue l'irrégularité. Défaut **0,035** : réaliste. L'ancien 0,16 étirait les bulles comme du caoutchouc. |
-| **Bulle sensible à la lumière** | `M_VibH2ODemoBubble` est en **Subsurface** opaque, non plus émissive. La face sombre et le bord clair simulent la transparence, la diffusion la fait luire en contre-jour, et la rugosité basse donne un reflet mouillé. Le battement reste visible, en pulsation interne discrète. |
+| **Bulle à stries, éclairée** | `M_VibH2ODemoBubble` reprend la bulle de la scène principale (`VIBH2o_PPCM`, `Bubble_Mat`) : des bandes de lumière qui défilent sur une sphère qu'on voit en partie au travers. Mais en **Subsurface masked** : éclairée par la scène et ses caustiques au lieu d'un disque blanc identique partout. La transparence est un tramage temporel du masque, comme l'original (`Transparency`, 0 = pleine) ; deux faces, pour voir les bandes de l'autre côté. Un anneau de lumière court d'un pôle à l'autre à chaque battement. Réglages d'artiste dans le matériau : `StripeCount`, `StripeSharpness`, `StripeWorldSpacing`, `StripeLight`, `RimLight`, `HeartLight`, `BodyLight`. |
 | **Éclairage qui suit la salle** | Acteur `VibH2O_Lumieres` (`AVibH2OLightRig`) : face, contre-jour et débouchage, recadrés et redosés à chaque image selon les bulles affichées. |
 | **Caustiques** | `M_VibH2OCaustics`, *light function* du soleil : deux réseaux de crêtes de bruit qui se croisent et se déforment sur place. |
 | **Fond marin** | `Seabed` + `M_VibH2OSeabed` : il reçoit les caustiques et les ombres des bulles, ce qui donne l'échelle et la profondeur. |
 | **Reflets** | `Reflets` (capture sphérique) + **Lumen** activé dans `Config/DefaultEngine.ini`. |
-| **Couleur selon l'excitation** | Rampe à **trois** paliers dans `M_VibH2ODemoBubble` — bleu profond, sarcelle, ambre. Un dégradé à deux couleurs passerait par un gris mort au milieu, là où se tient la majorité du public. |
+| **Couleur selon l'état de salle** | Palettes par état sur `VibH2O_Stage` → `Ambiance`, et en presets. Le matériau ne calcule plus de couleur : il prend `TintColor`. |
 | **Numéros sur les bulles** | `VibH2O_Stage` → `Show Seat Numbers`. Tournés vers la caméra à chaque frame. |
 | **Banc de poissons** | `VibH2O_Stage` → `Flock Driver`, catégorie `Banc`. La synchronie collective serre ou disperse le banc. |
 | **Particules dans l'eau** | Acteur `VibH2O_Particules`. Le champ entier dérive comme un corps, pas mote par mote. |
