@@ -258,4 +258,50 @@ public:
 	/** Duration of the BeatPulse envelope after a beat, in seconds. */
 	UPROPERTY(config, EditAnywhere, Category = "Donnees", meta = (ClampMin = "0.01", ForceUnits = "s"))
 	float BeatPulseDecaySeconds = 0.35f;
+
+	// ------------------------------------------------------------------ Cues
+
+	/**
+	 * "/Cue/<name>" fires the cue of that name in every cue director of the
+	 * level. The simplest route from Resolume: give a column a custom OSC
+	 * address, nothing to learn.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Cues", meta = (DisplayName = "Adresse OSC des cues"))
+	FString CuePrefix = TEXT("/Cue");
+
+	UPROPERTY(config, EditAnywhere, Category = "Cues", meta = (DisplayName = "Lire le MIDI"))
+	bool bEnableMidiInput = true;
+
+	/**
+	 * MIDI inputs to open, by part of their name, case ignored. "*" opens them
+	 * all.
+	 *
+	 * Only "VibH2O" by default, that is a loopMIDI port named so: under
+	 * classic Windows MIDI an input opened here is closed to every other
+	 * application, and opening everything would take the hardware controller
+	 * away from Resolume. A loopMIDI port, on the other hand, accepts several
+	 * readers at once. See docs/CUES.md.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Cues", meta = (DisplayName = "Entrees MIDI", EditCondition = "bEnableMidiInput"))
+	TArray<FString> MidiInputDevices = { TEXT("VibH2O") };
+
+	/**
+	 * Read the keyboard even when Unreal is in the background.
+	 *
+	 * Off by default, on purpose: the key also reaches the application that
+	 * has the focus, so a cue on a bare key fires whenever someone types in
+	 * Resolume. Prefer MIDI or OSC; if keys are needed, give the cues a
+	 * modifier. See docs/CUES.md.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Cues", meta = (DisplayName = "Lire le clavier en arriere-plan"))
+	bool bEnableKeyboardCues = false;
+
+	/**
+	 * Keep the game at full speed when another application has the focus:
+	 * resets t.IdleWhenNotForeground, lifts the editor's background throttle
+	 * during Play, opts out of Windows power throttling. Without it the cues
+	 * would arrive but the Spout feed could stutter.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Cues", meta = (DisplayName = "Pleine vitesse en arriere-plan"))
+	bool bKeepRunningInBackground = true;
 };

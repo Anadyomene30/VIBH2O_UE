@@ -119,6 +119,7 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		StartRemote();
 	}
+	InitializeCueInputs();
 }
 
 void UVibH2OSubsystem::RegisterBuiltInEffects()
@@ -138,6 +139,9 @@ void UVibH2OSubsystem::Deinitialize()
 {
 	StopListening();
 	StopRemote();
+	StopMidiInput();
+	StopKeyboardCues();
+	BackgroundGuard.Release();
 	Individuals.Reset();
 	Room.Reset();
 	Super::Deinitialize();
@@ -437,6 +441,7 @@ void UVibH2OSubsystem::Tick(float DeltaTime)
 	const double Now = FPlatformTime::Seconds();
 
 	DrainQueue();
+	DrainCueInputs();
 
 	// End of burst: the plan carries no end marker, silence stands in for one.
 	if (Pending.bDirty && (Now - Pending.LastMessageTime) >= Settings->RoomMappingSettleSeconds)
@@ -457,17 +462,16 @@ void UVibH2OSubsystem::DrainQueue()
 	const bool bLog = UVibH2OSettings::Get()->bLogOscTraffic;
 
 	FVibH2OOscMessage Message;
-	if (Receiver.IsValid())
+	// Re-checked every time: a message may end a learn capture, which closes
+	// the editor stand-in's receiver from inside HandleMessage.
+	while (Receiver.IsValid() && Receiver->Dequeue(Message))
 	{
-		while (Receiver->Dequeue(Message))
+		++MessagesThisSecond;
+		if (bLog)
 		{
-			++MessagesThisSecond;
-			if (bLog)
-			{
-				UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
-			}
-			HandleMessage(Message);
+			UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
 		}
+		HandleMessage(Message);
 	}
 
 	// The iPad's commands join the very same path as Max's: one control
@@ -500,6 +504,9 @@ void UVibH2OSubsystem::HandleMessage(const FVibH2OOscMessage& Message)
 	{
 		return;
 	}
+	// Room plan and sensor data are never cue material; everything else is,
+	// the plugin's own control routes included.
+	BroadcastOscCueInput(Message);
 	HandleControlMessage(Message);
 }
 
@@ -1310,4 +1317,10 @@ void UVibH2OSubsystem::UpdateDebugOverlay(float DeltaTime)
 		Line(770007, FColor::Silver, FString::Printf(TEXT("   iPad     telecommande inactive%s"),
 			Error.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("  [%s]"), *Error)));
 	}
+	const TArray<FString> MidiNames = GetOpenMidiInputs();
+	Line(770008, FColor::Silver, FString::Printf(
+		TEXT("   cues     MIDI %s   clavier %s   %s"),
+		MidiNames.Num() > 0 ? *FString::Join(MidiNames, TEXT(", ")) : TEXT("aucune entree"),
+		KeyboardSink.IsValid() && KeyboardSink->IsRunning() ? TEXT("actif") : TEXT("inactif"),
+		*FVibH2OBackgroundGuard::DescribeState()));
 }

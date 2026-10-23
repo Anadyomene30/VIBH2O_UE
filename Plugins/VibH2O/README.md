@@ -79,6 +79,7 @@ Si rien n'apparaît, `VibH2O.ShowDebug` dit pourquoi : port occupé, aucun paque
 | `UVibH2OPositionDriver` | Un tableau : une fonction qui dit où va chaque bulle. |
 | `UVibH2OGridDriver` | Tableau 1 — le plan de salle. |
 | `UVibH2OVortexDriver` | Tableau 2 — le vortex, amorce. |
+| `AVibH2OCueDirector` | La liste des cues : une note ou un CC MIDI, une adresse OSC, une touche → lancer, arrêter, sauter dans une Level Sequence, régler `BlendAlpha`, envoyer une commande au plugin. Apprend ses déclencheurs. Fonctionne sans que la fenêtre ait le focus — voir [`docs/CUES.md`](../../docs/CUES.md). |
 | `FVibH2OOscParser` | Parseur OSC 1.0, sans dépendance au moteur. |
 | `FVibH2OLayoutMath` | Toute la géométrie, en fonctions pures. Testée hors acteur. |
 
@@ -348,6 +349,9 @@ hors du pak, donc modifiable sur place (`VibH2O.Restart` la recharge).
 | `VibH2O.ShowDebug` | Bascule l'affichage réseau / salle / moyennes. |
 | `VibH2O.DumpRoom` | Écrit le plan dans le log, une ligne par rangée. **L'outil du test 7 × 3.** |
 | `VibH2O.Restart` | Redémarre l'écoute OSC et la télécommande iPad avec les réglages courants — et recharge la page de la télécommande depuis le disque. |
+| `VibH2O.Cue <nom>` | Déclenche une cue par son nom. |
+| `VibH2O.Midi` | Liste les entrées MIDI du PC et celles ouvertes pour les cues. |
+| `VibH2O.MidiRestart` | Rouvre les entrées MIDI des cues avec les réglages courants. |
 | `VibH2O.PreviewProbe` | Mesure si l'acteur de scène tourne dans l'éditeur, hors Play. Absente des builds Shipping. |
 | `VibH2O.Simulate [ales\|CxR\|off]` | Simule le patch Max sans rien brancher. Sans argument : bascule. Crée un simulateur si le niveau n'en a pas. |
 | `VibH2O.DemoSweep [ambiance]` | Déroule la recette visuelle complète — une capture PNG par critère dans `Saved/VibH2OSweep/`, dont les trois états de salle croisés avec la synchronie — puis quitte. `ambiance` : seulement les états, en une minute, pour régler palettes et matériau. Absente des builds Shipping. |

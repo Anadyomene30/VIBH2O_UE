@@ -7,6 +7,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Cues/VibH2OBackgroundGuard.h"
+#include "Cues/VibH2OCueTypes.h"
+#include "Cues/VibH2OKeyboardSink.h"
+#include "Cues/VibH2OMidiInput.h"
 #include "Osc/VibH2OOscReceiver.h"
 #include "Osc/VibH2OOscTypes.h"
 #include "Remote/VibH2ORemoteServer.h"
@@ -25,6 +29,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBackdropControlSignature, float, TargetPresence, float, FadeSeconds);
+DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2OCueInputEvent, const FVibH2OCueInput&);
 
 /** Operational figures, for the debug overlay and for get-in. */
 USTRUCT(BlueprintType)
@@ -331,6 +336,50 @@ public:
 	 */
 	void InjectOscMessage(const FVibH2OOscMessage& Message);
 
+	// ------------------------------------------------------------------ Cues
+
+	/**
+	 * Every cue input, whatever its device: OSC control messages (room plan
+	 * and sensor data excluded), MIDI notes, CCs and program changes, keys.
+	 * Raised on the game thread. Cue directors listen here.
+	 *
+	 * Silenced by bIgnoreOscControl, like the other control routes: a render
+	 * must not be disturbed by a cue either.
+	 */
+	FVibH2OCueInputEvent OnCueInput;
+
+	/** Raises OnCueInput as if the input had come from a device. For tests. */
+	void InjectCueInput(const FVibH2OCueInput& Input);
+
+	/** (Re)opens the MIDI inputs named in the project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	int32 StartMidiInput();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopMidiInput();
+
+	/** Names of the MIDI inputs currently open. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	TArray<FString> GetOpenMidiInputs() const;
+
+	/** Names of every MIDI input of this PC, open or not. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	static TArray<FString> GetAvailableMidiInputs();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	bool StartKeyboardCues();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopKeyboardCues();
+
+	/**
+	 * Opens the inputs for a learn capture, and says which ones answered.
+	 * Only the editor stand-in opens anything - the real subsystem already
+	 * listens. Pair with EndInputCapture.
+	 */
+	FString BeginInputCapture();
+	void EndInputCapture();
+
 	// ----------------------------------------------------------- Diagnostics
 
 	/** Shows the network and room state on screen. */
@@ -374,6 +423,28 @@ private:
 
 	/** The iPad remote. Complete type above, for the same reason. */
 	TUniquePtr<FVibH2ORemoteServer> RemoteServer;
+
+	/** Cue inputs. Complete types above, for the same reason. */
+	TUniquePtr<FVibH2OMidiInput> MidiInput;
+	TUniquePtr<FVibH2OKeyboardSink> KeyboardSink;
+	FVibH2OBackgroundGuard BackgroundGuard;
+
+	/** Opens what the project settings ask for. Real subsystem only. */
+	void InitializeCueInputs();
+	void DrainCueInputs();
+	void BroadcastOscCueInput(const FVibH2OOscMessage& Message);
+
+	/**
+	 * Set while OnCueInput is being raised. A cue that sends an OSC message
+	 * must not see it come back as a new cue input: a cue on /Blend that
+	 * sends /Blend would otherwise call itself without end.
+	 */
+	bool bBroadcastingCueInput = false;
+
+	/** Next attempt at opening a MIDI input that was missing - a loopMIDI port created late. */
+	double NextMidiRetryTime = 0.0;
+
+	int32 InputCaptureCount = 0;
 
 	UPROPERTY(Transient)
 	FVibH2ORoomSnapshot Room;
