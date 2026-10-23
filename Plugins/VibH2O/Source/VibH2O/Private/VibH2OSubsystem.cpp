@@ -105,6 +105,7 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		StartListening();
 	}
+	InitializeCueInputs();
 }
 
 void UVibH2OSubsystem::RegisterBuiltInEffects()
@@ -123,6 +124,9 @@ void UVibH2OSubsystem::RegisterBuiltInEffects()
 void UVibH2OSubsystem::Deinitialize()
 {
 	StopListening();
+	StopMidiInput();
+	StopKeyboardCues();
+	BackgroundGuard.Release();
 	Individuals.Reset();
 	Room.Reset();
 	Super::Deinitialize();
@@ -325,6 +329,7 @@ void UVibH2OSubsystem::Tick(float DeltaTime)
 	const double Now = FPlatformTime::Seconds();
 
 	DrainQueue();
+	DrainCueInputs();
 
 	// End of burst: the plan carries no end marker, silence stands in for one.
 	if (Pending.bDirty && (Now - Pending.LastMessageTime) >= Settings->RoomMappingSettleSeconds)
@@ -376,6 +381,9 @@ void UVibH2OSubsystem::HandleMessage(const FVibH2OOscMessage& Message)
 	{
 		return;
 	}
+	// Room plan and sensor data are never cue material; everything else is,
+	// the plugin's own control routes included.
+	BroadcastOscCueInput(Message);
 	HandleControlMessage(Message);
 }
 
@@ -1087,4 +1095,11 @@ void UVibH2OSubsystem::UpdateDebugOverlay(float DeltaTime)
 		TEXT("   controle  blend %.2f   focus %.2f sur '%s'   OSC de controle %s   battements externes %d"),
 		OscBlendAlpha, OscFocusAmount, *OscFocusGroup.ToString(),
 		bIgnoreOscControl ? TEXT("IGNORE") : TEXT("actif"), ExternalBeatCount));
+
+	const TArray<FString> MidiNames = GetOpenMidiInputs();
+	Line(770007, FColor::Silver, FString::Printf(
+		TEXT("   cues     MIDI %s   clavier %s   %s"),
+		MidiNames.Num() > 0 ? *FString::Join(MidiNames, TEXT(", ")) : TEXT("aucune entree"),
+		KeyboardSink.IsValid() && KeyboardSink->IsRunning() ? TEXT("actif") : TEXT("inactif"),
+		*FVibH2OBackgroundGuard::DescribeState()));
 }
