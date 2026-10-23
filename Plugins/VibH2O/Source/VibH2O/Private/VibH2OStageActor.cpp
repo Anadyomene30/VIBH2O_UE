@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Layout/VibH2OLayoutMath.h"
+#include "Layout/VibH2OSchoolMath.h"
 #include "VibH2OBubbleActor.h"
 #include "VibH2OModule.h"
 #include "VibH2OSubsystem.h"
@@ -102,6 +103,7 @@ void AVibH2OStageActor::UnbindFromSubsystem()
 
 void AVibH2OStageActor::DestroyBubbles()
 {
+	DestroyDaughters();
 	for (const TPair<int32, TObjectPtr<AVibH2OBubbleActor>>& Entry : Bubbles)
 	{
 		if (IsValid(Entry.Value))
@@ -232,37 +234,11 @@ void AVibH2OStageActor::ReconcileBubbles(const FVibH2ORoomSnapshot& NewRoom)
 			continue;
 		}
 
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParams.ObjectFlags |= RF_Transient;
-#if WITH_EDITOR
-		if (!World->IsGameWorld())
-		{
-			// Editor bubbles are scaffolding: no transaction, no dirty level,
-			// no outliner entry, and never written into an actor package.
-			SpawnParams.bTemporaryEditorActor = true;
-			SpawnParams.bHideFromSceneOutliner = true;
-			SpawnParams.bCreateActorPackage = false;
-		}
-#endif
-
-		AVibH2OBubbleActor* Bubble = World->SpawnActor<AVibH2OBubbleActor>(
-			const_cast<UClass*>(SpawnClass), GetActorTransform(), SpawnParams);
-
+		AVibH2OBubbleActor* Bubble = SpawnBubbleActor(World, SpawnClass);
 		if (Bubble == nullptr)
 		{
 			continue;
 		}
-
-		// Attaching to the stage root is what makes moving, rotating or scaling
-		// the actor carry the whole room along with it.
-		//
-		// SnapToTarget, not KeepRelative: an unparented actor's relative
-		// transform equals its world transform, so keeping it would place the
-		// bubble at twice the stage offset for one frame before Tick corrects
-		// it. Snapping starts it at the root, where the drivers expect it.
-		Bubble->AttachToComponent(StageRoot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		Bubble->AssignSeat(Seat);
 		Bubbles.Add(Seat.SeatIndex, Bubble);
 		++Created;
@@ -285,7 +261,217 @@ void AVibH2OStageActor::ReconcileBubbles(const FVibH2ORoomSnapshot& NewRoom)
 		TEXT("VibH2O: salle reconstruite — %d bulles creees, %d conservees, %d detruites (total %d)."),
 		Created, Reused, Destroyed, Bubbles.Num());
 
+	ReconcileDaughters();
+
 	OnRoomBuilt.Broadcast(Bubbles.Num());
+}
+
+AVibH2OBubbleActor* AVibH2OStageActor::SpawnBubbleActor(UWorld* World, const UClass* SpawnClass)
+{
+	if (World == nullptr || SpawnClass == nullptr || StageRoot == nullptr)
+	{
+		return nullptr;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.ObjectFlags |= RF_Transient;
+#if WITH_EDITOR
+	if (!World->IsGameWorld())
+	{
+		// Editor bubbles are scaffolding: no transaction, no dirty level,
+		// no outliner entry, and never written into an actor package.
+		SpawnParams.bTemporaryEditorActor = true;
+		SpawnParams.bHideFromSceneOutliner = true;
+		SpawnParams.bCreateActorPackage = false;
+	}
+#endif
+
+	AVibH2OBubbleActor* Bubble = World->SpawnActor<AVibH2OBubbleActor>(
+		const_cast<UClass*>(SpawnClass), GetActorTransform(), SpawnParams);
+	if (Bubble == nullptr)
+	{
+		return nullptr;
+	}
+
+	// Attaching to the stage root is what makes moving, rotating or scaling
+	// the actor carry the whole room along with it.
+	//
+	// SnapToTarget, not KeepRelative: an unparented actor's relative
+	// transform equals its world transform, so keeping it would place the
+	// bubble at twice the stage offset for one frame before Tick corrects
+	// it. Snapping starts it at the root, where the drivers expect it.
+	Bubble->AttachToComponent(StageRoot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	return Bubble;
+}
+
+// ---------------------------------------------------------------- Division
+
+void AVibH2OStageActor::ReconcileDaughters()
+{
+	UWorld* World = GetWorld();
+	const UClass* SpawnClass = BubbleClass ? BubbleClass.Get() : AVibH2OBubbleActor::StaticClass();
+
+	const int32 Wanted = FVibH2OSchoolMath::ComputeFamilySize(DaughtersPerBubble, Bubbles.Num(), MaxSchoolSize);
+	const int32 WantedDaughters = Wanted - 1;
+
+	// A family whose mother has gone goes with her.
+	for (auto It = Families.CreateIterator(); It; ++It)
+	{
+		if (!Bubbles.Contains(It.Key()))
+		{
+			for (const TObjectPtr<AVibH2OBubbleActor>& Daughter : It.Value().Daughters)
+			{
+				if (IsValid(Daughter))
+				{
+					Daughter->Destroy();
+				}
+			}
+			It.RemoveCurrent();
+		}
+	}
+
+	int32 Born = 0;
+	for (const FVibH2OSeat& Seat : Room.Seats)
+	{
+		if (!Seat.bOccupied || !Bubbles.Contains(Seat.SeatIndex))
+		{
+			continue;
+		}
+
+		TArray<TObjectPtr<AVibH2OBubbleActor>>& Daughters = Families.FindOrAdd(Seat.SeatIndex).Daughters;
+		Daughters.RemoveAll([](const TObjectPtr<AVibH2OBubbleActor>& Daughter) { return !IsValid(Daughter); });
+
+		while (Daughters.Num() > WantedDaughters)
+		{
+			Daughters.Pop()->Destroy();
+		}
+
+		// Same rule as the mothers: an unchanged daughter stays, so a resend of
+		// the room from Max does not make the school flicker.
+		for (int32 Index = 0; Index < Daughters.Num(); ++Index)
+		{
+			if (Daughters[Index]->IndividualId != Seat.IndividualId)
+			{
+				Daughters[Index]->AssignDaughter(Seat, Index + 1);
+			}
+		}
+
+		while (Daughters.Num() < WantedDaughters)
+		{
+			AVibH2OBubbleActor* Daughter = SpawnBubbleActor(World, SpawnClass);
+			if (Daughter == nullptr)
+			{
+				break;
+			}
+			Daughter->AssignDaughter(Seat, Daughters.Num() + 1);
+			// Born tucked away, whatever the division: the next frame places
+			// her. Hiding every daughter here instead would blink the whole
+			// school each time Max resends the room.
+			TuckAway(Daughter);
+			Daughters.Add(Daughter);
+			++Born;
+		}
+	}
+
+	if (Born > 0 || FamilySize != Wanted)
+	{
+		UE_LOG(LogVibH2O, Log, TEXT("VibH2O: %d filles par bulle (%d nees), banc de %d bulles."),
+			WantedDaughters, Born, Bubbles.Num() * Wanted);
+	}
+	FamilySize = Wanted;
+}
+
+void AVibH2OStageActor::TuckAway(AVibH2OBubbleActor* Daughter)
+{
+	if (!IsValid(Daughter))
+	{
+		return;
+	}
+	Daughter->SetActorHiddenInGame(true);
+	// Hidden in game is not hidden in the editor viewport: folded back to a
+	// speck at the stage root, a daughter is invisible in both.
+	Daughter->SetActorRelativeLocation(FVector::ZeroVector);
+	Daughter->SetActorRelativeScale3D(FVector(0.001f));
+}
+
+void AVibH2OStageActor::DestroyDaughters()
+{
+	for (const TPair<int32, FVibH2OBubbleFamily>& Entry : Families)
+	{
+		for (const TObjectPtr<AVibH2OBubbleActor>& Daughter : Entry.Value.Daughters)
+		{
+			if (IsValid(Daughter))
+			{
+				Daughter->Destroy();
+			}
+		}
+	}
+	Families.Reset();
+	FamilySize = 1;
+	bDaughtersTucked = false;
+}
+
+void AVibH2OStageActor::TuckAwayDaughters()
+{
+	for (const TPair<int32, FVibH2OBubbleFamily>& Entry : Families)
+	{
+		for (const TObjectPtr<AVibH2OBubbleActor>& Daughter : Entry.Value.Daughters)
+		{
+			TuckAway(Daughter);
+		}
+	}
+	bDaughtersTucked = true;
+}
+
+float AVibH2OStageActor::GetSchoolOrder() const
+{
+	const UVibH2OFlockDriver* Flock = Cast<UVibH2OFlockDriver>(FlockDriver);
+	return Flock ? Flock->GetSchoolOrder() : 0.0f;
+}
+
+float AVibH2OStageActor::GetDivisionProgress() const
+{
+	if (FamilySize <= 1)
+	{
+		return 0.0f;
+	}
+	const float RawBlend = FMath::Clamp(BlendAlpha, 0.0f, 1.0f);
+	const float Blend = BlendCurve ? FMath::Clamp(BlendCurve->GetFloatValue(RawBlend), 0.0f, 1.0f) : RawBlend;
+	return FVibH2OSchoolMath::ComputeDivisionProgress(Blend, DivisionStart, DivisionEnd);
+}
+
+TArray<AVibH2OBubbleActor*> AVibH2OStageActor::GetDaughters() const
+{
+	TArray<AVibH2OBubbleActor*> Result;
+	for (const TPair<int32, FVibH2OBubbleFamily>& Entry : Families)
+	{
+		for (const TObjectPtr<AVibH2OBubbleActor>& Daughter : Entry.Value.Daughters)
+		{
+			if (IsValid(Daughter))
+			{
+				Result.Add(Daughter.Get());
+			}
+		}
+	}
+	return Result;
+}
+
+TArray<AVibH2OBubbleActor*> AVibH2OStageActor::GetDaughtersOfSeat(int32 InSeatIndex) const
+{
+	TArray<AVibH2OBubbleActor*> Result;
+	if (const FVibH2OBubbleFamily* Family = Families.Find(InSeatIndex))
+	{
+		for (const TObjectPtr<AVibH2OBubbleActor>& Daughter : Family->Daughters)
+		{
+			if (IsValid(Daughter))
+			{
+				Result.Add(Daughter.Get());
+			}
+		}
+	}
+	return Result;
 }
 
 // --------------------------------------------------------------------- Tick
@@ -392,6 +578,29 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 	const float RawBlend = FMath::Clamp(BlendAlpha, 0.0f, 1.0f);
 	const float Blend = BlendCurve ? FMath::Clamp(BlendCurve->GetFloatValue(RawBlend), 0.0f, 1.0f) : RawBlend;
 
+	// The families follow their settings and the room, even when the count is
+	// changed from a Blueprint mid-show.
+	if (FVibH2OSchoolMath::ComputeFamilySize(DaughtersPerBubble, Bubbles.Num(), MaxSchoolSize) != FamilySize)
+	{
+		ReconcileDaughters();
+	}
+
+	// The division is a pure function of the blend: no state, so the morph runs
+	// backwards as well as forwards and the sisters fold back into their mother.
+	const float DivisionProgress = (FamilySize > 1)
+		? FVibH2OSchoolMath::ComputeDivisionProgress(Blend, DivisionStart, DivisionEnd)
+		: 0.0f;
+	const float Migration = FVibH2OSchoolMath::ComputeMigrationBlend(Blend, DivisionStart, DivisionEnd, FamilySize);
+	const bool bShowDaughters = DivisionProgress > 0.0f;
+	if (!bShowDaughters && !bDaughtersTucked)
+	{
+		TuckAwayDaughters();
+	}
+	else if (bShowDaughters)
+	{
+		bDaughtersTucked = false;
+	}
+
 	// Drivers that carry state step forward once, as a whole, before anyone
 	// asks where a single bubble is. A school has to move as a school.
 	FVibH2OFrameContext Frame;
@@ -399,6 +608,7 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 	Frame.DeltaSeconds = DeltaSeconds;
 	Frame.TimeSeconds = StageTime;
 	Frame.OccupiedCount = OccupiedCount;
+	Frame.FamilySize = FamilySize;
 	Frame.CollectiveSynchrony = CollectiveSynchrony;
 	Frame.AverageExcitation = Subsystem->GetAverageExcitation();
 	Frame.BlendAlpha = Blend;
@@ -444,19 +654,47 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 
 	static const FVibH2OIndividualState EmptyState;
 
+	// Every body on stage: each mother, followed by her daughters while the
+	// division shows. A daughter goes through exactly the same stack as her
+	// mother - same data, same layers - only her seed and family pose differ.
+	struct FBody
+	{
+		const FVibH2OSeat* Seat = nullptr;
+		AVibH2OBubbleActor* Bubble = nullptr;
+		int32 Member = 0;
+	};
+	TArray<FBody> Bodies;
+	Bodies.Reserve(Bubbles.Num() * (bShowDaughters ? FamilySize : 1));
 	for (const FVibH2OSeat& Seat : Room.Seats)
 	{
 		if (!Seat.bOccupied)
 		{
 			continue;
 		}
-
 		TObjectPtr<AVibH2OBubbleActor>* Found = Bubbles.Find(Seat.SeatIndex);
 		if (Found == nullptr || !IsValid(*Found))
 		{
 			continue;
 		}
-		AVibH2OBubbleActor* Bubble = *Found;
+		Bodies.Add({ &Seat, Found->Get(), 0 });
+
+		const FVibH2OBubbleFamily* Family = bShowDaughters ? Families.Find(Seat.SeatIndex) : nullptr;
+		if (Family != nullptr)
+		{
+			for (int32 Index = 0; Index < Family->Daughters.Num(); ++Index)
+			{
+				if (IsValid(Family->Daughters[Index]))
+				{
+					Bodies.Add({ &Seat, Family->Daughters[Index].Get(), Index + 1 });
+				}
+			}
+		}
+	}
+
+	for (const FBody& Body : Bodies)
+	{
+		const FVibH2OSeat& Seat = *Body.Seat;
+		AVibH2OBubbleActor* Bubble = Body.Bubble;
 
 		const FVibH2OIndividualState* StatePtr = Subsystem->FindIndividual(Seat.IndividualId);
 		const FVibH2OIndividualState& State = StatePtr ? *StatePtr : EmptyState;
@@ -468,37 +706,56 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		Context.Rows = Room.Rows;
 		Context.OccupiedOrdinal = Subsystem->GetOccupiedOrdinal(Seat.SeatIndex);
 		Context.OccupiedCount = OccupiedCount;
+		Context.FamilyMember = Body.Member;
+		Context.FamilySize = FamilySize;
 		Context.Individual = State;
 		Context.CollectiveSynchrony = CollectiveSynchrony;
 		Context.TimeSeconds = StageTime;
 		// The seed derives from the seat index, so relief and phases stay
-		// stable from one launch to the next.
-		Context.Seed = Seat.SeatIndex;
+		// stable from one launch to the next. A daughter's is derived from it.
+		Context.Seed = FVibH2OSchoolMath::MakeMemberSeed(Seat.SeatIndex, Body.Member);
 
-		// The position stack, as described in docs/SPEC.md section E.
+		// Where this sister sits in her family, and how big she is. Identity
+		// for the mother while the division has not begun.
+		const FVibH2ODivisionPose Division = FVibH2OSchoolMath::EvaluateDivision(
+			Body.Member, FamilySize, Seat.SeatIndex, DivisionProgress, DivisionSpread);
+
+		// The position stack, as described in docs/SPEC.md section E. The
+		// family divides around the seat, then travels to the school.
 		FTransform GridTransform = FTransform::Identity;
 		if (GridDriver != nullptr)
 		{
 			GridTransform = GridDriver->EvaluateSeat(Context);
 		}
 
-		FVector Location = GridTransform.GetLocation();
+		FVector Location = GridTransform.GetLocation() + Division.Offset;
 		FQuat Rotation = GridTransform.GetRotation();
 
-		if (Blend > 0.0f && FlockDriver != nullptr)
+		if (Migration > 0.0f && FlockDriver != nullptr)
 		{
 			const FTransform FlockTransform = FlockDriver->EvaluateSeat(Context);
-			Location = FMath::Lerp(Location, FlockTransform.GetLocation(), Blend);
-			Rotation = FQuat::Slerp(Rotation, FlockTransform.GetRotation(), Blend);
+			Location = FMath::Lerp(Location, FlockTransform.GetLocation(), Migration);
+			Rotation = FQuat::Slerp(Rotation, FlockTransform.GetRotation(), Migration);
 			Rotation.Normalize();
 		}
+
+		// A daughter floats and drifts as her mother does while still nested
+		// in her, then gradually on her own: otherwise the sisters would jiggle
+		// out of the mother before she has finished dividing.
+		const int32 MotherSeed = Seat.SeatIndex;
+		const float Own = (Body.Member > 0) ? Division.Individuation : 1.0f;
 
 		// The float is added AFTER the blend, and not inside the grid driver:
 		// it is a property of the bubble - it is underwater, so it floats - and
 		// not of the tableau. That is how it survives the move to the vortex.
 		if (bFloatEnabled && FloatAmplitude > 0.0f)
 		{
-			Location += FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, Context.Seed, StageTime);
+			FVector Float = FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, Context.Seed, StageTime);
+			if (Own < 1.0f)
+			{
+				Float = FMath::Lerp(FVibH2OLayoutMath::EvaluateFloatOffset(FloatParams, MotherSeed, StageTime), Float, Own);
+			}
+			Location += Float;
 		}
 		if (bFloatEnabled && FloatRotationAmount > 0.0f)
 		{
@@ -509,10 +766,17 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		// arousal, and stays bounded by construction.
 		if (bDriftEnabled && DriftIntensity > 0.0f)
 		{
-			Location += FVibH2OLayoutMath::EvaluateDriftOffset(DriftParams, Context.Seed, StageTime, State.Excitation, MinSpacing);
+			FVector Drift = FVibH2OLayoutMath::EvaluateDriftOffset(DriftParams, Context.Seed, StageTime, State.Excitation, MinSpacing);
+			if (Own < 1.0f)
+			{
+				Drift = FMath::Lerp(FVibH2OLayoutMath::EvaluateDriftOffset(DriftParams, MotherSeed, StageTime, State.Excitation, MinSpacing), Drift, Own);
+			}
+			Location += Drift;
 		}
 
-		float Scale = BaseScale;
+		// The division's share of the volume is structure, not an effect: it
+		// applies whether or not the scale effect is on.
+		float Scale = BaseScale * Division.ScaleFactor;
 		if (bScaleEnabled)
 		{
 			Scale *= 1.0f + State.Excitation * ScalePerExcitation + State.BeatPulse * BeatPopAmount;
@@ -542,11 +806,16 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		Bubble->SetActorRelativeLocation(Location);
 		Bubble->SetActorRelativeRotation(Rotation);
 		Bubble->SetActorRelativeScale3D(ScaleVector);
+		if (Body.Member > 0)
+		{
+			Bubble->SetActorHiddenInGame(false);
+		}
 
 		const float Mask = bFocusEnabled ? ComputeFocusMask(Seat) : 1.0f;
 		const FLinearColor Tint = bTintEnabled ? ComputeTint(State.Excitation) : CalmColor;
 
-		Bubble->SetSeatLabelVisible(bShowSeatNumbers);
+		// One number per spectator: on the mother only.
+		Bubble->SetSeatLabelVisible(bShowSeatNumbers && Body.Member == 0);
 		if (bShowSeatNumbers)
 		{
 			Bubble->OrientSeatLabel(ViewLocation);

@@ -118,6 +118,19 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
 	int32 Row = 0;
 
+	/**
+	 * 0 for the bubble of the seat itself, 1 and up for the daughters it
+	 * divides into on the way to tableau 2. A daughter shares her mother's
+	 * seat, individual and heartbeat, so she raises the same events: test this
+	 * in a Blueprint to play a sound once per spectator rather than once per
+	 * sister.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
+	int32 FamilyMember = 0;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Bulle")
+	bool IsDaughter() const { return FamilyMember > 0; }
+
 	/** Last known state of the individual. */
 	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
 	FVibH2OIndividualState State;
@@ -182,6 +195,9 @@ public:
 
 	/** Called by the stage actor on creation or reassignment. */
 	void AssignSeat(const FVibH2OSeat& Seat);
+
+	/** Called by the stage actor on a daughter: her seat is her mother's. */
+	void AssignDaughter(const FVibH2OSeat& Seat, int32 InFamilyMember);
 
 	/** Shows or hides the number floating over this bubble. */
 	void SetSeatLabelVisible(bool bVisible);
