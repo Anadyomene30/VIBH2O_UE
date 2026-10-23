@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VibH2O">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>VibH2O</title>
+<!--
+  Telecommande iPad de VibH2O, servie par le plugin Unreal lui-meme.
+
+  Un seul fichier, sans dependance : il doit marcher hors ligne d'internet, dans
+  une salle de spectacle. Il interroge /api/state quelques fois par seconde et
+  envoie ses commandes a /api/cmd, une par ligne, au format des adresses OSC.
+  Modifiable sur place : enregistrer, puis VibH2O.Restart dans la console
+  Unreal, puis recharger la page.
+-->
+<style>
+:root {
+  --bg: #000;
+  --panel: #0b0f12;
+  --line: #1c252c;
+  --text: #9fb1bd;
+  --dim: #5b6a74;
+  --strong: #d6e2ea;
+  --ok: #2fbf71;
+  --bad: #e0483e;
+  --warn: #d9a33a;
+  --radius: 16px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); }
+body {
+  color: var(--text);
+  font: 17px/1.3 -apple-system, system-ui, "Segoe UI", sans-serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  transition: filter .3s;
+}
+body.night { filter: brightness(.42); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+/* ---------------------------------------------------------------- Header */
+header {
+  display: flex; align-items: center; gap: 14px;
+  height: 56px; padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+#dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bad); flex: none; transition: background .2s; }
+#dot.ok { background: var(--ok); }
+#title { font-weight: 700; letter-spacing: .08em; color: var(--strong); }
+#status { color: var(--dim); font-size: 15px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hbtn {
+  height: 40px; min-width: 52px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel); font-size: 16px;
+}
+.hbtn.on { border-color: var(--warn); color: var(--warn); }
+nav { display: flex; gap: 6px; }
+nav button { height: 40px; padding: 0 16px; border-radius: 12px; color: var(--dim); border: 1px solid transparent; }
+nav button.sel { color: var(--strong); border-color: var(--line); background: var(--panel); }
+
+#banner {
+  display: none; padding: 10px 16px; font-weight: 600; text-align: center;
+  background: #2a0c0a; color: #ff8a80; border-bottom: 1px solid #4a1612;
+}
+#banner.show { display: block; }
+
+main { height: calc(100% - 56px); overflow: hidden; }
+.page { display: none; height: 100%; padding: 14px; gap: 14px; }
+.page.sel { display: flex; }
+body.locked main { pointer-events: none; opacity: .55; }
+
+section { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.empty { color: var(--dim); padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); line-height: 1.45; }
+
+/* ------------------------------------------------------------ Attractors */
+#left { flex: 1.35; }
+#right { flex: 1; }
+#tiles {
+  display: grid; gap: 12px; overflow-y: auto; flex: 1; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.tile {
+  --c: #f90;
+  position: relative; min-height: 118px; border-radius: var(--radius);
+  border: 2px solid var(--line); background: var(--panel);
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 14px 16px 16px; text-align: left; overflow: hidden;
+  transition: border-color .2s, background .2s;
+}
+.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--c); opacity: .7; }
+.tile .name { font-size: 22px; font-weight: 700; color: var(--strong); word-break: break-word; }
+.tile .meta { font-size: 14px; color: var(--dim); }
+.tile .bar { height: 8px; border-radius: 4px; background: #151c21; overflow: hidden; margin-top: 10px; }
+.tile .fill { height: 100%; width: 0; background: var(--c); transition: width .15s linear; }
+.tile.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--panel)); }
+.tile.on .meta { color: var(--text); }
+.tile:active { transform: scale(.985); }
+
+#release {
+  height: 72px; border-radius: var(--radius); font-size: 22px; font-weight: 800; letter-spacing: .06em;
+  color: #ffb4ab; background: #2a0f0c; border: 2px solid #6b2017;
+}
+#release:active { background: #4a160f; }
+
+.slider { display: flex; align-items: center; gap: 14px; }
+.slider label { min-width: 120px; color: var(--text); }
+.slider output { min-width: 70px; text-align: right; color: var(--strong); font-variant-numeric: tabular-nums; }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 44px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 5px; background: #1a232a; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 40px; height: 40px; margin-top: -15px; border-radius: 50%;
+  background: #33434e; border: 2px solid #6d8494;
+}
+input[type=range]::-moz-range-track { height: 10px; border-radius: 5px; background: #1a232a; }
+input[type=range]::-moz-range-thumb { width: 36px; height: 36px; border-radius: 50%; background: #33434e; border: 2px solid #6d8494; }
+
+/* ----------------------------------------------------------------- Zones */
+#padwrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+#pad {
+  position: relative; width: 100%; max-height: 100%; aspect-ratio: 4 / 3;
+  border: 2px solid #26323a; border-radius: 10px; overflow: hidden; touch-action: none;
+  background:
+    linear-gradient(#141b20 1px, transparent 1px) 0 0 / 100% 33.333%,
+    linear-gradient(90deg, #141b20 1px, transparent 1px) 0 0 / 25% 100%,
+    #06090b;
+}
+#pad .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: .5; }
+#pad .cross::before, #pad .cross::after { content: ""; position: absolute; background: #3a4b56; }
+#pad .cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
+#pad .cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
+#pad .tag { position: absolute; bottom: 6px; right: 10px; font-size: 13px; color: #34444e; }
+.zone {
+  --c: #d4f;
+  position: absolute; transform: translate(-50%, -50%);
+  border: 2px dashed var(--c); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--strong); font-size: 15px; font-weight: 600; touch-action: none;
+  min-width: 44px; min-height: 44px;
+}
+.zone.rect { border-radius: 18%; }
+.zone.on { border-style: solid; background: color-mix(in srgb, var(--c) 22%, transparent); }
+.zone.drag { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 45%, transparent); }
+#chips, #groups, #effects { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  --c: #6d8494;
+  min-height: 52px; padding: 0 20px; border-radius: 26px; font-size: 18px; font-weight: 600;
+  border: 2px solid var(--line); background: var(--panel); color: var(--text);
+}
+.chip.on { border-color: var(--c); color: var(--strong); background: color-mix(in srgb, var(--c) 20%, var(--panel)); }
+/* An effect switched off must read as off at a glance, in the dark. */
+#effects .chip, #backdrop .chip { --c: #3fa7d6; }
+#backdrop .chip:not(.on) { border-style: dashed; color: var(--dim); }
+#effects .chip:not(.on) { border-style: dashed; color: var(--dim); text-decoration: line-through; }
+
+/* --------------------------------------------------------------- Page 2 */
+#page2 { flex-direction: column; overflow-y: auto; }
+#page2 section { gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #05080a; }
+.ends { display: flex; justify-content: space-between; color: var(--dim); font-size: 15px; }
+#blend { height: 60px; }
+
+/* --------------------------------------------------------------- Help */
+#help {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 10;
+  align-items: center; justify-content: center; padding: 24px;
+}
+#help.show { display: flex; }
+#help div { max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; line-height: 1.5; }
+#help h3 { margin: 0 0 10px; color: var(--strong); }
+#help code { color: var(--strong); }
+#help button { margin-top: 16px; }
+
+@media (orientation: portrait) {
+  .page.sel#page1 { flex-direction: column; }
+  #left { flex: 1.2; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div id="dot"></div>
+  <div id="title">VIBH2O</div>
+  <div id="status">connexion…</div>
+  <nav>
+    <button data-page="page1" class="sel">Attracteurs</button>
+    <button data-page="page2">Tableaux · Focus · Effets</button>
+  </nav>
+  <button class="hbtn" id="night" title="Mode nuit">☾</button>
+  <button class="hbtn" id="lock" title="Verrouiller">🔓</button>
+  <button class="hbtn" id="info" title="Aide">?</button>
+</header>
+<div id="banner"></div>
+<main>
+  <div class="page sel" id="page1">
+    <section id="left">
+      <h2>Attracteurs</h2>
+      <div id="tiles"></div>
+      <button id="release">TOUT RELÂCHER</button>
+      <div class="slider">
+        <label for="fade">Durée des fondus</label>
+        <input type="range" id="fade" min="-2" max="2" step="0.01" value="0">
+        <output id="fadeOut">×1.0</output>
+      </div>
+    </section>
+    <section id="right">
+      <h2>Zones d'exclusion — le tulle</h2>
+      <div id="padwrap">
+        <div id="pad"><div class="cross"></div><div class="tag">vu depuis la salle</div></div>
+      </div>
+      <div id="chips"></div>
+    </section>
+  </div>
+
+  <div class="page" id="page2">
+    <section>
+      <h2>Tableaux</h2>
+      <div class="slider">
+        <label for="blend">Salle → Banc</label>
+        <input type="range" id="blend" min="0" max="1" step="0.001" value="0">
+        <output id="blendOut">0.00</output>
+      </div>
+      <div class="ends"><span>Tableau 1 — le plan de salle</span><span>Tableau 2 — le banc</span></div>
+    </section>
+    <section>
+      <h2>Fond</h2>
+      <div id="backdrop"><button class="chip" id="backdropChip">Fond sous-marin</button></div>
+      <div class="ends"><span>Éteint : fondu vers le noir pur, les bulles restent.</span><span>/Fond</span></div>
+    </section>
+    <section>
+      <h2>Focus</h2>
+      <div id="groups"></div>
+      <div class="slider">
+        <label for="focus">Intensité</label>
+        <input type="range" id="focus" min="0" max="1" step="0.001" value="0">
+        <output id="focusOut">0.00</output>
+      </div>
+    </section>
+    <section>
+      <h2>Effets</h2>
+      <div id="effects"></div>
+    </section>
+  </div>
+</main>
+
+<div id="help"><div>
+  <h3>Télécommande VibH2O</h3>
+  <p><b>Installer :</b> dans Safari, bouton Partager → <i>Sur l'écran d'accueil</i>. L'icône ouvre ensuite la télécommande en plein écran.</p>
+  <p><b>Adresse :</b> <code id="host"></code> — c'est le PC Unreal. Elle est écrite dans le log Unreal au lancement (<i>telecommande iPad — ouvrir…</i>).</p>
+  <p><b>Attracteurs :</b> un appui appelle les bulles, un second les renvoie à leur place. Le fondu est toujours doux, même si l'on change d'avis en route. <b>TOUT RELÂCHER</b> renvoie tout le monde.</p>
+  <p><b>Zones :</b> faire glisser une zone sur le tulle pour suivre une circassienne ; les pastilles dessous l'allument ou l'éteignent.</p>
+  <p><b>Dans le noir :</b> ☾ assombrit l'écran, 🔒 bloque les touches.</p>
+  <p>Point vert : Unreal répond. Point rouge : plus de réponse — vérifier le Wi-Fi et que le jeu tourne.</p>
+  <button class="hbtn" id="helpClose">Fermer</button>
+</div></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const POLL_MS = 350;
+const HOLD_MS = 1500;   // how long a local change outranks the polled state
+
+let state = null;
+let online = false;
+let failures = 0;
+
+// ------------------------------------------------------------ Local overrides
+// After a tap or a drag, the screen shows what was asked at once, without
+// waiting for the next poll to confirm it - and without the poll snapping it
+// back in the meantime.
+const overrides = new Map();
+function hold(key, value) { overrides.set(key, { value, until: performance.now() + HOLD_MS }); }
+function shown(key, serverValue) {
+  const o = overrides.get(key);
+  if (o && o.until > performance.now()) return o.value;
+  overrides.delete(key);
+  return serverValue;
+}
+
+// --------------------------------------------------------------- Command bus
+// One request in flight at most. Commands are keyed: a newer drag position
+// replaces an older one still waiting, so a slow network never piles up a
+// backlog of stale positions.
+const pending = new Map();
+let inflight = false;
+function send(key, line) { pending.set(key, { line, at: performance.now() }); flush(); }
+function timeoutSignal(ms) {
+  if (window.AbortSignal && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
+}
+async function flush() {
+  if (inflight || pending.size === 0) return;
+  const batch = [...pending.entries()];
+  pending.clear();
+  inflight = true;
+  try {
+    const r = await fetch("api/cmd", { method: "POST", body: batch.map(([, c]) => c.line).join("\n"),
+      headers: { "Content-Type": "text/plain" }, signal: timeoutSignal(2000) });
+    if (!r.ok) throw new Error(r.status);
+  } catch (e) {
+    // Retry what is still recent and has not been superseded; drop the rest,
+    // rather than replay a stale cue long after the network comes back.
+    const now = performance.now();
+    for (const [key, c] of batch) if (!pending.has(key) && now - c.at < 3000) pending.set(key, c);
+    setOnline(false);
+    inflight = false;
+    setTimeout(flush, 400);
+    return;
+  }
+  inflight = false;
+  if (pending.size) flush();
+}
+
+// -------------------------------------------------------------------- Polling
+async function poll() {
+  try {
+    const r = await fetch("api/state?t=" + Date.now(), { cache: "no-store", signal: timeoutSignal(1500) });
+    if (!r.ok) throw new Error(r.status);
+    state = await r.json();
+    failures = 0;
+    setOnline(true);
+    render();
+  } catch (e) {
+    if (++failures >= 2) setOnline(false);
+  } finally {
+    setTimeout(poll, POLL_MS);
+  }
+}
+
+function setOnline(value) {
+  online = value;
+  $("#dot").classList.toggle("ok", value);
+  updateBanner();
+}
+
+function updateBanner() {
+  const b = $("#banner");
+  let text = "";
+  if (!online) text = "Hors ligne — Unreal ne répond pas. Vérifier le Wi-Fi et que le jeu tourne.";
+  else if (state && state.oscIgnored) text = "Contrôle coupé dans Unreal (bIgnoreOscControl) : les commandes sont ignorées.";
+  b.textContent = text;
+  b.classList.toggle("show", text !== "");
+}
+
+// --------------------------------------------------------------------- Render
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const signature = (list) => (list || []).map((e) => e.id + "|" + e.label + "|" + e.color + "|" + (e.shape || "")).join(",");
+let tilesSig = null, zonesSig = null, groupsSig = null, effectsSig = null;
+
+function render() {
+  if (!state) return;
+  const attractors = state.attractors || [];
+  const zones = state.zones || [];
+  const count = (n, word) => n + " " + word + (n > 1 ? "s" : "");
+  $("#status").textContent = count(state.bubbles || 0, "bulle") + " · " + count(attractors.length, "attracteur") + " · " + count(zones.length, "zone");
+  updateBanner();
+
+  // Attractor tiles: rebuilt only when the set changes, updated in place
+  // otherwise, so a finger already on a tile is never pulled from under it.
+  const tiles = $("#tiles");
+  const ts = signature(attractors);
+  if (ts !== tilesSig) {
+    tilesSig = ts;
+    tiles.innerHTML = attractors.length ? "" :
+      '<div class="empty">Aucun attracteur dans le niveau. Placer un acteur <b>VibH2O — Attracteur</b> dans Unreal.</div>';
+    for (const a of attractors) {
+      const el = document.createElement("button");
+      el.className = "tile";
+      el.dataset.id = a.id;
+      el.style.setProperty("--c", a.color);
+      el.innerHTML = '<div class="name">' + esc(a.label) + '</div><div><div class="meta"></div><div class="bar"><div class="fill"></div></div></div>';
+      el.addEventListener("click", () => toggleAttractor(a.id));
+      tiles.appendChild(el);
+    }
+  }
+  for (const a of attractors) {
+    const el = tiles.querySelector('.tile[data-id="' + CSS.escape(a.id) + '"]');
+    if (!el) continue;
+    const on = shown("att:" + a.id, a.on) >= 0.5;
+    el.classList.toggle("on", on);
+    el.querySelector(".fill").style.width = Math.round(a.w * 100) + "%";
+    const pct = Math.round(a.w * 100);
+    el.querySelector(".meta").textContent = (on ? (pct >= 99 ? "arrivé" : "en route · " + pct + " %") : (pct <= 1 ? "au repos" : "retour · " + pct + " %"))
+      + " · part " + Math.round(a.share * 100) + " %" + (a.osc ? "" : " · Sequencer");
+  }
+
+  const fadeScale = shown("fade", state.fadeScale || 1);
+  if (!fadeDragging) $("#fade").value = Math.log2(fadeScale);
+  $("#fadeOut").textContent = "×" + fadeScale.toFixed(fadeScale < 1 ? 2 : 1);
+
+  renderZones(zones);
+  renderPage2();
+}
+
+// ---------------------------------------------------------------------- Zones
+const pad = $("#pad");
+function renderZones(zones) {
+  const zs = signature(zones);
+  if (zs !== zonesSig) {
+    zonesSig = zs;
+    pad.querySelectorAll(".zone").forEach((z) => z.remove());
+    const chips = $("#chips");
+    chips.innerHTML = zones.length ? "" :
+      '<div class="empty">Aucune zone d\'exclusion. Placer un acteur <b>VibH2O — Zone d\'exclusion</b> dans Unreal.</div>';
+    if (zones.length && zones[0].aspect) pad.style.aspectRatio = zones[0].aspect;
+    for (const z of zones) {
+      const el = document.createElement("div");
+      el.className = "zone" + (z.shape === "rect" ? " rect" : "");
+      el.dataset.id = z.id;
+      el.style.setProperty("--c", z.color);
+      el.textContent = z.label;
+      attachDrag(el, z.id);
+      pad.appendChild(el);
+
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.dataset.id = z.id;
+      chip.style.setProperty("--c", z.color);
+      chip.textContent = z.label;
+      chip.addEventListener("click", () => toggleZone(z.id));
+      chips.appendChild(chip);
+    }
+  }
+  for (const z of zones) {
+    const el = pad.querySelector('.zone[data-id="' + CSS.escape(z.id) + '"]');
+    const chip = $("#chips").querySelector('.chip[data-id="' + CSS.escape(z.id) + '"]');
+    const on = shown("zone:" + z.id, z.on) >= 0.5;
+    if (chip) chip.classList.toggle("on", on);
+    if (!el) continue;
+    el.classList.toggle("on", on);
+    el.style.width = Math.max(z.sx * 100, 1) + "%";
+    el.style.height = Math.max(z.sy * 100, 1) + "%";
+    if (dragging !== z.id) {
+      const p = shown("pos:" + z.id, [z.x, z.y]);
+      placeZone(el, p[0], p[1]);
+    }
+  }
+}
+
+function placeZone(el, x, y) {
+  el.style.left = ((x + 1) * 50) + "%";
+  el.style.top = ((1 - y) * 50) + "%";
+}
+
+let dragging = null;
+function attachDrag(el, id) {
+  let grab = [0, 0];
+  const toUnits = (e) => {
+    const r = pad.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * 2 - 1, 1 - ((e.clientY - r.top) / r.height) * 2];
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (document.body.classList.contains("locked")) return;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    dragging = id;
+    el.classList.add("drag");
+    // Keep the grab point under the finger: the zone does not jump to it.
+    const u = toUnits(e);
+    const cur = shown("pos:" + id, zoneById(id) ? [zoneById(id).x, zoneById(id).y] : [0, 0]);
+    grab = [cur[0] - u[0], cur[1] - u[1]];
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (dragging !== id) return;
+    const u = toUnits(e);
+    const x = Math.max(-1, Math.min(1, u[0] + grab[0]));
+    const y = Math.max(-1, Math.min(1, u[1] + grab[1]));
+    placeZone(el, x, y);
+    hold("pos:" + id, [x, y]);
+    send("pos:" + id, "/Exclusion/" + id + "/Position/ " + x.toFixed(3) + " " + y.toFixed(3));
+  });
+  const end = () => { if (dragging === id) { dragging = null; el.classList.remove("drag"); } };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+}
+const zoneById = (id) => (state && state.zones || []).find((z) => z.id === id);
+const attractorById = (id) => (state && state.attractors || []).find((a) => a.id === id);
+
+// ------------------------------------------------------------------- Actions
+function toggleAttractor(id) {
+  const a = attractorById(id);
+  if (!a) return;
+  const next = shown("att:" + id, a.on) >= 0.5 ? 0 : 1;
+  hold("att:" + id, next);
+  send("att:" + id, "/Attractor/" + id + "/ " + next);
+  render();
+}
+
+function toggleZone(id) {
+  const z = zoneById(id);
+  if (!z) return;
+  const next = shown("zone:" + id, z.on) >= 0.5 ? 0 : 1;
+  hold("zone:" + id, next);
+  send("zone:" + id, "/Exclusion/" + id + "/ " + next);
+  render();
+}
+
+$("#release").addEventListener("click", () => {
+  for (const a of (state && state.attractors) || []) if (a.osc) hold("att:" + a.id, 0);
+  send("release", "/Attractors/Release/");
+  render();
+});
+
+// The fade slider is logarithmic: the middle is ×1, each end halves or
+// doubles twice. The same gesture means the same thing at both ends.
+let fadeDragging = false;
+const fade = $("#fade");
+fade.addEventListener("pointerdown", () => { fadeDragging = true; });
+fade.addEventListener("pointerup", () => { fadeDragging = false; });
+fade.addEventListener("input", () => {
+  let v = Math.pow(2, parseFloat(fade.value));
+  if (Math.abs(Math.log2(v)) < 0.06) v = 1;   // a soft detent at ×1
+  hold("fade", v);
+  $("#fadeOut").textContent = "×" + v.toFixed(v < 1 ? 2 : 1);
+  send("fade", "/Attractors/FadeScale/ " + v.toFixed(3));
+});
+
+// -------------------------------------------------------------------- Page 2
+function bindSlider(id, key, address) {
+  const input = $("#" + id);
+  const out = $("#" + id + "Out");
+  let active = false;
+  input.addEventListener("pointerdown", () => { active = true; });
+  input.addEventListener("pointerup", () => { active = false; });
+  input.addEventListener("input", () => {
+    const v = parseFloat(input.value);
+    hold(key, v);
+    out.textContent = v.toFixed(2);
+    send(key, address + " " + v.toFixed(3));
+  });
+  return (value) => {
+    if (!active) input.value = value;
+    out.textContent = Number(value).toFixed(2);
+  };
+}
+const setBlend = bindSlider("blend", "blend", "/Blend/");
+const setFocus = bindSlider("focus", "focusAmount", "/Focus/Amount/");
+
+function renderPage2() {
+  setBlend(shown("blend", state.blend || 0));
+  const focus = state.focus || { groups: [], active: "", amount: 0 };
+  setFocus(shown("focusAmount", focus.amount || 0));
+
+  const groups = $("#groups");
+  const gs = (focus.groups || []).join(",");
+  if (gs !== groupsSig) {
+    groupsSig = gs;
+    groups.innerHTML = "";
+    for (const name of ["", ...(focus.groups || [])]) {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.dataset.id = name;
+      chip.textContent = name || "Aucun";
+      chip.addEventListener("click", () => {
+        hold("focusGroup", name);
+        send("focusGroup", "/Focus/Group/ " + (name || "None"));
+        renderPage2();
+      });
+      groups.appendChild(chip);
+    }
+  }
+  const activeGroup = shown("focusGroup", focus.active || "");
+  groups.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.id === activeGroup));
+
+  $("#backdropChip").classList.toggle("on", !!backdropShown());
+
+  const effects = $("#effects");
+  const list = state.effects || [];
+  const es = list.map((e) => e.id).join(",");
+  if (es !== effectsSig) {
+    effectsSig = es;
+    effects.innerHTML = "";
+    for (const e of list) {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.dataset.id = e.id;
+      chip.textContent = EFFECT_NAMES[e.id] || e.id;
+      chip.addEventListener("click", () => {
+        const cur = (state.effects || []).find((x) => x.id === e.id);
+        const next = !shown("fx:" + e.id, cur ? cur.on : true);
+        hold("fx:" + e.id, next);
+        send("fx:" + e.id, "/Effect/" + e.id + "/ " + (next ? 1 : 0));
+        renderPage2();
+      });
+      effects.appendChild(chip);
+    }
+  }
+  for (const e of list) {
+    const chip = effects.querySelector('.chip[data-id="' + CSS.escape(e.id) + '"]');
+    if (chip) chip.classList.toggle("on", !!shown("fx:" + e.id, e.on));
+  }
+}
+// The backdrop: "/Fond 1|0", handled by the environment layer of the plugin.
+// When the state does not report it, the last command sent is remembered here,
+// so the button still reads right after a reload.
+function backdropShown() {
+  let local = true;
+  try { local = localStorage.getItem("vibh2o.backdrop") !== "0"; } catch (e) {}
+  const server = state && typeof state.backdrop === "number" ? state.backdrop >= 0.5 : local;
+  return shown("backdrop", server);
+}
+$("#backdropChip").addEventListener("click", () => {
+  const next = !backdropShown();
+  hold("backdrop", next);
+  try { localStorage.setItem("vibh2o.backdrop", next ? "1" : "0"); } catch (e) {}
+  send("backdrop", "/Fond " + (next ? 1 : 0));
+  renderPage2();
+});
+
+const EFFECT_NAMES = { Float: "Flottement", Drift: "Dérive", Beat: "Battement", Tint: "Teinte", Focus: "Focus", Scale: "Taille" };
+
+// --------------------------------------------------------------------- Chrome
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("sel", x === b));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("sel", p.id === b.dataset.page));
+  try { localStorage.setItem("vibh2o.page", b.dataset.page); } catch (e) {}
+}));
+
+function setNight(on) {
+  document.body.classList.toggle("night", on);
+  $("#night").classList.toggle("on", on);
+  try { localStorage.setItem("vibh2o.night", on ? "1" : "0"); } catch (e) {}
+}
+$("#night").addEventListener("click", () => setNight(!document.body.classList.contains("night")));
+
+$("#lock").addEventListener("click", () => {
+  const on = !document.body.classList.contains("locked");
+  document.body.classList.toggle("locked", on);
+  $("#lock").classList.toggle("on", on);
+  $("#lock").textContent = on ? "🔒" : "🔓";
+});
+
+$("#info").addEventListener("click", () => $("#help").classList.add("show"));
+$("#helpClose").addEventListener("click", () => $("#help").classList.remove("show"));
+$("#host").textContent = location.host || "(page ouverte hors serveur)";
+
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+// Keep the screen awake: an iPad dimming itself mid-show is a lost cue.
+let wakeLock = null;
+async function keepAwake() {
+  try { if ("wakeLock" in navigator && document.visibilityState === "visible") wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+}
+document.addEventListener("visibilitychange", keepAwake);
+document.addEventListener("click", () => { if (!wakeLock) keepAwake(); }, { once: true });
+
+try {
+  if (localStorage.getItem("vibh2o.night") === "1") setNight(true);
+  const page = localStorage.getItem("vibh2o.page");
+  if (page) { const b = document.querySelector('nav button[data-page="' + page + '"]'); if (b) b.click(); }
+} catch (e) {}
+
+keepAwake();
+poll();
+</script>
+</body>
+</html>

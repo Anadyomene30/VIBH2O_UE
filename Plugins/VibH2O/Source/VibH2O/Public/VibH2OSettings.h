@@ -110,6 +110,55 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Adresses OSC")
 	FString FocusAmountPrefix = TEXT("/Focus/Amount");
 
+	/**
+	 * Attractor prefix: "/Attractor/<name>/ 0..1" sets its activation,
+	 * "/Attractor/<name>/Share/ 0..1" its share of the room.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Adresses OSC")
+	FString AttractorPrefix = TEXT("/Attractor");
+
+	/**
+	 * Commands for every attractor at once: "/Attractors/Release/" lets them
+	 * all go, "/Attractors/FadeScale/ x" scales every fade time.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Adresses OSC")
+	FString AttractorsGlobalPrefix = TEXT("/Attractors");
+
+	/**
+	 * Exclusion zone prefix: "/Exclusion/<name>/ 0..1" sets its activation,
+	 * "/Exclusion/<name>/Position/ x y" its live position, each from -1 to 1.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Adresses OSC")
+	FString ExclusionPrefix = TEXT("/Exclusion");
+
+	// ---------------------------------------------------------------- Remote
+
+	/**
+	 * Serve the iPad remote. The page is then at http://<this PC>:<port>/,
+	 * the address being written to the log at start-up.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Telecommande iPad", meta = (DisplayName = "Activer la telecommande"))
+	bool bEnableRemote = true;
+
+	/**
+	 * TCP port of the remote. Away from 9002 on purpose: Max sends there, and
+	 * the show's older Matrix_Controller_BP listens there too. Not 9080
+	 * either, which Logitech G HUB holds on many PCs.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Telecommande iPad", meta = (ClampMin = "1", ClampMax = "65535", DisplayName = "Port"))
+	int32 RemotePort = 8642;
+
+	UPROPERTY(config, EditAnywhere, Category = "Telecommande iPad", meta = (DisplayName = "Adresse d'ecoute"))
+	FString RemoteListenAddress = TEXT("0.0.0.0");
+
+	/**
+	 * Folder holding the remote's page. Empty: Resources/Remote inside the
+	 * plugin. Point it elsewhere to try an edited page without touching the
+	 * plugin.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Telecommande iPad", meta = (DisplayName = "Dossier de la page"))
+	FString RemoteWebRoot;
+
 	// ------------------------------------------------------------- Room plan
 
 	/**

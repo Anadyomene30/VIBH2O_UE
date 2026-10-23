@@ -20,10 +20,19 @@ public class VibH2O : ModuleRules
 		{
 			"Sockets",
 			"Networking",
+			// The iPad remote: Json builds its state snapshot, Projects finds
+			// the plugin folder its page is served from.
+			"Json",
+			"Projects",
 			// Used only by the non-shipping VibH2O.DemoSweep console command,
 			// which plays the demo Level Sequence as part of its visual pass.
 			"LevelSequence",
 			"MovieScene"
 		});
+
+		// The remote's page ships as loose files next to the packaged game,
+		// not inside the pak: it can then be edited on site, in a text editor,
+		// and reloaded with VibH2O.Restart - no repackaging.
+		RuntimeDependencies.Add("$(PluginDir)/Resources/Remote/...", StagedFileType.NonUFS);
 	}
 }

@@ -176,6 +176,19 @@ plate supposée — sinon le cadrage vise à côté dès que la salle est courb�
     passe aujourd'hui par Max ; un pilotage MIDI direct pourra se brancher plus tard sur les mêmes
     fonctions.
 
+## H bis. Pilotage à la main pendant le spectacle
+
+36 bis. **Placer des attracteurs** dans le niveau : un clic les active, une part réglable et stable de la
+   salle s'y rassemble en nuage ; désactivés, les bulles **reviennent exactement à leur place**.
+   Fondus doux même sur contre-ordre, plusieurs attracteurs cumulables.
+36 ter. **Placer des zones d'exclusion** devant le tulle, déplaçables en direct, pour qu'aucune bulle
+   ne passe devant les circassiennes ; une bulle qui traverse la contourne au lieu de sauter.
+36 quater. **Une télécommande iPad dédiée**, servie par le plugin, installable en plein écran.
+
+Les deux couches s'appliquent **après** le mélange des tableaux, la zone d'exclusion en tout dernier ;
+les pilotes de position tournent dessous sans interruption. Détail, réglages et mode d'emploi :
+[`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md).
+
 ## I. Outillage
 
 37. **Simulateur OSC** couvrant tous les cas de test — **partir de `Scripts/OSC_SIMULATOR.py`**

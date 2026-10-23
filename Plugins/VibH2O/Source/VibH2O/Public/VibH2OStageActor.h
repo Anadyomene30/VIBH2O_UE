@@ -14,7 +14,9 @@
 
 #include "VibH2OStageActor.generated.h"
 
+class AVibH2OAttractorActor;
 class AVibH2OBubbleActor;
+class AVibH2OExclusionZoneActor;
 class UCurveFloat;
 class UCurveLinearColor;
 class UVibH2OSubsystem;
@@ -350,6 +352,56 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Controle")
 	bool bFollowOscFocus = true;
 
+	/** Follow /Attractors/FadeScale and /Attractors/Release. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Controle")
+	bool bFollowOscSteering = true;
+
+	// =====================================================  Attractors and zones
+	//
+	// Hand-steered layers on top of the tableaux, placed in the level as
+	// AVibH2OAttractorActor and AVibH2OExclusionZoneActor. The stack becomes:
+	//
+	//   Lerp(Grid, Flock, Blend)  ->  attractors  ->  float + drift  ->  exclusion
+	//
+	// The drivers keep running under the attractors, which is why releasing one
+	// brings every bubble back to where it would have been: nothing had to
+	// remember it.
+
+	/**
+	 * Multiplies every attractor's fade times: 2 makes every cue twice as
+	 * slow. The iPad's speed slider drives this.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Attracteurs", meta = (ClampMin = "0.1", ClampMax = "10.0", DisplayName = "Multiplicateur des fondus"))
+	float AttractorFadeScale = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Attracteurs", meta = (DisplayName = "Appliquer les attracteurs"))
+	bool bApplyAttractors = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Attracteurs", meta = (DisplayName = "Appliquer les zones d'exclusion"))
+	bool bApplyExclusionZones = true;
+
+	/** Every attractor that follows OSC lets go, each over its own fade. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Attracteurs")
+	void ReleaseAllAttractors();
+
+	/** The attractors in this stage's level, in iPad order. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Attracteurs")
+	TArray<AVibH2OAttractorActor*> GetAttractors() const;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Attracteurs")
+	TArray<AVibH2OExclusionZoneActor*> GetExclusionZones() const;
+
+	/**
+	 * The stage builds what the iPad shows - attractors, zones, blend, focus,
+	 * effects - and hands it to the remote a few times a second.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Telecommande", meta = (DisplayName = "Publier l'etat pour l'iPad"))
+	bool bPublishRemoteState = true;
+
+	/** The remote's state as JSON. Public for the tests and for diagnosis. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	FString BuildRemoteStateJson() const;
+
 	// =====================================================  Editor preview
 
 	/**
@@ -447,6 +499,24 @@ protected:
 	UFUNCTION()
 	void HandleOscFocusGroup(FName GroupName);
 
+	UFUNCTION()
+	void HandleOscAttractor(FName Name, float Value);
+
+	UFUNCTION()
+	void HandleOscAttractorShare(FName Name, float Value);
+
+	UFUNCTION()
+	void HandleOscAttractorsReleased();
+
+	UFUNCTION()
+	void HandleOscAttractorFadeScale(float Value);
+
+	UFUNCTION()
+	void HandleOscExclusion(FName Name, float Value);
+
+	UFUNCTION()
+	void HandleOscExclusionMoved(FName Name, FVector2D Position);
+
 private:
 	void BindToSubsystem(UVibH2OSubsystem* Subsystem);
 	void UnbindFromSubsystem();
@@ -472,6 +542,21 @@ private:
 	FLinearColor ComputeTint(float Excitation) const;
 
 	UVibH2OSubsystem* GetSubsystem() const;
+
+	/** Collects this frame's attractors and zones and steps their fades. */
+	void BeginSteering(float DeltaSeconds);
+	void EndSteering();
+
+	/** The attractor layer, for one bubble, in local space. */
+	FVector ApplyAttractors(const FVector& Base, int32 SeatIndex, int32 Seed);
+
+	/** The exclusion layer, for one bubble, in local space. Always last. */
+	FVector ApplyExclusionZones(const FVector& Location, int32 SeatIndex, int32 Seed);
+
+	void PublishRemoteState(float DeltaSeconds);
+
+	AVibH2OAttractorActor* FindAttractor(FName ControlName) const;
+	AVibH2OExclusionZoneActor* FindExclusionZone(FName ControlName) const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> StageRoot;
@@ -501,4 +586,13 @@ private:
 	 * may already have replaced.
 	 */
 	TWeakObjectPtr<UVibH2OSubsystem> BoundSubsystem;
+
+	/** This frame's steering actors, gathered by BeginSteering. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AVibH2OAttractorActor>> FrameAttractors;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AVibH2OExclusionZoneActor>> FrameZones;
+
+	float RemotePublishTimer = 0.0f;
 };

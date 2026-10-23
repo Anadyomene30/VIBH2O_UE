@@ -247,6 +247,39 @@ camera.set_actor_label('VibH2O_Camera')
 # Play uses this camera straight away, instead of a default pawn at the origin.
 camera.set_editor_property('auto_activate_for_player', unreal.AutoReceiveInput.PLAYER0)
 
+# --- Hand-steered layers, for the iPad remote.
+#
+# Two attractors above the room, each calling its own third of the audience -
+# their shares sit back to back on the selection circle, so nobody is pulled
+# both ways. They are attached to the stage: move the installation, they come
+# along. The zone is not: it stands for a performer in front of the tulle, who
+# does not move when the installation does.
+attractors = (
+    ('Gauche', 'Haut gauche', unreal.Vector(-260.0, -140.0, 420.0), unreal.LinearColor(1.0, 0.25, 0.02, 1.0), 0.0),
+    ('Droite', 'Haut droite', unreal.Vector(260.0, 140.0, 420.0), unreal.LinearColor(0.02, 0.6, 0.45, 1.0), 0.35),
+)
+for order, (name, label, offset, colour, start) in enumerate(attractors):
+    attractor = actor_subsystem.spawn_actor_from_class(
+        unreal.VibH2OAttractorActor, unreal.Vector(400.0, -250.0, 150.0) + offset)
+    attractor.set_actor_label('VibH2O_Attracteur_' + name)
+    attractor.set_editor_property('control_name', name)
+    attractor.set_editor_property('display_label', label)
+    attractor.set_editor_property('display_color', colour)
+    attractor.set_editor_property('display_order', order)
+    attractor.set_editor_property('share', 0.35)
+    attractor.set_editor_property('share_start', start)
+    attractor.attach_to_actor(stage, '', unreal.AttachmentRule.KEEP_WORLD,
+                              unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD, False)
+
+# The zone faces the way the camera looks and is tied to it: a true cone from
+# the lens, so it clears the performer in the image at every depth.
+zone = actor_subsystem.spawn_actor_from_class(
+    unreal.VibH2OExclusionZoneActor, ROOM_CENTER, LOOK_AT)
+zone.set_actor_label('VibH2O_Zone_Circassienne')
+zone.set_editor_property('control_name', 'Circassienne')
+zone.set_editor_property('display_label', 'Circassienne')
+zone.set_editor_property('view_camera', camera)
+
 # A PlayerStart as well, so a map opened with a different GameMode - or with the
 # camera deleted - still starts somewhere the room is visible.
 player_start = actor_subsystem.spawn_actor_from_class(unreal.PlayerStart, VIEWPOINT, LOOK_AT)
