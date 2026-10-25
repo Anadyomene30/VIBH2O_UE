@@ -54,7 +54,7 @@ enum class EVibH2OSimulatorScenario : uint8
  * downstream - burst settling, seat-order mapping, smoothing, staleness,
  * averages - therefore runs the real code, not a shortcut.
  */
-UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Simulateur"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Simulation"), meta = (DisplayName = "VibH2O — Simulateur"))
 class VIBH2O_API AVibH2OSimulatorActor : public AActor
 {
 	GENERATED_BODY()
@@ -127,7 +127,7 @@ public:
 	// ================================================== Control
 
 	/** Start simulating as soon as the game starts. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler au lancement (Play, jeu packagé)", ToolTip = "Décocher dans la carte du spectacle, ou supprimer l'acteur. Coché, il remplace Max tant que Max n'a rien envoyé."))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler au lancement", ToolTip = "Décocher dans la carte du spectacle, ou supprimer l'acteur. Coché, il remplace Max tant que Max n'a rien envoyé."))
 	bool bSimulateOnBeginPlay = true;
 
 	/**
@@ -164,28 +164,28 @@ public:
 	 * message silences the simulator until the end of the game; only an
 	 * explicit start (button, console, Blueprint) brings it back.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Se taire pour de bon dès que Max parle", EditCondition = "bYieldToRealNetwork", ToolTip = "Coché : dès que Max a envoyé des données une fois, le simulateur se tait jusqu'à la fin de la partie. À laisser coché en représentation."))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Se taire dès que Max parle", EditCondition = "bYieldToRealNetwork", ToolTip = "Coché : dès que Max a envoyé des données une fois, le simulateur se tait jusqu'à la fin de la partie. À laisser coché en représentation."))
 	bool bStopForGoodOnRealData = true;
 
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Simulation", meta = (DisplayName = "Démarrer la simulation"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Démarrer la simulation"))
 	void StartSimulation();
 
 	/**
 	 * In the editor world, with bSimulateInEditor ticked, the next frame
 	 * starts it again: untick that box to freeze the editor room.
 	 */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Simulation", meta = (DisplayName = "Arrêter la simulation", ToolTip = "Arrête la simulation. Hors Play, décocher plutôt « Simuler dans l'éditeur » : sinon elle repart à l'image suivante."))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Arrêter la simulation", ToolTip = "Arrête la simulation. Hors Play, décocher plutôt « Simuler dans l'éditeur » : sinon elle repart à l'image suivante."))
 	void StopSimulation();
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Simulation")
 	bool IsSimulating() const { return bSimulating; }
 
 	/** Sends the full room plan immediately, as one burst. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Simulation", meta = (DisplayName = "Renvoyer le plan de salle"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Renvoyer le plan de salle"))
 	void SendRoomNow();
 
 	/** Configures the real Ales room: 23 x 4, aisles at columns 6 and 16. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Simulation", meta = (DisplayName = "Charger la salle d'Alès (23 × 4)"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Charger la salle d'Alès (23 × 4)"))
 	void ConfigureAles();
 
 	/**

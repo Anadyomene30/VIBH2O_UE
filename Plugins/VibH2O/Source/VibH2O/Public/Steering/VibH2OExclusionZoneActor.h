@@ -38,8 +38,8 @@ enum class EVibH2OExclusionShape : uint8
  * selecting the component; its X extent only matters with bLimitDepth.
  */
 UCLASS(Blueprintable, BlueprintType,
-	HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
-	PrioritizeCategories = ("VibH2O"),
+	HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Pilotage", "VibH2O|Forme"),
 	meta = (DisplayName = "VibH2O — Zone d'exclusion"))
 class VIBH2O_API AVibH2OExclusionZoneActor : public AActor
 {
@@ -198,7 +198,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "VibH2O|Pilotage")
 	void SetActive(bool bActive);
 
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Pilotage", meta = (DisplayName = "Basculer"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Basculer"))
 	void Toggle();
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Pilotage")
@@ -208,7 +208,7 @@ public:
 	void SetDragPosition(float X, float Y);
 
 	/** Brings the live position back to where the zone was placed. A button in the Details panel. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Déplacement", meta = (DisplayName = "Recentrer"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Recentrer"))
 	void Recenter();
 
 	/** Current push strength, 0 to 1, once faded. */

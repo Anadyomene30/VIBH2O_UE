@@ -73,7 +73,7 @@ struct VIBH2O_API FVibH2ORigLight
 /**
  * Lighting that follows the room.
  */
-UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Rig de lumières"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Lumieres"), meta = (DisplayName = "VibH2O — Rig de lumières"))
 class VIBH2O_API AVibH2OLightRig : public AActor
 {
 	GENERATED_BODY()
@@ -144,7 +144,7 @@ public:
 	float GetLitRadius() const { return SmoothedRadius; }
 
 	/** Re-aims at once, without smoothing. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Lumieres", meta = (DisplayName = "Recadrer les lumières maintenant"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Recadrer les lumières maintenant"))
 	void SnapToRoom();
 
 private:

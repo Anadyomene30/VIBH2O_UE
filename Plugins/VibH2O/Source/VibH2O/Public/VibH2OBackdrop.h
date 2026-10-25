@@ -75,7 +75,7 @@ struct VIBH2O_API FVibH2OBackdropSnapshot
 /**
  * Fades the underwater environment to black and back.
  */
-UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Fond"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, PostProcessVolumeSettings, Lens, ColorGrading, Film, GlobalIllumination, Reflections, RenderingFeatures, FilmGrain, PathTracing, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Fond"), meta = (DisplayName = "VibH2O — Fond"))
 class VIBH2O_API AVibH2OBackdrop : public AActor
 {
 	GENERATED_BODY()
@@ -168,15 +168,15 @@ public:
 	bool bFollowOsc = true;
 
 	/** Fades the environment out. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Fond", meta = (DisplayName = "Enlever le fond"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Enlever le fond"))
 	void RemoveBackdrop();
 
 	/** Fades the environment back in. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Fond", meta = (DisplayName = "Remettre le fond"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Remettre le fond"))
 	void RestoreBackdrop();
 
 	/** Removes it if it is (heading towards) present, brings it back otherwise. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Fond", meta = (DisplayName = "Basculer le fond"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Basculer le fond"))
 	void ToggleBackdrop();
 
 	/** Glides Presence to Target. Seconds < 0 uses FadeSeconds. */
@@ -195,7 +195,7 @@ public:
 	 * and very large meshes (sky spheres). Leaves out VibH2O's own actors and
 	 * every particle system: those are what remains on black.
 	 */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Fond", meta = (DisplayName = "Remplir depuis la carte"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Remplir depuis la carte"))
 	void CollectEnvironmentFromLevel();
 
 	/** Raised whenever the applied presence changes. */

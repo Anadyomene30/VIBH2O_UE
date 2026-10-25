@@ -40,8 +40,9 @@ struct FVibH2OBubbleFamily
  * The room, and the tableaux that move it about.
  */
 UCLASS(Blueprintable, BlueprintType,
-	HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
 	PrioritizeCategories = ("VibH2O"),
+	AutoExpandCategories = ("VibH2O|Ambiance", "VibH2O|Tableaux"),
 	meta = (DisplayName = "VibH2O — Acteur de scène"))
 class VIBH2O_API AVibH2OStageActor : public AActor
 {
@@ -160,7 +161,7 @@ public:
 	void SetMoodOverride(EVibH2OMoodOverride NewOverride);
 
 	/** Jumps to the mood the room implies right now, without cross-fade. */
-	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O|Ambiance", meta = (DisplayName = "Appliquer l'ambiance sans fondu", ToolTip = "Passe tout de suite à l'ambiance que la salle indique, sans attendre la bascule."))
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O", meta = (DisplayName = "Appliquer l'ambiance sans fondu", ToolTip = "Passe tout de suite à l'ambiance que la salle indique, sans attendre la bascule."))
 	void SnapMood();
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Ambiance")
@@ -170,11 +171,11 @@ public:
 	FVibH2OMoodWeights GetMoodWeights() const { return MoodTracker.GetWeights(); }
 
 	/** Writes the palettes the stage plays back into the preset asset. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Ambiance", meta = (DisplayName = "Enregistrer dans le preset", ToolTip = "Écrit les palettes actuelles dans le preset choisi (il peut servir à d'autres cartes)."))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Enregistrer dans le preset", ToolTip = "Écrit les palettes actuelles dans le preset choisi (il peut servir à d'autres cartes)."))
 	void SaveMoodPreset();
 
 	/** Reloads the preset, dropping any tuning not saved into it. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Ambiance", meta = (DisplayName = "Recharger le preset", ToolTip = "Recharge le preset : les réglages non enregistrés sont perdus."))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Recharger le preset", ToolTip = "Recharge le preset : les réglages non enregistrés sont perdus."))
 	void ReloadMoodPreset();
 
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
@@ -337,11 +338,11 @@ public:
 	float OscBlendGlideSeconds = 6.0f;
 
 	/** Glides to tableau 1 over the commanded transition time. */
-	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O|Tableaux", meta = (DisplayName = "Aller au tableau 1 (salle)"))
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O", meta = (DisplayName = "Aller au tableau 1 (salle)"))
 	void GoToTableau1();
 
 	/** Glides to tableau 2 over the commanded transition time. */
-	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O|Tableaux", meta = (DisplayName = "Aller au tableau 2 (banc)"))
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O", meta = (DisplayName = "Aller au tableau 2 (banc)"))
 	void GoToTableau2();
 
 	/** Glides BlendAlpha to Target; Seconds < 0 uses OscBlendGlideSeconds. */
@@ -603,7 +604,7 @@ public:
 	bool bApplyExclusionZones = true;
 
 	/** Every attractor that follows OSC lets go, each over its own fade. */
-	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O|Attracteurs", meta = (DisplayName = "Relâcher tous les attracteurs", ToolTip = "Toutes les bulles appelées rentrent à leur place."))
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "VibH2O", meta = (DisplayName = "Relâcher tous les attracteurs", ToolTip = "Toutes les bulles appelées rentrent à leur place."))
 	void ReleaseAllAttractors();
 
 	/** The attractors in this stage's level, in iPad order. */
@@ -810,7 +811,7 @@ private:
 	AVibH2OAttractorActor* FindAttractor(FName ControlName) const;
 	AVibH2OExclusionZoneActor* FindExclusionZone(FName ControlName) const;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O|Diagnostic", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> StageRoot;
 
 	/** Live bubbles, keyed by seat index. */
@@ -843,7 +844,7 @@ private:
 	 * the same clock the plugin uses, and because it is the plainest evidence
 	 * that the actor ticks in the editor: outside Play it still climbs.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "VibH2O", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, AdvancedDisplay, Category = "VibH2O|Diagnostic", meta = (AllowPrivateAccess = "true", DisplayName = "Horloge de la scène (s)"))
 	float StageTime = 0.0f;
 
 	/**

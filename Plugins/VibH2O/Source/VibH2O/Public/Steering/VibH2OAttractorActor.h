@@ -21,8 +21,8 @@ class USphereComponent;
  * volume their cloud fills on arrival.
  */
 UCLASS(Blueprintable, BlueprintType,
-	HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
-	PrioritizeCategories = ("VibH2O"),
+	HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Pilotage", "VibH2O|Fondu"),
 	meta = (DisplayName = "VibH2O — Attracteur"))
 class VIBH2O_API AVibH2OAttractorActor : public AActor
 {
@@ -153,15 +153,15 @@ public:
 	void SetActive(bool bActive);
 
 	/** SetActive(true), as a button in the Details panel. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Pilotage", meta = (DisplayName = "Appeler"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Appeler"))
 	void CallBubbles();
 
 	/** SetActive(false), as a button in the Details panel. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Pilotage", meta = (DisplayName = "Renvoyer"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Renvoyer"))
 	void ReleaseBubbles();
 
 	/** Flips the target. Also a button in the Details panel, to try a cue in the editor. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Pilotage", meta = (DisplayName = "Basculer"))
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Basculer"))
 	void Toggle();
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Pilotage")

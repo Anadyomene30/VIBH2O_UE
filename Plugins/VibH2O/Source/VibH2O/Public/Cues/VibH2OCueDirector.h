@@ -28,8 +28,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OCueFiredSignature, const FSt
  * Level Sequence does not play in the editor world. In the editor world the
  * director only learns.
  */
-UCLASS(HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
-	PrioritizeCategories = ("VibH2O"),
+UCLASS(HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Cues"),
 	meta = (DisplayName = "VibH2O — Directeur de cues"))
 class VIBH2O_API AVibH2OCueDirector : public AActor
 {
@@ -94,7 +94,7 @@ public:
 	 * so. Pressed on the level's director while Play runs, it fires the cue on
 	 * the playing copy.
 	 */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Cues", meta = (DisplayName = "Déclencher la cue choisie"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Déclencher la cue choisie"))
 	void FireTestCue();
 
 	/** Names of the cues in the list, for the test picker. */
@@ -120,14 +120,14 @@ public:
 	 * the trigger of the cue to learn. Editor only, outside Play: the inputs
 	 * are opened for the time of the capture and closed right after.
 	 */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Apprentissage", meta = (DisplayName = "Apprendre"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Apprendre"))
 	void Learn();
 
-	UFUNCTION(CallInEditor, Category = "VibH2O|Apprentissage", meta = (DisplayName = "Annuler l'apprentissage"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Annuler l'apprentissage"))
 	void CancelLearn();
 
 	/** Lists the MIDI inputs of this PC into the status line. */
-	UFUNCTION(CallInEditor, Category = "VibH2O|Apprentissage", meta = (DisplayName = "Lister les entrées MIDI"))
+	UFUNCTION(CallInEditor, Category = "VibH2O", meta = (DisplayName = "Lister les entrées MIDI"))
 	void ListMidiInputs();
 #endif
 
