@@ -22,7 +22,7 @@ namespace VibH2OCueConsole
 	/** "VibH2O.Cue <name>": fires a cue by hand, from the console. */
 	static FAutoConsoleCommandWithWorldAndArgs FireCommand(
 		TEXT("VibH2O.Cue"),
-		TEXT("Declenche une cue par son nom : VibH2O.Cue <nom>."),
+		TEXT("Déclenche une cue par son nom : VibH2O.Cue <nom>."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (World == nullptr || Args.Num() == 0)
@@ -38,7 +38,7 @@ namespace VibH2OCueConsole
 			}
 			if (!bFired)
 			{
-				UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: aucune cue nommee '%s' dans ce niveau."), *Name);
+				UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: aucune cue nommée '%s' dans ce niveau."), *Name);
 			}
 		}));
 }
@@ -61,7 +61,7 @@ void AVibH2OCueDirector::BeginPlay()
 	}
 	else
 	{
-		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: %s ne trouve pas le subsystem, aucune cue ne sera jouee."), *GetName());
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: %s ne trouve pas le subsystem, aucune cue ne sera jouée."), *GetName());
 	}
 }
 
@@ -108,7 +108,7 @@ void AVibH2OCueDirector::HandleCueInput(const FVibH2OCueInput& Input)
 {
 	if (bLogInputs)
 	{
-		UE_LOG(LogVibH2O, Display, TEXT("VibH2O: entree de cue : %s"), *Input.Describe());
+		UE_LOG(LogVibH2O, Display, TEXT("VibH2O: entrée de cue : %s"), *Input.Describe());
 	}
 	if (!bCuesActive)
 	{
@@ -238,7 +238,7 @@ void AVibH2OCueDirector::ExecuteSequenceAction(const FVibH2OCue& Cue)
 	ULevelSequencePlayer* Player = SequenceActor ? SequenceActor->GetSequencePlayer() : nullptr;
 	if (Player == nullptr || Player->GetSequence() == nullptr)
 	{
-		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: cue '%s' : aucune Level Sequence assignee ou initialisee."), *Cue.Name);
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: cue '%s' : aucune Level Sequence assignée ou initialisée."), *Cue.Name);
 		return;
 	}
 
@@ -285,10 +285,55 @@ void AVibH2OCueDirector::ExecuteSequenceAction(const FVibH2OCue& Cue)
 		break;
 	}
 
-	UE_LOG(LogVibH2O, Display, TEXT("VibH2O:    sequence '%s' %s a %.2f s."),
+	UE_LOG(LogVibH2O, Display, TEXT("VibH2O:    séquence '%s' %s à %.2f s."),
 		*Player->GetSequence()->GetName(),
-		Player->IsPlaying() ? TEXT("en lecture") : (Player->IsPaused() ? TEXT("en pause") : TEXT("arretee")),
+		Player->IsPlaying() ? TEXT("en lecture") : (Player->IsPaused() ? TEXT("en pause") : TEXT("arrêtée")),
 		Player->GetCurrentTime().AsSeconds());
+}
+
+// -------------------------------------------------------------------- Test
+
+TArray<FString> AVibH2OCueDirector::GetCueNames() const
+{
+	TArray<FString> Names;
+	for (const FVibH2OCue& Cue : Cues)
+	{
+		if (!Cue.Name.IsEmpty())
+		{
+			Names.AddUnique(Cue.Name);
+		}
+	}
+	return Names;
+}
+
+void AVibH2OCueDirector::FireTestCue()
+{
+	if (TestCueName.IsEmpty())
+	{
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: choisir d'abord la cue à tester."));
+		return;
+	}
+
+	AVibH2OCueDirector* Target = this;
+#if WITH_EDITOR
+	// The button is most often pressed on the level's director, not on its
+	// copy in the running Play: hand the test to that copy.
+	const UWorld* OwnWorld = GetWorld();
+	if (OwnWorld != nullptr && !OwnWorld->IsGameWorld())
+	{
+		Target = Cast<AVibH2OCueDirector>(EditorUtilities::GetSimWorldCounterpartActor(this));
+	}
+#endif
+
+	const UWorld* TargetWorld = Target != nullptr ? Target->GetWorld() : nullptr;
+	if (TargetWorld == nullptr || !TargetWorld->IsGameWorld())
+	{
+		// A Level Sequence does not play in the editor world: firing here
+		// would look like a broken cue.
+		UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: Lancer Play pour tester la cue '%s' : hors Play, rien ne joue."), *TestCueName);
+		return;
+	}
+	Target->FireCue(TestCueName);
 }
 
 // ------------------------------------------------------------------- Learn
@@ -376,7 +421,7 @@ bool AVibH2OCueDirector::TickLearn(float DeltaTime)
 	// The input may have ended the capture during that tick.
 	if (bLearning && FPlatformTime::Seconds() > LearnDeadline)
 	{
-		EndLearn(TEXT("Rien recu en 30 s. Verifier la sortie OSC de Resolume, le port loopMIDI, ou le reglage des entrees MIDI."));
+		EndLearn(TEXT("Rien reçu en 30 s. Vérifier la sortie OSC de Resolume, le port loopMIDI, ou le réglage des entrées MIDI."));
 	}
 	return bLearning;
 }
@@ -387,12 +432,12 @@ void AVibH2OCueDirector::Learn()
 	UWorld* World = GetWorld();
 	if (World == nullptr || World->WorldType != EWorldType::Editor)
 	{
-		LearnStatus = TEXT("L'apprentissage se fait dans l'editeur, hors Play.");
+		LearnStatus = TEXT("L'apprentissage se fait dans l'éditeur, hors Play.");
 		return;
 	}
 	if (GEditor != nullptr && GEditor->PlayWorld != nullptr)
 	{
-		LearnStatus = TEXT("Arreter Play d'abord : la partie en cours tient deja le port OSC et les entrees.");
+		LearnStatus = TEXT("Arrêter Play d'abord : la partie en cours tient déjà le port OSC et les entrées.");
 		return;
 	}
 
@@ -404,7 +449,7 @@ void AVibH2OCueDirector::Learn()
 	UVibH2OSubsystem* Subsystem = UVibH2OSubsystem::GetEditorPreview(World);
 	if (Subsystem == nullptr)
 	{
-		LearnStatus = TEXT("Subsystem de previsualisation indisponible.");
+		LearnStatus = TEXT("Subsystem de prévisualisation indisponible.");
 		return;
 	}
 
@@ -427,7 +472,7 @@ void AVibH2OCueDirector::Learn()
 	const FString Target = Cues.IsValidIndex(LearnTargetIndex)
 		? FString::Printf(TEXT("cue %d"), LearnTargetIndex)
 		: TEXT("une nouvelle cue");
-	LearnStatus = FString::Printf(TEXT("En ecoute pour %s (30 s) - %s"), *Target, *Report);
+	LearnStatus = FString::Printf(TEXT("En écoute pour %s (30 s) - %s"), *Target, *Report);
 	UE_LOG(LogVibH2O, Display, TEXT("VibH2O: %s"), *LearnStatus);
 }
 
@@ -435,7 +480,7 @@ void AVibH2OCueDirector::CancelLearn()
 {
 	if (bLearning)
 	{
-		EndLearn(TEXT("Apprentissage annule."));
+		EndLearn(TEXT("Apprentissage annulé."));
 	}
 }
 
@@ -443,8 +488,8 @@ void AVibH2OCueDirector::ListMidiInputs()
 {
 	const TArray<FString> Names = UVibH2OSubsystem::GetAvailableMidiInputs();
 	LearnStatus = Names.Num() > 0
-		? FString::Printf(TEXT("Entrees MIDI : %s"), *FString::Join(Names, TEXT(", ")))
-		: TEXT("Aucune entree MIDI sur ce PC. Creer un port dans loopMIDI.");
+		? FString::Printf(TEXT("Entrées MIDI : %s"), *FString::Join(Names, TEXT(", ")))
+		: TEXT("Aucune entrée MIDI sur ce PC. Créer un port dans loopMIDI.");
 	UE_LOG(LogVibH2O, Display, TEXT("VibH2O: %s"), *LearnStatus);
 }
 #endif

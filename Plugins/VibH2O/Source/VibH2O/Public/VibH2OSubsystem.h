@@ -29,6 +29,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBackdropControlSignature, float, TargetPresence, float, FadeSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OAmbianceControlSignature, int32, MoodOverrideIndex);
 DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2OCueInputEvent, const FVibH2OCueInput&);
 
 /** Operational figures, for the debug overlay and for get-in. */
@@ -138,6 +139,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Reseau")
 	FVibH2ONetworkStats GetNetworkStats() const;
+
+	/**
+	 * Room plan and sensor messages received from the network so far - not
+	 * control, not injected. Moves only when Max (or another real sender of
+	 * data) is talking: the simulator steps aside on it.
+	 */
+	int32 GetNetworkDataMessageCount() const { return NetworkDataMessageCount; }
 
 	// ---------------------------------------------------------------- Remote
 
@@ -323,6 +331,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
 	FVibH2OBackdropControlSignature OnOscBackdropChanged;
 
+	/** /Ambiance - 0 automatic, 1 calm, 2 normal, 3 excited (EVibH2OMoodOverride order). */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OAmbianceControlSignature OnOscAmbianceChanged;
+
 	// ------------------------------------------------------------- Injection
 
 	/**
@@ -494,6 +506,10 @@ private:
 	 * since Sequencer or the Details panel may have moved the stage since.
 	 */
 	bool bForceControlEcho = false;
+
+	/** Set while DrainQueue hands on what came off the socket. */
+	bool bDrainingNetwork = false;
+	int32 NetworkDataMessageCount = 0;
 
 	/** Only these addresses are taken from the iPad: control, never data. */
 	bool IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const;

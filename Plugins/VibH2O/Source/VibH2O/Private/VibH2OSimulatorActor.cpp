@@ -73,15 +73,20 @@ void AVibH2OSimulatorActor::StartSimulation()
 	bSimulating = true;
 	bAnnouncedFirstFeed = false;
 	bReportedYield = false;
+	// An explicit start overrides an earlier silencing by real data.
+	bSilencedByRealData = false;
 	SimTime = 0.0f;
 	NextFeedTime = 0.0;
 	NextRoomTime = (RoomResendInterval > 0.0f) ? (FPlatformTime::Seconds() + RoomResendInterval) : 0.0;
 
 	// Prime the network-yield watermark so pre-existing traffic does not count.
+	// Only data messages are counted: Resolume's "Output all" or the iPad must
+	// not pass for Max.
 	if (UVibH2OSubsystem* Subsystem = GetSubsystem())
 	{
-		LastNetworkMessageCount = Subsystem->GetNetworkStats().MessagesReceived;
+		LastNetworkMessageCount = Subsystem->GetNetworkDataMessageCount();
 	}
+	RealDataHoldUntil = 0.0;
 
 	SendRoomNow();
 
@@ -104,6 +109,8 @@ void AVibH2OSimulatorActor::ConfigureAles()
 {
 	// The real venue, read from RoomMapping_Presets/ALES_FINAL.json: 23 x 4
 	// with two centre aisles. Non-square AND holed - the best test room there is.
+	// Also a Details-panel button: mark the map dirty so the change is saved.
+	Modify();
 	Columns = 23;
 	Rows = 4;
 	AisleColumns = { 6, 16 };
@@ -411,6 +418,8 @@ void AVibH2OSimulatorActor::Tick(float DeltaSeconds)
 		FedSubsystem = Subsystem;
 		if (bReplaced)
 		{
+			// Its counters are its own: watch them from where they stand now.
+			LastNetworkMessageCount = Subsystem->GetNetworkDataMessageCount();
 			SendRoomNow();
 		}
 	}
@@ -418,29 +427,46 @@ void AVibH2OSimulatorActor::Tick(float DeltaSeconds)
 	const double Now = FPlatformTime::Seconds();
 
 	// Step aside for the real thing. The simulator is a stand-in for Max, not
-	// a competitor: the moment genuine packets come off the socket, feeding
-	// pauses, and it resumes only after a few seconds of network silence.
+	// a competitor: the moment genuine data comes off the socket, feeding
+	// pauses - for good if asked, otherwise until a few seconds of silence.
+	// Only data messages count (room plan, BPM, excitation, synchrony, beat):
+	// other OSC traffic on the port must not silence the room.
 	if (bYieldToRealNetwork && Subsystem->IsListening())
 	{
-		const int32 Received = Subsystem->GetNetworkStats().MessagesReceived;
+		const int32 Received = Subsystem->GetNetworkDataMessageCount();
 		if (Received > LastNetworkMessageCount)
 		{
 			LastNetworkMessageCount = Received;
 			RealDataHoldUntil = Now + VibH2OSimulatorInternal::RealDataHoldSeconds;
+
+			if (bStopForGoodOnRealData)
+			{
+				// A patch paused mid-show must leave the room quiet, not let
+				// fake heart rates back in front of the audience.
+				bSimulating = false;
+				bReportedYield = false;
+				if (!bSilencedByRealData)
+				{
+					bSilencedByRealData = true;
+					UE_LOG(LogVibH2O, Display,
+						TEXT("VibH2O: Max envoie des données — le simulateur se tait jusqu'à la fin de la partie."));
+				}
+				return;
+			}
 		}
 		if (Now < RealDataHoldUntil)
 		{
 			if (!bReportedYield)
 			{
 				bReportedYield = true;
-				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation en pause — de vraies donnees reseau arrivent."));
+				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation en pause — de vraies données réseau arrivent."));
 			}
 			return;
 		}
 		if (bReportedYield)
 		{
 			bReportedYield = false;
-			UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation reprise — le reseau est silencieux."));
+			UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation reprise — le réseau est silencieux."));
 		}
 	}
 

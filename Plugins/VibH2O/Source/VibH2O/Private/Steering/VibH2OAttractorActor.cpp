@@ -52,6 +52,15 @@ FString AVibH2OAttractorActor::GetEffectiveLabel() const
 void AVibH2OAttractorActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// A typed name goes into an OSC address: spaces and slashes would split
+	// it, so they become '_' - before the auto-name check, which then sees
+	// the name as the operator's own.
+	if (PropertyChangedEvent.GetMemberPropertyName() == GET_MEMBER_NAME_CHECKED(AVibH2OAttractorActor, ControlName) && !ControlName.IsNone())
+	{
+		ControlName = VibH2OSteeringNaming::SanitizeControlName(ControlName.ToString().Replace(TEXT("/"), TEXT("_")));
+	}
+
 	// Renaming the actor in the outliner comes through here too.
 	RefreshAutoControlName();
 }
@@ -73,6 +82,16 @@ void AVibH2OAttractorActor::RefreshAutoControlName()
 void AVibH2OAttractorActor::SetActive(bool bActive)
 {
 	Activation = bActive ? 1.0f : 0.0f;
+}
+
+void AVibH2OAttractorActor::CallBubbles()
+{
+	SetActive(true);
+}
+
+void AVibH2OAttractorActor::ReleaseBubbles()
+{
+	SetActive(false);
 }
 
 void AVibH2OAttractorActor::Toggle()

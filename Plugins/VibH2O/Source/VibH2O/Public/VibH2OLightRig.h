@@ -33,18 +33,18 @@ struct VIBH2O_API FVibH2ORigLight
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Allumée"))
 	bool bEnabled = true;
 
 	/**
 	 * Direction the light comes FROM, as a yaw around the stage, in degrees.
 	 * 0 is the stage's forward axis; it turns with the stage actor.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (ClampMin = "-180.0", ClampMax = "180.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Direction (azimut, °)", ClampMin = "-180.0", ClampMax = "180.0", ToolTip = "D'où vient la lumière, en tournant autour de la scène. 0 = l'axe avant de l'acteur de scène ; elle tourne avec lui."))
 	float Azimuth = 0.0f;
 
 	/** Height of the light above the room's horizon, in degrees. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (ClampMin = "-30.0", ClampMax = "89.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Hauteur (°)", ClampMin = "-30.0", ClampMax = "89.0", ToolTip = "Hauteur de la lumière au-dessus de l'horizon de la salle, en degrés."))
 	float Elevation = 45.0f;
 
 	/**
@@ -52,28 +52,28 @@ struct VIBH2O_API FVibH2ORigLight
 	 * The rig works the lamp's candelas out from its distance, which is what
 	 * keeps the room equally lit at any size.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (ClampMin = "0.0", ForceUnits = "lux"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Lumière reçue par les bulles", ClampMin = "0.0", UIMax = "20.0", ForceUnits = "lux", ToolTip = "Lumière reçue au centre de la salle, en lux - pas la puissance de la lampe. Le rig compense la distance : la salle reste éclairée pareil à toute taille."))
 	float Illuminance = 2.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Couleur"))
 	FLinearColor Color = FLinearColor::White;
 
 	/** Half-angle of the beam, in degrees. Wider is closer and softer. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (ClampMin = "5.0", ClampMax = "80.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Ouverture du faisceau (°)", ClampMin = "5.0", ClampMax = "80.0", ToolTip = "Demi-angle du faisceau. Plus large : la lampe se rapproche et la lumière s'adoucit."))
 	float ConeAngle = 32.0f;
 
 	/** How much the beam shows in the volumetric fog - the visible shaft. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Lumiere", meta = (DisplayName = "Faisceau visible dans le brouillard", ClampMin = "0.0", UIMax = "10.0"))
 	float VolumetricScattering = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lumiere")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lumiere", meta = (DisplayName = "Projette des ombres"))
 	bool bCastShadows = true;
 };
 
 /**
  * Lighting that follows the room.
  */
-UCLASS(Blueprintable, BlueprintType, meta = (DisplayName = "VibH2O — Rig de lumieres"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Rig de lumières"))
 class VIBH2O_API AVibH2OLightRig : public AActor
 {
 	GENERATED_BODY()
@@ -86,7 +86,7 @@ public:
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
 	/** Stage to light. Left empty, the first stage actor of the level is used. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres", AdvancedDisplay, meta = (DisplayName = "Acteur de scène à éclairer", ToolTip = "Vide : le premier acteur de scène de la carte."))
 	TObjectPtr<AVibH2OStageActor> Stage;
 
 	/**
@@ -95,33 +95,33 @@ public:
 	 * The lights then converge on the group as the focus moves - a follow
 	 * spot for free. Off by default: the focus already dims the others.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Suivre le groupe de focus", ToolTip = "Coché : les lumières convergent sur le groupe de focus et le suivent. Décoché : toute la salle reste éclairée."))
 	bool bFollowFocus = false;
 
 	/** Master level, multiplying all three lights. Handy to fade in Sequencer. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Niveau général", ClampMin = "0.0", UIMax = "4.0", ToolTip = "Multiplie les trois lumières. Pratique à animer dans Sequencer."))
 	float MasterIntensity = 1.0f;
 
 	/** How fast the lights follow a change of room, per second. 0 snaps. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Vitesse de suivi", ClampMin = "0.0", UIMax = "10.0", ToolTip = "Vitesse à laquelle les lumières suivent un changement de salle. 0 = saut immédiat."))
 	float FollowSpeed = 1.5f;
 
 	/** Extra room around the bubbles, as a factor of the room's radius. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres", AdvancedDisplay, meta = (DisplayName = "Marge de couverture", ClampMin = "1.0", UIMax = "2.0"))
 	float CoverageMargin = 1.15f;
 
 	/**
 	 * Closest a light may come to the centre, in cm. Keeps a tiny room from
 	 * pulling the lamps into the bubbles.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres", meta = (ClampMin = "50.0", ForceUnits = "cm"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Lumieres", AdvancedDisplay, meta = (DisplayName = "Distance minimale", ClampMin = "50.0", UIMax = "3000.0", ForceUnits = "cm"))
 	float MinDistance = 600.0f;
 
 	/**
 	 * The key: the main light, from in front and above, slightly warm. It
 	 * gives the bubbles their shape and their highlight.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Face (key)"))
 	FVibH2ORigLight Key;
 
 	/**
@@ -129,11 +129,11 @@ public:
 	 * subsurface bubble glow from inside and draws a bright rim round it -
 	 * and, through the fog, a visible shaft.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Contre-jour (back)"))
 	FVibH2ORigLight Back;
 
 	/** The fill: low, from the other side, deep blue. It keeps the shadows from going black. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Lumieres", meta = (DisplayName = "Débouchage (fill)"))
 	FVibH2ORigLight Fill;
 
 	/** Centre and radius currently lit, in world space, after smoothing. */
@@ -144,7 +144,7 @@ public:
 	float GetLitRadius() const { return SmoothedRadius; }
 
 	/** Re-aims at once, without smoothing. */
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Lumieres")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Lumieres", meta = (DisplayName = "Recadrer les lumières maintenant"))
 	void SnapToRoom();
 
 private:
@@ -152,13 +152,13 @@ private:
 	void UpdateRig(float DeltaSeconds, bool bSnap);
 	void ApplyLight(USpotLightComponent* Component, const FVibH2ORigLight& Settings, const FQuat& StageRotation) const;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres")
+	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
 	TObjectPtr<USpotLightComponent> KeyLight;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres")
+	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
 	TObjectPtr<USpotLightComponent> BackLight;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres")
+	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
 	TObjectPtr<USpotLightComponent> FillLight;
 
 	FVector SmoothedCenter = FVector::ZeroVector;

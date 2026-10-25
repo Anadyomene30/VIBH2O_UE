@@ -21,20 +21,47 @@
   Unreal, puis recharger la page.
 -->
 <style>
+/* Two themes, both dark. Night mode only swaps variables: no global filter,
+   so secondary text never drops below #8fa0ab. */
 :root {
   --bg: #000;
   --panel: #0b0f12;
-  --line: #1c252c;
-  --text: #9fb1bd;
-  --dim: #5b6a74;
-  --strong: #d6e2ea;
+  --panel2: #05080a;
+  --line: #26323a;
+  --track: #1a232a;
+  --text: #b9c7d0;
+  --dim: #8fa0ab;
+  --strong: #e3ecf1;
   --ok: #2fbf71;
   --bad: #e0483e;
-  --warn: #d9a33a;
+  --warn: #e0a63a;
+  --blue: #3fa7d6;
+  --accent: 100%;   /* how much of a server colour shows */
+  --onmix: 20%;     /* tint of a lit tile */
+  --bannerbg: #2a0c0a;
+  --bannertext: #ffb0a8;
   --radius: 16px;
   color-scheme: dark;
 }
+body.night {
+  --panel: #030506;
+  --panel2: #020304;
+  --line: #182127;
+  --track: #11181d;
+  --text: #a6b4bd;
+  --dim: #8fa0ab;
+  --strong: #c7d2d9;
+  --ok: #259a5b;
+  --bad: #c23d34;
+  --warn: #b8862f;
+  --blue: #2f7fa3;
+  --accent: 62%;
+  --onmix: 12%;
+  --bannerbg: #1a0706;
+  --bannertext: #e8958c;
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); }
 body {
   color: var(--text);
@@ -43,222 +70,355 @@ body {
   -webkit-touch-callout: none;
   touch-action: manipulation;
   overflow: hidden;
+  display: flex; flex-direction: column;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  transition: filter .3s;
 }
-body.night { filter: brightness(.42); }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 /* ---------------------------------------------------------------- Header */
 header {
-  display: flex; align-items: center; gap: 14px;
-  height: 56px; padding: 0 16px;
+  flex: none; display: flex; align-items: center; gap: 12px;
+  min-height: 64px; padding: 8px 12px;
   border-bottom: 1px solid var(--line);
 }
-#dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bad); flex: none; transition: background .2s; }
+#dot { width: 16px; height: 16px; border-radius: 50%; background: var(--bad); flex: none; transition: background .2s; }
 #dot.ok { background: var(--ok); }
-#title { font-weight: 700; letter-spacing: .08em; color: var(--strong); }
-#status { color: var(--dim); font-size: 15px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#title { font-weight: 700; letter-spacing: .08em; color: var(--strong); flex: none; }
+#pills { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pill {
+  display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 17px;
+  border: 2px solid var(--line); font-size: 15px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  color: var(--text);
+}
+.pill.ok { border-color: var(--ok); color: var(--ok); }
+.pill.bad { border-color: var(--bad); background: var(--bad); color: #fff; }
+.pill.warn { border-color: var(--warn); color: var(--warn); }
+.pill.lock { border-color: var(--warn); background: var(--warn); color: #000; }
+.pill.blue { border-color: var(--blue); color: var(--text); }
+.pill.black { border-style: dashed; color: var(--strong); }
+.pill.sim { border-color: var(--warn); background: var(--warn); color: #000; animation: blink 1.2s steps(1) infinite; }
+@keyframes blink { 50% { background: transparent; color: var(--warn); } }
+#status { color: var(--dim); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 120px; }
 .hbtn {
-  height: 40px; min-width: 52px; padding: 0 14px; border-radius: 12px;
-  border: 1px solid var(--line); background: var(--panel); font-size: 16px;
+  flex: none; height: 48px; min-width: 52px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel); font-size: 20px; color: var(--strong);
 }
 .hbtn.on { border-color: var(--warn); color: var(--warn); }
-nav { display: flex; gap: 6px; }
-nav button { height: 40px; padding: 0 16px; border-radius: 12px; color: var(--dim); border: 1px solid transparent; }
-nav button.sel { color: var(--strong); border-color: var(--line); background: var(--panel); }
+body.locked #night, body.locked #nav { cursor: not-allowed; }
+body.locked #night { border-style: dashed; color: var(--dim); }
+#lock.on { background: var(--warn); color: #000; border-color: var(--warn); }
 
-#banner {
-  display: none; padding: 10px 16px; font-weight: 600; text-align: center;
-  background: #2a0c0a; color: #ff8a80; border-bottom: 1px solid #4a1612;
+/* ------------------------------------------------------- Stage and shield */
+#stage { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+#shield { display: none; position: absolute; inset: 0; z-index: 5; }
+body.locked #shield { display: block; }
+
+.banner {
+  display: none; padding: 12px 16px; font-weight: 600; text-align: center; flex: none;
+  background: var(--bannerbg); color: var(--bannertext); border-bottom: 1px solid var(--bad);
 }
-#banner.show { display: block; }
+.banner.show { display: block; }
+#nack { border-left: 8px solid var(--bad); }
 
-main { height: calc(100% - 56px); overflow: hidden; }
+nav { flex: none; display: flex; gap: 8px; padding: 10px 12px 0; }
+nav button {
+  flex: 1 1 auto; min-height: 52px; padding: 6px 16px; border-radius: 12px; color: var(--dim);
+  border: 1px solid var(--line); background: transparent; font-weight: 600;
+}
+nav button.sel { color: var(--strong); border-color: var(--dim); background: var(--panel); }
+
+main { flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .page { display: none; height: 100%; padding: 14px; gap: 14px; }
 .page.sel { display: flex; }
-body.locked main { pointer-events: none; opacity: .55; }
+body.nostate .page { display: none !important; }
+#noconn { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; padding: 24px; }
+body.nostate #noconn { display: flex; }
+#noconn div { max-width: 560px; text-align: center; line-height: 1.5; }
+#noconn h3 { margin: 0 0 12px; font-size: 26px; color: var(--strong); }
+#noconn.bad h3 { color: var(--bad); }
 
 section { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
-h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
 .empty { color: var(--dim); padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); line-height: 1.45; }
+.note { color: var(--dim); font-size: 15px; }
+
+/* Revert flash: the server said otherwise, the control snaps back - visibly. */
+.revert { animation: revert 1.6s ease-out; }
+@keyframes revert { 0%, 45% { box-shadow: 0 0 0 5px var(--bad); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* Driven by Sequencer: the iPad cannot act on it. */
+.seq { border-style: dotted !important; pointer-events: none; }
 
 /* ------------------------------------------------------------ Attractors */
 #left { flex: 1.35; }
-#right { flex: 1; }
+#right { flex: 1; border-radius: var(--radius); }
 #tiles {
   display: grid; gap: 12px; overflow-y: auto; flex: 1; align-content: start;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
 .tile {
   --c: #f90;
+  --cc: color-mix(in srgb, var(--c) var(--accent), #000);
   position: relative; min-height: 118px; border-radius: var(--radius);
   border: 2px solid var(--line); background: var(--panel);
   display: flex; flex-direction: column; justify-content: space-between;
   padding: 14px 16px 16px; text-align: left; overflow: hidden;
   transition: border-color .2s, background .2s;
 }
-.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--c); opacity: .7; }
+.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--cc); }
 .tile .name { font-size: 22px; font-weight: 700; color: var(--strong); word-break: break-word; }
-.tile .meta { font-size: 14px; color: var(--dim); }
-.tile .bar { height: 8px; border-radius: 4px; background: #151c21; overflow: hidden; margin-top: 10px; }
-.tile .fill { height: 100%; width: 0; background: var(--c); transition: width .15s linear; }
-.tile.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--panel)); }
+.tile .meta { font-size: 15px; color: var(--dim); }
+.tile .bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin-top: 10px; }
+.tile .fill { height: 100%; width: 0; background: var(--cc); transition: width .15s linear; }
+.tile.on { border-color: var(--cc); background: color-mix(in srgb, var(--cc) var(--onmix), var(--panel)); }
 .tile.on .meta { color: var(--text); }
-.tile:active { transform: scale(.985); }
+.tile.pressing { transform: scale(.985); }
+.tile.seq { background: var(--panel2); }
+.tile.seq .meta { color: var(--dim); }
 
 #release {
-  height: 72px; border-radius: var(--radius); font-size: 22px; font-weight: 800; letter-spacing: .06em;
-  color: #ffb4ab; background: #2a0f0c; border: 2px solid #6b2017;
+  flex: none; min-height: 72px; border-radius: var(--radius); font-size: 22px; font-weight: 800; letter-spacing: .06em;
+  color: var(--bannertext); background: var(--bannerbg); border: 2px solid var(--bad);
 }
-#release:active { background: #4a160f; }
+#release.pressing { filter: brightness(1.5); }
 
 .slider { display: flex; align-items: center; gap: 14px; }
-.slider label { min-width: 120px; color: var(--text); }
+.slider label, .slider .lbl { min-width: 120px; color: var(--text); }
 .slider output { min-width: 70px; text-align: right; color: var(--strong); font-variant-numeric: tabular-nums; }
-input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 44px; background: transparent; }
-input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 5px; background: #1a232a; }
+#fadeLabel { min-height: 52px; text-align: left; display: flex; flex-direction: column; justify-content: center; }
+#fadeLabel small { color: var(--dim); font-size: 13px; }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 52px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 10px; border-radius: 5px; background: var(--track); }
 input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 40px; height: 40px; margin-top: -15px; border-radius: 50%;
-  background: #33434e; border: 2px solid #6d8494;
+  -webkit-appearance: none; width: 48px; height: 48px; margin-top: -19px; border-radius: 50%;
+  background: #33434e; border: 2px solid var(--dim);
 }
-input[type=range]::-moz-range-track { height: 10px; border-radius: 5px; background: #1a232a; }
-input[type=range]::-moz-range-thumb { width: 36px; height: 36px; border-radius: 50%; background: #33434e; border: 2px solid #6d8494; }
+input[type=range]::-moz-range-track { height: 10px; border-radius: 5px; background: var(--track); }
+input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 50%; background: #33434e; border: 2px solid var(--dim); }
 
 /* ----------------------------------------------------------------- Zones */
+#right.warn { box-shadow: 0 0 0 2px var(--warn); padding: 10px; }
+#right.warn h2 { color: var(--warn); }
+#zonesWarn { color: var(--warn); font-weight: 700; }
 #padwrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
 #pad {
   position: relative; width: 100%; max-height: 100%; aspect-ratio: 4 / 3;
-  border: 2px solid #26323a; border-radius: 10px; overflow: hidden; touch-action: none;
+  border: 2px solid var(--line); border-radius: 10px; overflow: hidden; touch-action: none;
   background:
-    linear-gradient(#141b20 1px, transparent 1px) 0 0 / 100% 33.333%,
-    linear-gradient(90deg, #141b20 1px, transparent 1px) 0 0 / 25% 100%,
-    #06090b;
+    linear-gradient(var(--track) 1px, transparent 1px) 0 0 / 100% 33.333%,
+    linear-gradient(90deg, var(--track) 1px, transparent 1px) 0 0 / 25% 100%,
+    var(--panel2);
 }
-#pad .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: .5; }
-#pad .cross::before, #pad .cross::after { content: ""; position: absolute; background: #3a4b56; }
+#pad .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); }
+#pad .cross::before, #pad .cross::after { content: ""; position: absolute; background: var(--line); }
 #pad .cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
 #pad .cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
-#pad .tag { position: absolute; bottom: 6px; right: 10px; font-size: 13px; color: #34444e; }
+#pad .tag { position: absolute; bottom: 6px; right: 10px; font-size: 14px; color: var(--text); }
 .zone {
   --c: #d4f;
+  --cc: color-mix(in srgb, var(--c) var(--accent), #000);
   position: absolute; transform: translate(-50%, -50%);
-  border: 2px dashed var(--c); border-radius: 50%;
+  border: 3px dashed var(--cc); border-radius: 50%;
   display: flex; align-items: center; justify-content: center; text-align: center;
   color: var(--strong); font-size: 15px; font-weight: 600; touch-action: none;
-  min-width: 44px; min-height: 44px;
+  min-width: 48px; min-height: 48px;
 }
 .zone.rect { border-radius: 18%; }
-.zone.on { border-style: solid; background: color-mix(in srgb, var(--c) 22%, transparent); }
-.zone.drag { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 45%, transparent); }
-#chips, #groups, #effects { display: flex; flex-wrap: wrap; gap: 10px; }
+.zone.on { border-style: solid; background: color-mix(in srgb, var(--cc) 22%, transparent); }
+.zone.drag { box-shadow: 0 0 0 4px color-mix(in srgb, var(--cc) 45%, transparent); }
+#chips, #groups, #effects, #moods, #backdrop { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip {
   --c: #6d8494;
-  min-height: 52px; padding: 0 20px; border-radius: 26px; font-size: 18px; font-weight: 600;
+  --cc: color-mix(in srgb, var(--c) var(--accent), #000);
+  min-height: 56px; min-width: 56px; padding: 4px 20px; border-radius: 28px; font-size: 18px; font-weight: 600;
   border: 2px solid var(--line); background: var(--panel); color: var(--text);
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15;
 }
-.chip.on { border-color: var(--c); color: var(--strong); background: color-mix(in srgb, var(--c) 20%, var(--panel)); }
-/* An effect switched off must read as off at a glance, in the dark. */
+.chip small { font-size: 13px; font-weight: 600; color: var(--dim); }
+.chip.on { border-color: var(--cc); color: var(--strong); background: color-mix(in srgb, var(--cc) var(--onmix), var(--panel)); }
+.chip.pressing { transform: scale(.97); }
+/* Something switched off must read as off at a glance, in the dark. */
 #effects .chip, #backdrop .chip { --c: #3fa7d6; }
-#backdrop .chip:not(.on) { border-style: dashed; color: var(--dim); }
-#effects .chip:not(.on) { border-style: dashed; color: var(--dim); text-decoration: line-through; }
+#chips .chip:not(.on), #backdrop .chip:not(.on), #effects .chip:not(.on) { border-style: dashed; }
+#chips .chip:not(.on) { border-color: var(--warn); color: var(--warn); }
+#chips .chip:not(.on) small { color: var(--warn); }
+#effects .chip:not(.on) .lbl { text-decoration: line-through; }
 
 /* --------------------------------------------------------------- Page 2 */
-#page2 { flex-direction: column; overflow-y: auto; }
-#page2 section { gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #05080a; }
-.ends { display: flex; justify-content: space-between; color: var(--dim); font-size: 15px; }
-#blend { height: 60px; }
+.page.sel#page2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
+#page2 section { min-height: auto; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); }
+.ends { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 15px; }
+.row2 { display: flex; gap: 12px; }
+.big {
+  flex: 1; min-height: 72px; border-radius: var(--radius); font-size: 22px; font-weight: 800;
+  border: 2px solid var(--line); background: var(--panel); color: var(--text);
+}
+.big.on { border-color: var(--blue); color: var(--strong); background: color-mix(in srgb, var(--blue) var(--onmix), var(--panel)); }
+.big.pressing { transform: scale(.98); }
+.meter { position: relative; height: 12px; border-radius: 6px; background: var(--track); overflow: visible; }
+.meter .fill { height: 100%; width: 0; border-radius: 6px; background: var(--blue); transition: width .2s linear; }
+.meter .mark { position: absolute; top: -6px; width: 4px; height: 24px; margin-left: -2px; background: var(--strong); border-radius: 2px; }
+#blendText, #moodNow { color: var(--strong); }
+.wide { min-height: 52px; border-radius: 12px; border: 1px dashed var(--line); color: var(--dim); padding: 0 16px; align-self: flex-start; }
+.wide.on { border-style: solid; border-color: var(--warn); color: var(--warn); }
+#moods .chip { --c: #b48cf0; min-width: 120px; }
+#excRow .fill { background: #e07a5f; }
+
+/* ---------------------------------------------------- Hold ring and toast */
+#ring {
+  position: fixed; left: 0; top: 0; width: 132px; height: 132px; margin: -66px 0 0 -66px;
+  pointer-events: none; z-index: 20; display: none; transform: rotate(-90deg);
+}
+#ring.show { display: block; }
+#ring circle { fill: none; stroke-width: 10; }
+#ring .track { stroke: rgba(0,0,0,.6); }
+#ring .prog { stroke: var(--ringc, var(--warn)); stroke-linecap: round; }
+#toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  max-width: 90vw; padding: 14px 22px; border-radius: 14px; z-index: 30; pointer-events: none;
+  background: var(--panel); border: 2px solid var(--warn); color: var(--strong); font-weight: 600; text-align: center;
+  display: none;
+}
+#toast.show { display: block; }
 
 /* --------------------------------------------------------------- Help */
 #help {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 10;
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 40;
   align-items: center; justify-content: center; padding: 24px;
 }
 #help.show { display: flex; }
-#help div { max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; line-height: 1.5; }
+#help > div { max-width: 600px; max-height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; line-height: 1.5; }
 #help h3 { margin: 0 0 10px; color: var(--strong); }
-#help code { color: var(--strong); }
+#help b, #help code { color: var(--strong); }
 #help button { margin-top: 16px; }
 
 @media (orientation: portrait) {
   .page.sel#page1 { flex-direction: column; }
   #left { flex: 1.2; }
 }
+@media (max-width: 560px) {
+  #title { display: none; }
+}
 </style>
 </head>
-<body>
+<body class="nostate">
 <header>
   <div id="dot"></div>
   <div id="title">VIBH2O</div>
-  <div id="status">connexion…</div>
-  <nav>
-    <button data-page="page1" class="sel">Attracteurs</button>
-    <button data-page="page2">Tableaux · Focus · Effets</button>
-  </nav>
-  <button class="hbtn" id="night" title="Mode nuit">☾</button>
-  <button class="hbtn" id="lock" title="Verrouiller">🔓</button>
-  <button class="hbtn" id="info" title="Aide">?</button>
+  <div id="pills">
+    <span class="pill" id="pConn">connexion…</span>
+    <span class="pill lock" id="pLock" hidden>VERROUILLÉ</span>
+    <span class="pill" id="pSource" hidden></span>
+    <span class="pill" id="pMood" hidden></span>
+    <span class="pill" id="pFond" hidden></span>
+    <span class="pill warn" id="pZones" hidden></span>
+    <span id="status"></span>
+  </div>
+  <button class="hbtn" id="night" aria-label="Mode nuit">☾</button>
+  <button class="hbtn" id="lock" aria-label="Verrouiller">🔓</button>
+  <button class="hbtn" id="info" aria-label="Aide">?</button>
 </header>
-<div id="banner"></div>
-<main>
-  <div class="page sel" id="page1">
-    <section id="left">
-      <h2>Attracteurs</h2>
-      <div id="tiles"></div>
-      <button id="release">TOUT RELÂCHER</button>
-      <div class="slider">
-        <label for="fade">Durée des fondus</label>
-        <input type="range" id="fade" min="-2" max="2" step="0.01" value="0">
-        <output id="fadeOut">×1.0</output>
-      </div>
-    </section>
-    <section id="right">
-      <h2>Zones d'exclusion — le tulle</h2>
-      <div id="padwrap">
-        <div id="pad"><div class="cross"></div><div class="tag">vu depuis la salle</div></div>
-      </div>
-      <div id="chips"></div>
-    </section>
-  </div>
+<div id="stage">
+  <div class="banner" id="banner"></div>
+  <div class="banner" id="nack"></div>
+  <nav id="nav">
+    <button data-page="page1" class="sel">Attracteurs</button>
+    <button data-page="page2" id="tab2">Tableaux · Fond · Focus · Effets</button>
+  </nav>
+  <main>
+    <div id="noconn"><div>
+      <h3 id="noconnTitle">Connexion à Unreal…</h3>
+      <p id="noconnText">La télécommande attend la réponse du PC Unreal.</p>
+    </div></div>
 
-  <div class="page" id="page2">
-    <section>
-      <h2>Tableaux</h2>
-      <div class="slider">
-        <label for="blend">Salle → Banc</label>
-        <input type="range" id="blend" min="0" max="1" step="0.001" value="0">
-        <output id="blendOut">0.00</output>
-      </div>
-      <div class="ends"><span>Tableau 1 — le plan de salle</span><span>Tableau 2 — le banc</span></div>
-    </section>
-    <section>
-      <h2>Fond</h2>
-      <div id="backdrop"><button class="chip" id="backdropChip">Fond sous-marin</button></div>
-      <div class="ends"><span>Éteint : fondu vers le noir pur, les bulles restent.</span><span>/Fond</span></div>
-    </section>
-    <section>
-      <h2>Focus</h2>
-      <div id="groups"></div>
-      <div class="slider">
-        <label for="focus">Intensité</label>
-        <input type="range" id="focus" min="0" max="1" step="0.001" value="0">
-        <output id="focusOut">0.00</output>
-      </div>
-    </section>
-    <section>
-      <h2>Effets</h2>
-      <div id="effects"></div>
-    </section>
-  </div>
-</main>
+    <div class="page sel" id="page1">
+      <section id="left">
+        <h2>Attracteurs</h2>
+        <div id="tiles"></div>
+        <button id="release">TOUT RELÂCHER</button>
+        <div class="slider">
+          <button id="fadeLabel" class="lbl">Durée des fondus<small>double appui : ×1</small></button>
+          <input type="range" id="fade" min="-2" max="2" step="0.01" value="0" aria-label="Durée des fondus">
+          <output id="fadeOut">×1.0</output>
+        </div>
+      </section>
+      <section id="right">
+        <h2>Zones d'exclusion — le tulle <span id="zonesWarn"></span></h2>
+        <div id="padwrap">
+          <div id="pad"><div class="cross"></div><div class="tag">vu depuis la salle</div></div>
+        </div>
+        <div id="chips"></div>
+      </section>
+    </div>
+
+    <div class="page" id="page2">
+      <section>
+        <h2>Tableaux</h2>
+        <div class="row2">
+          <button class="big" id="toSalle" data-key="blendTarget">→ Salle</button>
+          <button class="big" id="toBanc" data-key="blendTarget">→ Banc</button>
+        </div>
+        <div id="blendText">—</div>
+        <div class="meter" id="blendMeter"><div class="fill" id="blendFill"></div><div class="mark" id="blendMark" hidden></div></div>
+        <div class="ends"><span>Tableau 1 — le plan de salle</span><span>Tableau 2 — le banc</span></div>
+        <button class="wide" id="blendUnlock">Déverrouiller le curseur</button>
+        <div class="slider" id="blendSlider" hidden>
+          <label for="blend">Salle → Banc</label>
+          <input type="range" id="blend" min="0" max="1" step="0.001" value="0">
+          <output id="blendOut">0.00</output>
+        </div>
+      </section>
+      <section>
+        <h2>Fond</h2>
+        <div id="backdrop"><button class="chip" id="backdropChip" data-key="backdrop"><span class="lbl">Fond : PRÉSENT</span><small></small></button></div>
+        <div class="note">Noir : fondu vers le noir pur, les bulles restent. Passer au noir demande un appui maintenu.</div>
+      </section>
+      <section id="ambiance" hidden>
+        <h2>Ambiance</h2>
+        <div id="moods">
+          <button class="chip" data-mood="auto" data-key="mood">Auto</button>
+          <button class="chip" data-mood="calme" data-key="mood">Calme</button>
+          <button class="chip" data-mood="normal" data-key="mood">Normal</button>
+          <button class="chip" data-mood="excite" data-key="mood">Excité</button>
+        </div>
+        <div id="moodNow">—</div>
+        <div id="excRow" hidden>
+          <div class="ends"><span>Excitation de la salle</span><span id="excOut">0 %</span></div>
+          <div class="meter"><div class="fill" id="excFill"></div></div>
+        </div>
+      </section>
+      <section>
+        <h2>Focus</h2>
+        <div id="groups"></div>
+        <div class="slider">
+          <label for="focus">Intensité</label>
+          <input type="range" id="focus" min="0" max="1" step="0.001" value="0">
+          <output id="focusOut">0.00</output>
+        </div>
+      </section>
+      <section>
+        <h2>Effets</h2>
+        <div id="effects"></div>
+        <div class="note">Couper un effet demande un appui maintenu ; le rallumer, un simple appui.</div>
+      </section>
+    </div>
+  </main>
+  <div id="shield"></div>
+</div>
+
+<svg id="ring" viewBox="0 0 132 132"><circle class="track" cx="66" cy="66" r="56"/><circle class="prog" id="ringProg" cx="66" cy="66" r="56"/></svg>
+<div id="toast"></div>
 
 <div id="help"><div>
   <h3>Télécommande VibH2O</h3>
   <p><b>Installer :</b> dans Safari, bouton Partager → <i>Sur l'écran d'accueil</i>. L'icône ouvre ensuite la télécommande en plein écran.</p>
   <p><b>Adresse :</b> <code id="host"></code> — c'est le PC Unreal. Elle est écrite dans le log Unreal au lancement (<i>telecommande iPad — ouvrir…</i>).</p>
-  <p><b>Attracteurs :</b> un appui appelle les bulles, un second les renvoie à leur place. Le fondu est toujours doux, même si l'on change d'avis en route. <b>TOUT RELÂCHER</b> renvoie tout le monde.</p>
-  <p><b>Zones :</b> faire glisser une zone sur le tulle pour suivre une circassienne ; les pastilles dessous l'allument ou l'éteignent.</p>
-  <p><b>Dans le noir :</b> ☾ assombrit l'écran, 🔒 bloque les touches.</p>
+  <p><b>En-tête :</b> <b>MAX</b> (vert) = les capteurs arrivent de Max. <b>SIMULATION</b> (orange clignotant) = de fausses données remplacent Max. <b>AUCUNE DONNÉE</b> (rouge) = rien n'arrive. Puis l'ambiance, le fond, et les zones éteintes.</p>
+  <p><b>Attracteurs :</b> un appui appelle les bulles, un second les renvoie à leur place. <b>TOUT RELÂCHER</b> renvoie tout le monde. Double appui sur <i>Durée des fondus</i> : retour à ×1.</p>
+  <p><b>Zones :</b> faire glisser une zone sur le tulle pour suivre une circassienne. Pour <b>éteindre</b> une zone, <b>maintenir</b> sa pastille jusqu'au bout de l'anneau ; un simple appui la rallume. Pareil pour passer le fond au noir et couper un effet.</p>
+  <p><b>Tableaux :</b> « → Salle » et « → Banc » font glisser la salle d'un tableau à l'autre. Le curseur fin est caché derrière <i>Déverrouiller le curseur</i>.</p>
+  <p><b>Dans le noir :</b> ☾ passe en thème de nuit. 🔒 bloque tout ; pour déverrouiller, <b>maintenir 🔒 1,5 s</b>.</p>
+  <p><b>Commande non reçue</b> (bandeau rouge) : Unreal n'a pas eu l'ordre ; le bouton revient à l'état réel. Recommencer.</p>
   <p>Point vert : Unreal répond. Point rouge : plus de réponse — vérifier le Wi-Fi et que le jeu tourne.</p>
   <button class="hbtn" id="helpClose">Fermer</button>
 </div></div>
@@ -267,23 +427,65 @@ input[type=range]::-moz-range-thumb { width: 36px; height: 36px; border-radius: 
 "use strict";
 const $ = (s) => document.querySelector(s);
 const POLL_MS = 350;
-const HOLD_MS = 1500;   // how long a local change outranks the polled state
+const HOLD_MS = 1500;     // after Unreal acknowledged, how long the local value still outranks the polled one
+const RETRY_MS = 3000;    // a command not delivered within this is declared lost
+const CONFIRM_MS = 600;   // hold to switch something off
+const UNLOCK_MS = 1500;   // hold to unlock
+
+const num = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
+const has = (o, k) => !!o && typeof o === "object" && o[k] !== undefined && o[k] !== null;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
 
 let state = null;
 let online = false;
 let failures = 0;
 
 // ------------------------------------------------------------ Local overrides
-// After a tap or a drag, the screen shows what was asked at once, without
-// waiting for the next poll to confirm it - and without the poll snapping it
-// back in the meantime.
+// After a tap or a drag, the screen shows what was asked at once. The local
+// value holds while its command is on its way, then HOLD_MS more once Unreal
+// has acknowledged it. A command declared lost drops it at once: the control
+// returns to the server state, and flashes so the operator sees it.
 const overrides = new Map();
-function hold(key, value) { overrides.set(key, { value, until: performance.now() + HOLD_MS }); }
+const FLASHABLE = /^(att:|zone:|fx:|backdrop$|focusGroup$|mood$|blendTarget$)/;
+function hold(key, value) {
+  const o = overrides.get(key);
+  overrides.set(key, { value, until: performance.now() + 10000, waiting: o ? o.waiting : 0 });
+}
+function same(key, a, b) {
+  if (typeof a === "boolean" || typeof b === "boolean") return !!a === !!b;
+  if (typeof a === "number" && typeof b === "number") return key.startsWith("blend") ? Math.abs(a - b) < 0.02 : (a >= 0.5) === (b >= 0.5);
+  return String(a) === String(b);
+}
 function shown(key, serverValue) {
   const o = overrides.get(key);
-  if (o && o.until > performance.now()) return o.value;
+  if (!o) return serverValue;
+  if (o.until > performance.now()) return o.value;
   overrides.delete(key);
+  if (FLASHABLE.test(key) && !same(key, o.value, serverValue)) flash(key);
   return serverValue;
+}
+function flash(key) {
+  const sel = '[data-key="' + CSS.escape(key) + '"]';
+  requestAnimationFrame(() => document.querySelectorAll(sel).forEach((el) => {
+    el.classList.remove("revert");
+    void el.offsetWidth;
+    el.classList.add("revert");
+    setTimeout(() => el.classList.remove("revert"), 1700);
+  }));
+}
+// mode: "ok" delivered, "lost" never delivered, "superseded" replaced by a newer command
+function settle(keys, mode) {
+  for (const k of keys) {
+    const o = overrides.get(k);
+    if (!o) continue;
+    o.waiting = Math.max(0, o.waiting - 1);
+    if (o.waiting > 0 || mode === "superseded") continue;
+    if (mode === "ok") o.until = performance.now() + HOLD_MS;
+    else { overrides.delete(k); flash(k); }
+  }
 }
 
 // --------------------------------------------------------------- Command bus
@@ -292,7 +494,14 @@ function shown(key, serverValue) {
 // backlog of stale positions.
 const pending = new Map();
 let inflight = false;
-function send(key, line) { pending.set(key, { line, at: performance.now() }); flush(); }
+function send(key, line, label, holdKeys) {
+  holdKeys = holdKeys || (overrides.has(key) ? [key] : []);
+  const old = pending.get(key);
+  if (old) settle(old.holdKeys, "superseded");
+  for (const k of holdKeys) { const o = overrides.get(k); if (o) o.waiting++; }
+  pending.set(key, { line, label, holdKeys, at: old ? old.at : performance.now() });
+  flush();
+}
 function timeoutSignal(ms) {
   if (window.AbortSignal && AbortSignal.timeout) return AbortSignal.timeout(ms);
   const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
@@ -302,36 +511,63 @@ async function flush() {
   const batch = [...pending.entries()];
   pending.clear();
   inflight = true;
+  let status = 0;
   try {
     const r = await fetch("api/cmd", { method: "POST", body: batch.map(([, c]) => c.line).join("\n"),
       headers: { "Content-Type": "text/plain", "X-VibH2O": "1" }, signal: timeoutSignal(2000) });
-    if (!r.ok) throw new Error(r.status);
+    status = r.status;
+    if (!r.ok) throw new Error(String(r.status));
   } catch (e) {
-    // Retry what is still recent and has not been superseded; drop the rest,
-    // rather than replay a stale cue long after the network comes back.
+    // Retry what is still recent and has not been superseded; declare the
+    // rest lost, rather than replay a stale cue long after the network is back.
+    // A 4xx is a refusal: retrying would not change the answer.
     const now = performance.now();
-    for (const [key, c] of batch) if (!pending.has(key) && now - c.at < 3000) pending.set(key, c);
-    setOnline(false);
+    const refused = status >= 400 && status < 500;
+    const lost = [];
+    for (const [key, c] of batch) {
+      if (pending.has(key)) { settle(c.holdKeys, "superseded"); continue; }
+      if (!refused && now - c.at < RETRY_MS) pending.set(key, c);
+      else { settle(c.holdKeys, "lost"); lost.push(c.label); }
+    }
+    if (!refused) setOnline(false);
+    if (lost.length) { commandLost(lost, status); safeRender(); }
     inflight = false;
     setTimeout(flush, 400);
     return;
   }
+  for (const [, c] of batch) settle(c.holdKeys, "ok");
   inflight = false;
   if (pending.size) flush();
 }
+
+let nackTimer = 0;
+function commandLost(labels, status) {
+  const unique = [...new Set(labels.filter(Boolean))];
+  let why = "";
+  if (status === 403) why = " — refusée par Unreal : recharger la page.";
+  else if (status >= 400) why = " — refusée par Unreal (" + status + ").";
+  else if (!online) why = " — pas de connexion.";
+  const el = $("#nack");
+  el.textContent = "Commande non reçue : " + (unique.join(" · ") || "?") + why;
+  el.classList.add("show");
+  clearTimeout(nackTimer);
+  nackTimer = setTimeout(() => el.classList.remove("show"), 8000);
+}
+$("#nack").addEventListener("click", () => $("#nack").classList.remove("show"));
 
 // -------------------------------------------------------------------- Polling
 async function poll() {
   try {
     const r = await fetch("api/state?t=" + Date.now(), { cache: "no-store", signal: timeoutSignal(1500) });
     if (!r.ok) throw new Error(r.status);
-    state = await r.json();
+    const next = await r.json();
+    state = next && typeof next === "object" ? next : {};
     failures = 0;
     setOnline(true);
-    render();
   } catch (e) {
     if (++failures >= 2) setOnline(false);
   } finally {
+    safeRender();
     setTimeout(poll, POLL_MS);
   }
 }
@@ -339,33 +575,92 @@ async function poll() {
 function setOnline(value) {
   online = value;
   $("#dot").classList.toggle("ok", value);
-  updateBanner();
-}
-
-function updateBanner() {
-  const b = $("#banner");
-  let text = "";
-  if (!online) text = "Hors ligne — Unreal ne répond pas. Vérifier le Wi-Fi et que le jeu tourne.";
-  else if (state && state.oscIgnored) text = "Contrôle coupé dans Unreal (bIgnoreOscControl) : les commandes sont ignorées.";
-  b.textContent = text;
-  b.classList.toggle("show", text !== "");
 }
 
 // --------------------------------------------------------------------- Render
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const signature = (list) => (list || []).map((e) => e.id + "|" + e.label + "|" + e.color + "|" + (e.shape || "")).join(",");
+const signature = (list) => list.map((e) => e.id + "|" + e.label + "|" + e.color + "|" + (e.shape || "")).join(",");
+const list = (v) => (Array.isArray(v) ? v.filter((e) => e && typeof e === "object" && e.id !== undefined) : []);
+const count = (n, word) => n + " " + word + (n > 1 ? "s" : "");
+const MOOD_NAMES = { calme: "Calme", normal: "Normal", excite: "Excité" };
+const moodName = (m) => MOOD_NAMES[m] || String(m);
+const EFFECT_NAMES = { Float: "Flottement", Drift: "Dérive", Beat: "Battement", Tint: "Teinte", Focus: "Focus", Scale: "Taille" };
+const effectName = (id) => EFFECT_NAMES[id] || "Effet : " + id;
 let tilesSig = null, zonesSig = null, groupsSig = null, effectsSig = null;
 
-function render() {
-  if (!state) return;
-  const attractors = state.attractors || [];
-  const zones = state.zones || [];
-  const count = (n, word) => n + " " + word + (n > 1 ? "s" : "");
-  $("#status").textContent = count(state.bubbles || 0, "bulle") + " · " + count(attractors.length, "attracteur") + " · " + count(zones.length, "zone");
-  updateBanner();
+function safeRender() {
+  try { render(); } catch (e) { if (window.console) console.error(e); }
+}
 
-  // Attractor tiles: rebuilt only when the set changes, updated in place
-  // otherwise, so a finger already on a tile is never pulled from under it.
+function render() {
+  document.body.classList.toggle("nostate", !state);
+  renderHeader();
+  renderBanner();
+  if (!state) {
+    const bad = failures >= 2;
+    $("#noconn").classList.toggle("bad", bad);
+    $("#noconnTitle").textContent = bad ? "Pas de connexion à Unreal" : "Connexion à Unreal…";
+    $("#noconnText").textContent = bad
+      ? "Unreal ne répond pas. Vérifier que l'iPad est sur le Wi-Fi du spectacle, que le jeu tourne, et le pare-feu Windows. La page réessaie toute seule."
+      : "La télécommande attend la réponse du PC Unreal.";
+    return;
+  }
+  renderAttractors();
+  renderZones(list(state.zones));
+  renderPage2();
+}
+
+function renderHeader() {
+  const s = state || {};
+  const conn = $("#pConn");
+  conn.hidden = online;
+  conn.textContent = failures >= 2 ? "PAS DE CONNEXION" : "connexion…";
+  conn.className = "pill" + (failures >= 2 ? " bad" : "");
+
+  const live = online && !!state;
+  const src = $("#pSource");
+  const SOURCES = { max: ["MAX", "ok"], simulateur: ["SIMULATION", "sim"], aucune: ["AUCUNE DONNÉE", "bad"] };
+  const sv = live && has(s, "source") ? SOURCES[String(s.source).toLowerCase()] : null;
+  src.hidden = !sv;
+  if (sv) { src.textContent = sv[0]; src.className = "pill " + sv[1]; }
+
+  const mood = $("#pMood");
+  mood.hidden = !(live && has(s, "mood"));
+  if (!mood.hidden) mood.textContent = "Ambiance : " + moodName(s.mood) + (s.moodForced === true ? " · forcée" : "");
+
+  const fond = $("#pFond");
+  fond.hidden = !(live && typeof s.backdrop === "number");
+  if (!fond.hidden) {
+    const present = backdropShown();
+    fond.textContent = present ? "Fond : PRÉSENT" : "Fond : NOIR";
+    fond.className = "pill " + (present ? "blue" : "black");
+  }
+
+  const off = live ? zonesOff() : 0;
+  const pz = $("#pZones");
+  pz.hidden = off === 0;
+  pz.textContent = off + (off > 1 ? " zones éteintes" : " zone éteinte");
+
+  $("#pLock").hidden = !isLocked();
+  $("#status").textContent = live
+    ? count(num(s.bubbles, 0), "bulle") + " · " + count(list(s.attractors).length, "attracteur") + " · " + count(list(s.zones).length, "zone")
+    : "";
+}
+
+function renderBanner() {
+  const b = $("#banner");
+  let text = "";
+  if (failures >= 2 && !online) text = "Pas de connexion — Unreal ne répond pas. Vérifier le Wi-Fi et que le jeu tourne. Les commandes ne partent pas.";
+  else if (online && state && state.oscIgnored === true) text = "Contrôle coupé dans Unreal : l'iPad est ignoré.";
+  b.textContent = text;
+  b.classList.toggle("show", text !== "");
+}
+
+// ----------------------------------------------------------------- Attractors
+function renderAttractors() {
+  const attractors = list(state.attractors);
+  // Rebuilt only when the set changes, updated in place otherwise, so a
+  // finger already on a tile is never pulled from under it.
   const tiles = $("#tiles");
   const ts = signature(attractors);
   if (ts !== tilesSig) {
@@ -376,33 +671,36 @@ function render() {
       const el = document.createElement("button");
       el.className = "tile";
       el.dataset.id = a.id;
-      el.style.setProperty("--c", a.color);
+      el.dataset.key = "att:" + a.id;
+      el.style.setProperty("--c", a.color || "#f90");
       el.innerHTML = '<div class="name">' + esc(a.label) + '</div><div><div class="meta"></div><div class="bar"><div class="fill"></div></div></div>';
-      el.addEventListener("click", () => toggleAttractor(a.id));
+      pressable(el, { tap: () => toggleAttractor(a.id) });
       tiles.appendChild(el);
     }
   }
   for (const a of attractors) {
     const el = tiles.querySelector('.tile[data-id="' + CSS.escape(a.id) + '"]');
     if (!el) continue;
-    const on = shown("att:" + a.id, a.on) >= 0.5;
+    const seq = a.osc === false;
+    const on = shown("att:" + a.id, num(a.on, 0)) >= 0.5;
+    const pct = Math.round(num(a.w, 0) * 100);
     el.classList.toggle("on", on);
-    el.querySelector(".fill").style.width = Math.round(a.w * 100) + "%";
-    const pct = Math.round(a.w * 100);
-    el.querySelector(".meta").textContent = (on ? (pct >= 99 ? "arrivé" : "en route · " + pct + " %") : (pct <= 1 ? "au repos" : "retour · " + pct + " %"))
-      + " · part " + Math.round(a.share * 100) + " %" + (a.osc ? "" : " · Sequencer");
+    el.classList.toggle("seq", seq);
+    el.querySelector(".fill").style.width = pct + "%";
+    el.querySelector(".meta").textContent = (seq ? "piloté par Sequencer · " : "")
+      + (on ? (pct >= 99 ? "arrivé" : "en route · " + pct + " %") : (pct <= 1 ? "au repos" : "retour · " + pct + " %"))
+      + " · part " + Math.round(num(a.share, 0) * 100) + " %";
   }
 
-  const fadeScale = shown("fade", state.fadeScale || 1);
+  const fadeScale = shown("fade", num(state.fadeScale, 1)) || 1;
   if (!fadeDragging) $("#fade").value = Math.log2(fadeScale);
   $("#fadeOut").textContent = "×" + fadeScale.toFixed(fadeScale < 1 ? 2 : 1);
-
-  renderZones(zones);
-  renderPage2();
 }
 
 // ---------------------------------------------------------------------- Zones
 const pad = $("#pad");
+const zoneOn = (z) => shown("zone:" + z.id, num(z.on, 1)) >= 0.5;
+const zonesOff = () => list(state && state.zones).filter((z) => !zoneOn(z)).length;
 function renderZones(zones) {
   const zs = signature(zones);
   if (zs !== zonesSig) {
@@ -411,12 +709,12 @@ function renderZones(zones) {
     const chips = $("#chips");
     chips.innerHTML = zones.length ? "" :
       '<div class="empty">Aucune zone d\'exclusion. Placer un acteur <b>VibH2O — Zone d\'exclusion</b> dans Unreal.</div>';
-    if (zones.length && zones[0].aspect) pad.style.aspectRatio = zones[0].aspect;
+    if (zones.length && num(zones[0].aspect, 0) > 0) pad.style.aspectRatio = zones[0].aspect;
     for (const z of zones) {
       const el = document.createElement("div");
       el.className = "zone" + (z.shape === "rect" ? " rect" : "");
       el.dataset.id = z.id;
-      el.style.setProperty("--c", z.color);
+      el.style.setProperty("--c", z.color || "#d4f");
       el.textContent = z.label;
       attachDrag(el, z.id);
       pad.appendChild(el);
@@ -424,26 +722,42 @@ function renderZones(zones) {
       const chip = document.createElement("button");
       chip.className = "chip";
       chip.dataset.id = z.id;
-      chip.style.setProperty("--c", z.color);
-      chip.textContent = z.label;
-      chip.addEventListener("click", () => toggleZone(z.id));
+      chip.dataset.key = "zone:" + z.id;
+      chip.style.setProperty("--c", z.color || "#d4f");
+      chip.innerHTML = '<span class="lbl">' + esc(z.label) + '</span><small></small>';
+      pressable(chip, {
+        holdMs: () => { const cur = zoneById(z.id); return cur && zoneOn(cur) ? CONFIRM_MS : 0; },
+        tap: () => setZone(z.id, 1),
+        confirm: () => setZone(z.id, 0),
+        hint: "Maintenir jusqu'au bout de l'anneau pour éteindre la zone.",
+      });
       chips.appendChild(chip);
     }
   }
+  let off = 0;
   for (const z of zones) {
     const el = pad.querySelector('.zone[data-id="' + CSS.escape(z.id) + '"]');
     const chip = $("#chips").querySelector('.chip[data-id="' + CSS.escape(z.id) + '"]');
-    const on = shown("zone:" + z.id, z.on) >= 0.5;
-    if (chip) chip.classList.toggle("on", on);
+    const on = zoneOn(z);
+    const seq = z.osc === false;
+    if (!on) off++;
+    if (chip) {
+      chip.classList.toggle("on", on);
+      chip.classList.toggle("seq", seq);
+      chip.querySelector("small").textContent = seq ? "piloté par Sequencer" : (on ? "allumée" : "ÉTEINTE");
+    }
     if (!el) continue;
     el.classList.toggle("on", on);
-    el.style.width = Math.max(z.sx * 100, 1) + "%";
-    el.style.height = Math.max(z.sy * 100, 1) + "%";
+    el.classList.toggle("seq", seq);
+    el.style.width = Math.max(num(z.sx, 0.2) * 100, 1) + "%";
+    el.style.height = Math.max(num(z.sy, 0.2) * 100, 1) + "%";
     if (dragging !== z.id) {
-      const p = shown("pos:" + z.id, [z.x, z.y]);
+      const p = shown("pos:" + z.id, [num(z.x, 0), num(z.y, 0)]);
       placeZone(el, p[0], p[1]);
     }
   }
+  $("#right").classList.toggle("warn", off > 0);
+  $("#zonesWarn").textContent = off ? "· " + off + (off > 1 ? " zones éteintes" : " zone éteinte") : "";
 }
 
 function placeZone(el, x, y) {
@@ -459,14 +773,15 @@ function attachDrag(el, id) {
     return [((e.clientX - r.left) / r.width) * 2 - 1, 1 - ((e.clientY - r.top) / r.height) * 2];
   };
   el.addEventListener("pointerdown", (e) => {
-    if (document.body.classList.contains("locked")) return;
+    const z = zoneById(id);
+    if (isLocked() || !z || z.osc === false) return;
     e.preventDefault();
-    el.setPointerCapture(e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
     dragging = id;
     el.classList.add("drag");
     // Keep the grab point under the finger: the zone does not jump to it.
     const u = toUnits(e);
-    const cur = shown("pos:" + id, zoneById(id) ? [zoneById(id).x, zoneById(id).y] : [0, 0]);
+    const cur = shown("pos:" + id, [num(z.x, 0), num(z.y, 0)]);
     grab = [cur[0] - u[0], cur[1] - u[1]];
   });
   el.addEventListener("pointermove", (e) => {
@@ -476,39 +791,40 @@ function attachDrag(el, id) {
     const y = Math.max(-1, Math.min(1, u[1] + grab[1]));
     placeZone(el, x, y);
     hold("pos:" + id, [x, y]);
-    send("pos:" + id, "/Exclusion/" + id + "/Position/ " + x.toFixed(3) + " " + y.toFixed(3));
+    send("pos:" + id, "/Exclusion/" + id + "/Position/ " + x.toFixed(3) + " " + y.toFixed(3), "Zone « " + zoneLabel(id) + " » : déplacement");
   });
   const end = () => { if (dragging === id) { dragging = null; el.classList.remove("drag"); } };
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", end);
 }
-const zoneById = (id) => (state && state.zones || []).find((z) => z.id === id);
-const attractorById = (id) => (state && state.attractors || []).find((a) => a.id === id);
+const zoneById = (id) => list(state && state.zones).find((z) => z.id === id);
+const attractorById = (id) => list(state && state.attractors).find((a) => a.id === id);
+const zoneLabel = (id) => { const z = zoneById(id); return z ? z.label : id; };
 
 // ------------------------------------------------------------------- Actions
 function toggleAttractor(id) {
   const a = attractorById(id);
-  if (!a) return;
-  const next = shown("att:" + id, a.on) >= 0.5 ? 0 : 1;
+  if (!a || a.osc === false) return;
+  const next = shown("att:" + id, num(a.on, 0)) >= 0.5 ? 0 : 1;
   hold("att:" + id, next);
-  send("att:" + id, "/Attractor/" + id + "/ " + next);
-  render();
+  send("att:" + id, "/Attractor/" + id + "/ " + next, "Attracteur « " + a.label + " » : " + (next ? "appeler" : "renvoyer"));
+  safeRender();
 }
 
-function toggleZone(id) {
+function setZone(id, next) {
   const z = zoneById(id);
-  if (!z) return;
-  const next = shown("zone:" + id, z.on) >= 0.5 ? 0 : 1;
+  if (!z || z.osc === false) return;
   hold("zone:" + id, next);
-  send("zone:" + id, "/Exclusion/" + id + "/ " + next);
-  render();
+  send("zone:" + id, "/Exclusion/" + id + "/ " + next, "Zone « " + z.label + " » : " + (next ? "allumer" : "éteindre"));
+  safeRender();
 }
 
-$("#release").addEventListener("click", () => {
-  for (const a of (state && state.attractors) || []) if (a.osc) hold("att:" + a.id, 0);
-  send("release", "/Attractors/Release/");
-  render();
-});
+pressable($("#release"), { tap: () => {
+  const keys = [];
+  for (const a of list(state && state.attractors)) if (a.osc !== false) { hold("att:" + a.id, 0); keys.push("att:" + a.id); }
+  send("release", "/Attractors/Release/", "TOUT RELÂCHER", keys);
+  safeRender();
+} });
 
 // The fade slider is logarithmic: the middle is ×1, each end halves or
 // doubles twice. The same gesture means the same thing at both ends.
@@ -516,131 +832,321 @@ let fadeDragging = false;
 const fade = $("#fade");
 fade.addEventListener("pointerdown", () => { fadeDragging = true; });
 fade.addEventListener("pointerup", () => { fadeDragging = false; });
+fade.addEventListener("pointercancel", () => { fadeDragging = false; });
+function setFade(v) {
+  hold("fade", v);
+  $("#fadeOut").textContent = "×" + v.toFixed(v < 1 ? 2 : 1);
+  send("fade", "/Attractors/FadeScale/ " + v.toFixed(3), "Durée des fondus ×" + v.toFixed(v < 1 ? 2 : 1));
+}
 fade.addEventListener("input", () => {
   let v = Math.pow(2, parseFloat(fade.value));
   if (Math.abs(Math.log2(v)) < 0.06) v = 1;   // a soft detent at ×1
-  hold("fade", v);
-  $("#fadeOut").textContent = "×" + v.toFixed(v < 1 ? 2 : 1);
-  send("fade", "/Attractors/FadeScale/ " + v.toFixed(3));
+  setFade(v);
 });
+// Double tap on the label: back to ×1. Detected by hand - iPad Safari has no
+// reliable dblclick.
+let lastFadeTap = 0;
+pressable($("#fadeLabel"), { tap: () => {
+  const now = performance.now();
+  if (now - lastFadeTap < 450) { lastFadeTap = 0; fade.value = 0; setFade(1); toast("Durée des fondus : ×1"); }
+  else lastFadeTap = now;
+} });
 
 // -------------------------------------------------------------------- Page 2
-function bindSlider(id, key, address) {
-  const input = $("#" + id);
-  const out = $("#" + id + "Out");
+function bindSlider(input, out, key, sendKey, address, labelOf) {
   let active = false;
   input.addEventListener("pointerdown", () => { active = true; });
   input.addEventListener("pointerup", () => { active = false; });
+  input.addEventListener("pointercancel", () => { active = false; });
   input.addEventListener("input", () => {
     const v = parseFloat(input.value);
     hold(key, v);
     out.textContent = v.toFixed(2);
-    send(key, address + " " + v.toFixed(3));
+    send(sendKey, address + " " + v.toFixed(3), labelOf(v), [key]);
+    input.dispatchEvent(new CustomEvent("used"));
   });
   return (value) => {
     if (!active) input.value = value;
     out.textContent = Number(value).toFixed(2);
   };
 }
-const setBlend = bindSlider("blend", "blend", "/Blend/");
-const setFocus = bindSlider("focus", "focusAmount", "/Focus/Amount/");
+const setBlendSlider = bindSlider($("#blend"), $("#blendOut"), "blendTarget", "blend", "/Blend/", (v) => "Tableau : curseur " + Math.round(v * 100) + " %");
+const setFocus = bindSlider($("#focus"), $("#focusOut"), "focusAmount", "focusAmount", "/Focus/Amount/", (v) => "Focus : intensité " + Math.round(v * 100) + " %");
+
+function goBlend(v) {
+  hold("blendTarget", v);
+  send("blend", "/Blend/ " + v, v ? "Tableau → Banc" : "Tableau → Salle", ["blendTarget"]);
+  safeRender();
+}
+pressable($("#toSalle"), { tap: () => goBlend(0) });
+pressable($("#toBanc"), { tap: () => goBlend(1) });
+
+// The fine slider hides behind a button and locks itself again after a
+// while: a stray swipe on the page must not morph the room.
+let blendUnlocked = false, blendRelock = 0;
+function setBlendUnlocked(on) {
+  blendUnlocked = on;
+  $("#blendSlider").hidden = !on;
+  $("#blendUnlock").classList.toggle("on", on);
+  $("#blendUnlock").textContent = on ? "Verrouiller le curseur" : "Déverrouiller le curseur";
+  clearTimeout(blendRelock);
+  if (on) blendRelock = setTimeout(() => setBlendUnlocked(false), 20000);
+}
+pressable($("#blendUnlock"), { tap: () => setBlendUnlocked(!blendUnlocked) });
+$("#blend").addEventListener("used", () => { if (blendUnlocked) setBlendUnlocked(true); });
 
 function renderPage2() {
-  setBlend(shown("blend", state.blend || 0));
-  const focus = state.focus || { groups: [], active: "", amount: 0 };
-  setFocus(shown("focusAmount", focus.amount || 0));
+  const s = state;
 
+  // Tableaux. blendTarget is where the glide is heading; an older plugin
+  // without it jumps, and the target is then the value itself.
+  const blend = Math.min(1, Math.max(0, num(s.blend, 0)));
+  const hasTarget = typeof s.blendTarget === "number";
+  const target = Math.min(1, Math.max(0, num(shown("blendTarget", hasTarget ? s.blendTarget : blend), blend)));
+  $("#toSalle").classList.toggle("on", target <= 0.001);
+  $("#toBanc").classList.toggle("on", target >= 0.999);
+  $("#blendFill").style.width = (blend * 100) + "%";
+  const moving = Math.abs(target - blend) > 0.005;
+  $("#blendMark").hidden = !moving;
+  $("#blendMark").style.left = (target * 100) + "%";
+  const pct = Math.round(blend * 100);
+  $("#blendText").textContent = moving
+    ? (target > blend ? "En route vers le banc · " : "En route vers la salle · ") + pct + " %"
+    : (blend <= 0.001 ? "Tableau 1 — le plan de salle" : blend >= 0.999 ? "Tableau 2 — le banc" : "Entre les deux · " + pct + " %");
+  setBlendSlider(target);
+
+  // Backdrop
+  const present = !!backdropShown();
+  const chip = $("#backdropChip");
+  chip.classList.toggle("on", present);
+  chip.querySelector(".lbl").textContent = present ? "Fond : PRÉSENT" : "Fond : NOIR";
+  chip.querySelector("small").textContent = typeof s.backdrop === "number"
+    ? (present ? "maintenir pour passer au noir" : "appuyer pour le rallumer")
+    : "pas de fond dans le niveau : mémoire de l'iPad";
+
+  // Ambiance - only with a plugin that reports it.
+  const hasMood = has(s, "mood");
+  $("#ambiance").hidden = !hasMood;
+  $("#tab2").textContent = hasMood ? "Tableaux · Fond · Ambiance · Focus · Effets" : "Tableaux · Fond · Focus · Effets";
+  if (hasMood) {
+    const forced = s.moodForced === true;
+    const sel = shown("mood", forced ? String(s.mood) : "auto");
+    document.querySelectorAll("#moods .chip").forEach((c) => c.classList.toggle("on", c.dataset.mood === sel));
+    $("#moodNow").textContent = "Ambiance actuelle : " + moodName(s.mood) + (forced ? " (forcée depuis l'iPad ou une cue)" : " (automatique, d'après la salle)");
+    const hasExc = typeof s.roomExcitation === "number";
+    $("#excRow").hidden = !hasExc;
+    if (hasExc) {
+      const e = Math.min(1, Math.max(0, s.roomExcitation));
+      $("#excFill").style.width = (e * 100) + "%";
+      $("#excOut").textContent = Math.round(e * 100) + " %";
+    }
+  }
+
+  // Focus
+  const focus = has(s, "focus") && typeof s.focus === "object" ? s.focus : {};
+  const groupNames = Array.isArray(focus.groups) ? focus.groups.map(String) : [];
+  setFocus(shown("focusAmount", num(focus.amount, 0)));
   const groups = $("#groups");
-  const gs = (focus.groups || []).join(",");
+  const gs = groupNames.join(",");
   if (gs !== groupsSig) {
     groupsSig = gs;
     groups.innerHTML = "";
-    for (const name of ["", ...(focus.groups || [])]) {
-      const chip = document.createElement("button");
-      chip.className = "chip";
-      chip.dataset.id = name;
-      chip.textContent = name || "Aucun";
-      chip.addEventListener("click", () => {
+    for (const name of ["", ...groupNames]) {
+      const c = document.createElement("button");
+      c.className = "chip";
+      c.dataset.id = name;
+      c.dataset.key = "focusGroup";
+      c.textContent = name || "Aucun";
+      pressable(c, { tap: () => {
         hold("focusGroup", name);
-        send("focusGroup", "/Focus/Group/ " + (name || "None"));
-        renderPage2();
-      });
-      groups.appendChild(chip);
+        send("focusGroup", "/Focus/Group/ " + (name || "None"), "Focus : groupe " + (name || "aucun"));
+        safeRender();
+      } });
+      groups.appendChild(c);
     }
   }
-  const activeGroup = shown("focusGroup", focus.active || "");
+  const activeGroup = shown("focusGroup", typeof focus.active === "string" ? focus.active : "");
   groups.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.id === activeGroup));
 
-  $("#backdropChip").classList.toggle("on", !!backdropShown());
-
+  // Effects
   const effects = $("#effects");
-  const list = state.effects || [];
-  const es = list.map((e) => e.id).join(",");
+  const fx = list(s.effects);
+  const es = fx.map((e) => e.id).join(",");
   if (es !== effectsSig) {
     effectsSig = es;
-    effects.innerHTML = "";
-    for (const e of list) {
-      const chip = document.createElement("button");
-      chip.className = "chip";
-      chip.dataset.id = e.id;
-      chip.textContent = EFFECT_NAMES[e.id] || e.id;
-      chip.addEventListener("click", () => {
-        const cur = (state.effects || []).find((x) => x.id === e.id);
-        const next = !shown("fx:" + e.id, cur ? cur.on : true);
-        hold("fx:" + e.id, next);
-        send("fx:" + e.id, "/Effect/" + e.id + "/ " + (next ? 1 : 0));
-        renderPage2();
+    effects.innerHTML = fx.length ? "" : '<div class="empty">Aucun effet nommé pour l\'instant.</div>';
+    for (const e of fx) {
+      const c = document.createElement("button");
+      c.className = "chip";
+      c.dataset.id = e.id;
+      c.dataset.key = "fx:" + e.id;
+      c.innerHTML = '<span class="lbl">' + esc(effectName(e.id)) + '</span><small></small>';
+      pressable(c, {
+        holdMs: () => (effectOn(e.id) ? CONFIRM_MS : 0),
+        tap: () => setEffect(e.id, true),
+        confirm: () => setEffect(e.id, false),
+        hint: "Maintenir jusqu'au bout de l'anneau pour couper l'effet.",
       });
-      effects.appendChild(chip);
+      effects.appendChild(c);
     }
   }
-  for (const e of list) {
-    const chip = effects.querySelector('.chip[data-id="' + CSS.escape(e.id) + '"]');
-    if (chip) chip.classList.toggle("on", !!shown("fx:" + e.id, e.on));
+  for (const e of fx) {
+    const c = effects.querySelector('.chip[data-id="' + CSS.escape(e.id) + '"]');
+    if (!c) continue;
+    const on = effectOn(e.id);
+    c.classList.toggle("on", on);
+    c.querySelector("small").textContent = on ? "actif" : "coupé";
   }
 }
-// The backdrop: "/Fond 1|0", handled by the environment layer of the plugin.
-// When the state does not report it, the last command sent is remembered here,
-// so the button still reads right after a reload.
+
+function effectOn(id) {
+  const cur = list(state && state.effects).find((x) => x.id === id);
+  return !!shown("fx:" + id, cur ? cur.on !== false : true);
+}
+function setEffect(id, on) {
+  hold("fx:" + id, on);
+  send("fx:" + id, "/Effect/" + id + "/ " + (on ? 1 : 0), effectName(id) + " : " + (on ? "rallumer" : "couper"));
+  safeRender();
+}
+
+// The backdrop: "/Fond 1|0", handled by the backdrop actor. When the state
+// does not report it, the last command sent is remembered here, so the button
+// still reads right after a reload.
 function backdropShown() {
-  let local = true;
-  try { local = localStorage.getItem("vibh2o.backdrop") !== "0"; } catch (e) {}
+  const local = store.get("vibh2o.backdrop") !== "0";
   const server = state && typeof state.backdrop === "number" ? state.backdrop >= 0.5 : local;
   return shown("backdrop", server);
 }
-$("#backdropChip").addEventListener("click", () => {
-  const next = !backdropShown();
+function setBackdrop(next) {
   hold("backdrop", next);
-  try { localStorage.setItem("vibh2o.backdrop", next ? "1" : "0"); } catch (e) {}
-  send("backdrop", "/Fond " + (next ? 1 : 0));
-  renderPage2();
+  store.set("vibh2o.backdrop", next ? "1" : "0");
+  send("backdrop", "/Fond " + (next ? 1 : 0), next ? "Fond : rallumer" : "Fond : passer au noir");
+  safeRender();
+}
+pressable($("#backdropChip"), {
+  holdMs: () => (backdropShown() ? CONFIRM_MS : 0),
+  tap: () => setBackdrop(true),
+  confirm: () => setBackdrop(false),
+  hint: "Maintenir jusqu'au bout de l'anneau pour passer le fond au noir.",
 });
 
-const EFFECT_NAMES = { Float: "Flottement", Drift: "Dérive", Beat: "Battement", Tint: "Teinte", Focus: "Focus", Scale: "Taille" };
+document.querySelectorAll("#moods .chip").forEach((c) => pressable(c, { tap: () => {
+  const m = c.dataset.mood;
+  hold("mood", m);
+  send("mood", "/Ambiance " + m, "Ambiance : " + (m === "auto" ? "Auto" : moodName(m)));
+  safeRender();
+} }));
+
+// ------------------------------------------------- Press, hold, ring, toast
+// Every control goes through here: a tap fires on release; a control that
+// switches something off must be held until the ring closes. Releasing early
+// only shows a hint. Nothing fires while locked, except the lock itself.
+const ring = $("#ring"), ringProg = $("#ringProg");
+const RING_LEN = 2 * Math.PI * 56;
+ringProg.style.strokeDasharray = RING_LEN;
+function pressable(el, o) {
+  let p = null;
+  const stop = () => {
+    if (!p) return;
+    cancelAnimationFrame(p.raf);
+    clearTimeout(p.timer);
+    ring.classList.remove("show");
+    el.classList.remove("pressing");
+    p = null;
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button > 0 || p) return;
+    if (!o.free && isLocked()) { lockedHint(); return; }
+    const ms = o.holdMs ? o.holdMs() : 0;
+    p = { id: e.pointerId, x: e.clientX, y: e.clientY, ms, t0: performance.now(), done: false, raf: 0 };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.classList.add("pressing");
+    if (ms > 0) {
+      ring.style.left = e.clientX + "px";
+      ring.style.top = e.clientY + "px";
+      ring.style.setProperty("--ringc", o.ringColor || "var(--warn)");
+      ringProg.style.strokeDashoffset = RING_LEN;
+      ring.classList.add("show");
+      // The timer decides; the animation frames only draw the ring.
+      const q = p;
+      q.timer = setTimeout(() => {
+        if (p !== q) return;
+        q.done = true;
+        stop();
+        if (o.confirm) o.confirm();
+      }, q.ms);
+      const step = () => {
+        if (p !== q) return;
+        ringProg.style.strokeDashoffset = RING_LEN * (1 - Math.min(1, (performance.now() - q.t0) / q.ms));
+        q.raf = requestAnimationFrame(step);
+      };
+      q.raf = requestAnimationFrame(step);
+    }
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (p && e.pointerId === p.id && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 28) stop();
+  });
+  el.addEventListener("pointerup", (e) => {
+    if (!p || e.pointerId !== p.id) return;
+    const q = p;
+    stop();
+    if (q.done) return;
+    if (q.ms > 0) { toast(o.hint || "Maintenir pour confirmer."); return; }
+    const r = el.getBoundingClientRect();
+    if (e.clientX >= r.left - 10 && e.clientX <= r.right + 10 && e.clientY >= r.top - 10 && e.clientY <= r.bottom + 10) o.tap && o.tap();
+  });
+  el.addEventListener("pointercancel", stop);
+}
+
+let toastTimer = 0;
+function toast(text) {
+  const t = $("#toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
 
 // --------------------------------------------------------------------- Chrome
-document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("sel", x === b));
-  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("sel", p.id === b.dataset.page));
-  try { localStorage.setItem("vibh2o.page", b.dataset.page); } catch (e) {}
-}));
+document.querySelectorAll("nav button").forEach((b) => pressable(b, { tap: () => showPage(b.dataset.page) }));
+function showPage(id) {
+  if (!document.getElementById(id)) return;
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("sel", x.dataset.page === id));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("sel", p.id === id));
+  store.set("vibh2o.page", id);
+}
 
 function setNight(on) {
   document.body.classList.toggle("night", on);
   $("#night").classList.toggle("on", on);
-  try { localStorage.setItem("vibh2o.night", on ? "1" : "0"); } catch (e) {}
+  store.set("vibh2o.night", on ? "1" : "0");
 }
-$("#night").addEventListener("click", () => setNight(!document.body.classList.contains("night")));
+pressable($("#night"), { tap: () => setNight(!document.body.classList.contains("night")) });
 
-$("#lock").addEventListener("click", () => {
-  const on = !document.body.classList.contains("locked");
+// Lock: one tap locks; unlocking needs a 1.5 s hold. Remembered across reloads.
+const isLocked = () => document.body.classList.contains("locked");
+function setLocked(on) {
   document.body.classList.toggle("locked", on);
   $("#lock").classList.toggle("on", on);
   $("#lock").textContent = on ? "🔒" : "🔓";
+  $("#lock").setAttribute("aria-label", on ? "Déverrouiller (maintenir)" : "Verrouiller");
+  $("#pLock").hidden = !on;
+  store.set("vibh2o.locked", on ? "1" : "0");
+  if (on && blendUnlocked) setBlendUnlocked(false);
+}
+function lockedHint() { toast("Verrouillé — maintenir 🔒 1,5 s pour déverrouiller."); }
+pressable($("#lock"), {
+  free: true,
+  holdMs: () => (isLocked() ? UNLOCK_MS : 0),
+  tap: () => { setLocked(true); toast("Verrouillé."); },
+  confirm: () => { setLocked(false); toast("Déverrouillé."); },
+  hint: "Maintenir 1,5 s pour déverrouiller.",
+  ringColor: "var(--ok)",
 });
+$("#shield").addEventListener("pointerdown", (e) => { e.preventDefault(); lockedHint(); });
 
-$("#info").addEventListener("click", () => $("#help").classList.add("show"));
-$("#helpClose").addEventListener("click", () => $("#help").classList.remove("show"));
+pressable($("#info"), { free: true, tap: () => $("#help").classList.add("show") });
+pressable($("#helpClose"), { free: true, tap: () => $("#help").classList.remove("show") });
 $("#host").textContent = location.host || "(page ouverte hors serveur)";
 
 document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -652,15 +1158,15 @@ async function keepAwake() {
   try { if ("wakeLock" in navigator && document.visibilityState === "visible") wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
 }
 document.addEventListener("visibilitychange", keepAwake);
-document.addEventListener("click", () => { if (!wakeLock) keepAwake(); }, { once: true });
+document.addEventListener("pointerdown", () => { if (!wakeLock) keepAwake(); }, { once: true });
 
-try {
-  if (localStorage.getItem("vibh2o.night") === "1") setNight(true);
-  const page = localStorage.getItem("vibh2o.page");
-  if (page) { const b = document.querySelector('nav button[data-page="' + page + '"]'); if (b) b.click(); }
-} catch (e) {}
+if (store.get("vibh2o.night") === "1") setNight(true);
+if (store.get("vibh2o.locked") === "1") setLocked(true);
+const savedPage = store.get("vibh2o.page");
+if (savedPage) showPage(savedPage);
 
 keepAwake();
+safeRender();
 poll();
 </script>
 </body>

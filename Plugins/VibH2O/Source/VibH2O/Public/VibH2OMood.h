@@ -23,7 +23,7 @@ enum class EVibH2OMood : uint8
 {
 	Calm UMETA(DisplayName = "Calme"),
 	Normal UMETA(DisplayName = "Normal"),
-	Excited UMETA(DisplayName = "Excite")
+	Excited UMETA(DisplayName = "Excité")
 };
 
 /** Who decides the mood: the room, or the operator. */
@@ -31,10 +31,10 @@ UENUM(BlueprintType)
 enum class EVibH2OMoodOverride : uint8
 {
 	/** The room's mean arousal decides. */
-	Auto UMETA(DisplayName = "Automatique (la salle decide)"),
-	Calm UMETA(DisplayName = "Force : calme"),
-	Normal UMETA(DisplayName = "Force : normal"),
-	Excited UMETA(DisplayName = "Force : excite")
+	Auto UMETA(DisplayName = "Automatique (la salle décide)"),
+	Calm UMETA(DisplayName = "Forcé : calme"),
+	Normal UMETA(DisplayName = "Forcé : normal"),
+	Excited UMETA(DisplayName = "Forcé : excité")
 };
 
 /** How much of each mood is showing. Always sums to one. */
@@ -175,7 +175,7 @@ struct VIBH2O_API FVibH2OMoodPalette
  * and where it goes back to: drop one on the stage to load it, press "Save to
  * preset" to keep a tuning. Swapping between scenes is one drag.
  */
-UCLASS(BlueprintType, meta = (DisplayName = "VibH2O - Preset d'ambiance"))
+UCLASS(BlueprintType, meta = (DisplayName = "VibH2O — Preset d'ambiance"))
 class VIBH2O_API UVibH2OMoodPreset : public UDataAsset
 {
 	GENERATED_BODY()

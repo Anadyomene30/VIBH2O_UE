@@ -34,7 +34,7 @@ enum class EVibH2OCueSource : uint8
 	 * background. Off unless enabled in the project settings: see
 	 * docs/CUES.md for the risks.
 	 */
-	Key UMETA(DisplayName = "Touche du clavier")
+	Key UMETA(DisplayName = "Clavier (arrière-plan)")
 };
 
 /** What a cue does once triggered. */
@@ -42,24 +42,24 @@ UENUM(BlueprintType)
 enum class EVibH2OCueAction : uint8
 {
 	/** Plays the sequence from where it stands. */
-	PlaySequence UMETA(DisplayName = "Sequence - Lancer"),
+	PlaySequence UMETA(DisplayName = "Séquence - Lancer"),
 
 	/** Rewinds the sequence to its start, then plays it. */
-	PlaySequenceFromStart UMETA(DisplayName = "Sequence - Lancer depuis le debut"),
+	PlaySequenceFromStart UMETA(DisplayName = "Séquence - Lancer depuis le début"),
 
-	PauseSequence UMETA(DisplayName = "Sequence - Pause"),
+	PauseSequence UMETA(DisplayName = "Séquence - Pause"),
 
 	/** Stops the sequence; the play head goes back to the start. */
-	StopSequence UMETA(DisplayName = "Sequence - Arreter"),
+	StopSequence UMETA(DisplayName = "Séquence - Arrêter"),
 
 	/** Jumps to a marked frame of the sequence, by its label. */
-	JumpToMarker UMETA(DisplayName = "Sequence - Sauter a un marqueur"),
+	JumpToMarker UMETA(DisplayName = "Séquence - Sauter à un marqueur"),
 
 	/** Jumps to a time of the sequence, in seconds. */
-	JumpToTime UMETA(DisplayName = "Sequence - Sauter a un temps"),
+	JumpToTime UMETA(DisplayName = "Séquence - Sauter à un temps"),
 
 	/** Sets the tableau 1 to tableau 2 morph, through the /Blend route. */
-	SetBlendAlpha UMETA(DisplayName = "Regler BlendAlpha"),
+	SetBlendAlpha UMETA(DisplayName = "Tableau - Régler salle → banc"),
 
 	/**
 	 * Hands an OSC message to the plugin as if it had come off the network:
@@ -69,7 +69,7 @@ enum class EVibH2OCueAction : uint8
 	SendOsc UMETA(DisplayName = "Message OSC interne"),
 
 	/** Only raises OnCueFired, for a Blueprint to act on. */
-	BlueprintEvent UMETA(DisplayName = "Evenement Blueprint seulement")
+	BlueprintEvent UMETA(DisplayName = "Événement Blueprint seulement")
 };
 
 /**
@@ -140,38 +140,45 @@ struct VIBH2O_API FVibH2OCue
 	 * Name shown in the log, and the one to use from OSC: "/Cue/<Name>" fires
 	 * this cue whatever its own trigger.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cue")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cue",
+		meta = (DisplayName = "Nom", ToolTip = "Nom écrit dans le log, et à utiliser en OSC : /Cue/<Nom> déclenche cette cue, quel que soit son déclencheur."))
 	FString Name;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cue", meta = (DisplayName = "Active"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cue",
+		meta = (DisplayName = "Active", ToolTip = "Décochée : la cue ne se déclenche plus, ni par son déclencheur ni par /Cue/<Nom>."))
 	bool bEnabled = true;
 
 	// --------------------------------------------------------------- Trigger
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur", meta = (DisplayName = "Source"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Source", ToolTip = "D'où vient l'entrée qui déclenche la cue : OSC (Resolume, iPad, Max), MIDI, ou clavier."))
 	EVibH2OCueSource Source = EVibH2OCueSource::Osc;
 
 	/** Compared segment by segment, case and stray slashes ignored. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Adresse OSC", EditCondition = "Source == EVibH2OCueSource::Osc", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Adresse OSC", EditCondition = "Source == EVibH2OCueSource::Osc", EditConditionHides,
+			ToolTip = "Adresse OSC attendue. Comparée segment par segment, sans tenir compte des majuscules ni des « / » en trop."))
 	FString OscAddress;
 
 	/** 1 to 16; 0 accepts every channel. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
 		meta = (DisplayName = "Canal MIDI (0 = tous)", ClampMin = "0", ClampMax = "16",
+			ToolTip = "Canal MIDI, de 1 à 16. 0 accepte tous les canaux.",
 			EditCondition = "Source == EVibH2OCueSource::MidiNote || Source == EVibH2OCueSource::MidiControlChange || Source == EVibH2OCueSource::MidiProgramChange",
 			EditConditionHides))
 	int32 MidiChannel = 0;
 
 	/** Note, controller or program number. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Numero MIDI", ClampMin = "0", ClampMax = "127",
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Numéro MIDI", ClampMin = "0", ClampMax = "127",
+			ToolTip = "Numéro de note, de contrôleur (CC) ou de programme, de 0 à 127.",
 			EditCondition = "Source == EVibH2OCueSource::MidiNote || Source == EVibH2OCueSource::MidiControlChange || Source == EVibH2OCueSource::MidiProgramChange",
 			EditConditionHides))
 	int32 MidiNumber = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Touche", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Touche", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides,
+			ToolTip = "Touche lue même quand Unreal est en arrière-plan, si le clavier est activé dans les réglages du projet. Elle arrive aussi à l'application qui a le focus : préférer une touche avec Ctrl ou Alt."))
 	FKey Key;
 
 	/**
@@ -179,16 +186,19 @@ struct VIBH2O_API FVibH2OCue
 	 * the focus - typing a clip name in Resolume included - so a modifier is
 	 * the safer choice.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Avec Ctrl", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Avec Ctrl", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides,
+			ToolTip = "Une touche seule se déclenche aussi quand on tape un nom de clip dans Resolume : un modificateur est plus sûr."))
 	bool bRequireCtrl = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Avec Maj", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Avec Maj", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides,
+			ToolTip = "La touche ne déclenche la cue qu'avec Maj enfoncée."))
 	bool bRequireShift = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Avec Alt", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Avec Alt", EditCondition = "Source == EVibH2OCueSource::Key", EditConditionHides,
+			ToolTip = "La touche ne déclenche la cue qu'avec Alt enfoncée."))
 	bool bRequireAlt = false;
 
 	/**
@@ -197,8 +207,9 @@ struct VIBH2O_API FVibH2OCue
 	 * sends 127 then 0 (1.0 then 0.0 here). 0.5 lets the press through and
 	 * stops the release.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur",
-		meta = (DisplayName = "Seuil", ClampMin = "0.0", EditCondition = "!bContinuous"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Seuil", ClampMin = "0.0", UIMax = "1.0", EditCondition = "!bContinuous",
+			ToolTip = "Une entrée avec valeur ne déclenche qu'à partir de ce seuil. Resolume et les pads envoient 1 à l'appui puis 0 au relâché : 0,5 laisse passer l'appui et arrête le relâché."))
 	float Threshold = 0.5f;
 
 	/**
@@ -206,53 +217,59 @@ struct VIBH2O_API FVibH2OCue
 	 * fader driving BlendAlpha or an attractor. The value is passed on to the
 	 * action.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Declencheur", meta = (DisplayName = "Continu (fader)"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Déclencheur",
+		meta = (DisplayName = "Continu (fader)",
+			ToolTip = "Se déclenche à chaque message, quelle que soit sa valeur, sans anti-rebond : pour un fader qui pilote la transition ou un attracteur. La valeur est transmise à l'action."))
 	bool bContinuous = false;
 
 	// ---------------------------------------------------------------- Action
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action", meta = (DisplayName = "Action"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
+		meta = (DisplayName = "Action", ToolTip = "Ce que fait la cue une fois déclenchée."))
 	EVibH2OCueAction Action = EVibH2OCueAction::PlaySequence;
 
 	/** A Level Sequence actor of this level. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Sequence",
+		meta = (DisplayName = "Séquence", ToolTip = "Un acteur Level Sequence de ce niveau.",
 			EditCondition = "Action == EVibH2OCueAction::PlaySequence || Action == EVibH2OCueAction::PlaySequenceFromStart || Action == EVibH2OCueAction::PauseSequence || Action == EVibH2OCueAction::StopSequence || Action == EVibH2OCueAction::JumpToMarker || Action == EVibH2OCueAction::JumpToTime",
 			EditConditionHides))
 	TObjectPtr<ALevelSequenceActor> Sequence = nullptr;
 
 	/** Label of the marked frame, as typed in Sequencer. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Marqueur", EditCondition = "Action == EVibH2OCueAction::JumpToMarker", EditConditionHides))
+		meta = (DisplayName = "Marqueur", EditCondition = "Action == EVibH2OCueAction::JumpToMarker", EditConditionHides,
+			ToolTip = "Nom du marqueur, tel qu'il est écrit dans Sequencer."))
 	FString MarkerName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
 		meta = (DisplayName = "Temps", ForceUnits = "s", ClampMin = "0.0",
-			EditCondition = "Action == EVibH2OCueAction::JumpToTime", EditConditionHides))
+			EditCondition = "Action == EVibH2OCueAction::JumpToTime", EditConditionHides,
+			ToolTip = "Temps de la séquence où sauter, en secondes."))
 	float TimeSeconds = 0.0f;
 
 	/** After the jump: play on, or hold still on the new frame. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Lancer apres le saut",
+		meta = (DisplayName = "Lancer après le saut", ToolTip = "Coché : la séquence repart après le saut. Décoché : elle reste immobile sur la nouvelle image.",
 			EditCondition = "Action == EVibH2OCueAction::JumpToMarker || Action == EVibH2OCueAction::JumpToTime",
 			EditConditionHides))
 	bool bPlayAfterJump = true;
 
 	/** Address handed to the plugin, e.g. "/Attractor/Centre". */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Adresse OSC envoyee", EditCondition = "Action == EVibH2OCueAction::SendOsc", EditConditionHides))
+		meta = (DisplayName = "Adresse OSC envoyée", EditCondition = "Action == EVibH2OCueAction::SendOsc", EditConditionHides,
+			ToolTip = "Exemples : /Attractor/HautGauche/ — /Effect/Beat/ — /Fond"))
 	FString OutOscAddress;
 
 	/** The value sent - BlendAlpha for that action, the argument for an OSC message. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Valeur",
+		meta = (DisplayName = "Valeur", ToolTip = "Valeur envoyée : la position salle → banc (0 à 1) pour la transition, l'argument du message OSC sinon.",
 			EditCondition = "(Action == EVibH2OCueAction::SetBlendAlpha || Action == EVibH2OCueAction::SendOsc) && !bUseInputValue",
 			EditConditionHides))
 	float OutValue = 1.0f;
 
 	/** Send the incoming value instead - for a fader in continuous mode. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Action",
-		meta = (DisplayName = "Transmettre la valeur recue",
+		meta = (DisplayName = "Transmettre la valeur reçue", ToolTip = "Envoie la valeur de l'entrée à la place : pour un fader en mode continu.",
 			EditCondition = "Action == EVibH2OCueAction::SetBlendAlpha || Action == EVibH2OCueAction::SendOsc",
 			EditConditionHides))
 	bool bUseInputValue = false;

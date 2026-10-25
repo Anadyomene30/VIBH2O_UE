@@ -45,6 +45,8 @@ void AVibH2OExclusionZoneActor::OnConstruction(const FTransform& Transform)
 	RefreshAutoControlName();
 #endif
 
+	SyncHalfSize(true);
+
 	const FColor Color = DisplayColor.ToFColor(true);
 	if (Volume != nullptr)
 	{
@@ -71,6 +73,15 @@ void AVibH2OExclusionZoneActor::OnConstruction(const FTransform& Transform)
 void AVibH2OExclusionZoneActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// A typed name goes into an OSC address: spaces and slashes would split
+	// it, so they become '_' - before the auto-name check, which then sees
+	// the name as the operator's own.
+	if (PropertyChangedEvent.GetMemberPropertyName() == GET_MEMBER_NAME_CHECKED(AVibH2OExclusionZoneActor, ControlName) && !ControlName.IsNone())
+	{
+		ControlName = VibH2OSteeringNaming::SanitizeControlName(ControlName.ToString().Replace(TEXT("/"), TEXT("_")));
+	}
+
 	// Renaming the actor in the outliner comes through here too.
 	RefreshAutoControlName();
 }
@@ -113,6 +124,59 @@ void AVibH2OExclusionZoneActor::SetDragPosition(float X, float Y)
 {
 	DragX = FMath::Clamp(X, -1.0f, 1.0f);
 	DragY = FMath::Clamp(Y, -1.0f, 1.0f);
+}
+
+void AVibH2OExclusionZoneActor::Recenter()
+{
+	DragX = 0.0f;
+	DragY = 0.0f;
+
+	// Outside play, show it at once, as OnConstruction does: no stage tick
+	// is needed to see the zone come back.
+	const UWorld* World = GetWorld();
+	if (World == nullptr || !World->IsGameWorld())
+	{
+		DragSpringX.Reset(0.0f);
+		DragSpringY.Reset(0.0f);
+		ApplyDragOffset(FVector2D::ZeroVector);
+	}
+}
+
+void AVibH2OExclusionZoneActor::SyncHalfSize(bool bRecordUndo)
+{
+	if (Volume == nullptr)
+	{
+		return;
+	}
+
+	constexpr double Tolerance = 0.01;
+	const FVector Extent = Volume->GetUnscaledBoxExtent();
+	const FVector2D OnComponent(Extent.Y, Extent.Z);
+
+	if (!OnComponent.Equals(LastAppliedHalfSize, Tolerance))
+	{
+		// The box changed behind HalfSize's back: a map saved before HalfSize
+		// existed, or an extent typed on the component. Its size is the one
+		// the operator sees and meant - take it, overwrite nothing.
+		HalfSize = OnComponent;
+		LastAppliedHalfSize = OnComponent;
+		return;
+	}
+
+	// Never a flat box, whatever Sequencer or a Blueprint asks for: the push
+	// divides by these.
+	const FVector2D Wanted(FMath::Max(HalfSize.X, 1.0), FMath::Max(HalfSize.Y, 1.0));
+	if (!Wanted.Equals(LastAppliedHalfSize, Tolerance))
+	{
+#if WITH_EDITOR
+		if (bRecordUndo)
+		{
+			Volume->Modify();
+		}
+#endif
+		Volume->SetBoxExtent(FVector(Extent.X, Wanted.X, Wanted.Y), false);
+		LastAppliedHalfSize = Wanted;
+	}
 }
 
 FVector2D AVibH2OExclusionZoneActor::GetHalfSize() const
@@ -159,6 +223,11 @@ void AVibH2OExclusionZoneActor::BeginSteeringFrame(const FTransform& StageRootTr
 {
 	FrameNumber = GFrameCounter;
 	FrameDeltaSeconds = DeltaSeconds;
+
+	// HalfSize is animatable, and Sequencer does not rerun the construction
+	// script: carry it to the box here too. Not undoable from here - a
+	// per-frame Modify() would flood the transaction buffer.
+	SyncHalfSize(false);
 
 	if (LastSteppedFrame != FrameNumber)
 	{

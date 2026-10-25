@@ -261,20 +261,24 @@ public:
 	FVector GetAgentVelocity(int32 Agent) const { return Velocities.IsValidIndex(Agent) ? Velocities[Agent] : FVector::ZeroVector; }
 
 	/** Radius within which a bubble notices its neighbours, in cm. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "10.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "10.0", ForceUnits = "cm", DisplayName = "Rayon de voisinage", ToolTip = "Distance, en cm, à laquelle une bulle remarque ses voisines."))
 	float NeighbourRadius = 320.0f;
 
 	/**
 	 * Below this distance a bubble actively pushes away, in cm. Shrunk
 	 * automatically for daughters, which are smaller.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "1.0", UIMax = "400.0", ForceUnits = "cm", DisplayName = "Distance d'écartement", ToolTip = "En dessous de cette distance, en cm, une bulle s'écarte activement de ses voisines. Réduite d'office pour les filles, plus petites."))
 	float SeparationRadius = 110.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "0.0", DisplayName = "Force d'écartement", ToolTip = "Force avec laquelle les bulles trop proches s'écartent."))
 	float SeparationWeight = 2.6f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "0.0", DisplayName = "Alignement", ToolTip = "Tendance de chaque bulle à nager dans le même sens que ses voisines."))
 	float AlignmentWeight = 1.5f;
 
 	/**
@@ -282,7 +286,8 @@ public:
 	 * design: the families and the cone already hold it together, and more
 	 * makes the dispersed families heap up.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "0.0", DisplayName = "Cohésion", ToolTip = "Attraction vers les voisines, sensible seulement quand le banc se disperse. Faible exprès : plus fort, les familles dispersées s'entassent."))
 	float CohesionWeight = 0.06f;
 
 	/**
@@ -290,25 +295,31 @@ public:
 	 * is dispersed. What keeps the families spread evenly - and so readable -
 	 * rather than drifting into a heap.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "0.0", DisplayName = "Familles : tenue en place", ToolTip = "Force qui ramène chaque famille vers sa place dans le volume quand le banc est dispersé : les familles restent réparties et lisibles."))
 	float AttractorWeight = 1.4f;
 
 	/** Radius of the volume the dispersed families share, in cm. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "100.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "100.0", UIMax = "3000.0", ForceUnits = "cm", DisplayName = "Volume de dispersion : rayon", ToolTip = "Rayon, en cm, du volume que partagent les familles dispersées."))
 	float BoundsRadius = 1100.0f;
 
 	/** Height of that volume, in cm. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "100.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "100.0", ForceUnits = "cm", DisplayName = "Volume de dispersion : hauteur", ToolTip = "Hauteur, en cm, de ce volume."))
 	float BoundsHeight = 800.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "1.0", UIMax = "1000.0", DisplayName = "Vitesse min", ToolTip = "Vitesse minimale d'une bulle du banc, en cm/s."))
 	float MinSpeed = 90.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "1.0", UIMax = "1000.0", DisplayName = "Vitesse max", ToolTip = "Vitesse maximale d'une bulle du banc, en cm/s."))
 	float MaxSpeed = 420.0f;
 
 	/** How much the room's arousal speeds the school up. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc",
+		meta = (ClampMin = "0.0", DisplayName = "Accélération avec l'excitation", ToolTip = "De combien l'excitation de la salle accélère le banc."))
 	float ExcitationSpeedBoost = 0.8f;
 
 	/** How fast the centre of the school wanders, in turns per second. */
@@ -322,7 +333,8 @@ public:
 	// ----------------------------------------------------- Vortex
 
 	/** How firmly the school swims round the axis once in order, per second. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Vortex", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Vortex",
+		meta = (ClampMin = "0.0", DisplayName = "Vortex : force de rotation", ToolTip = "Fermeté avec laquelle le banc, une fois en ordre, tourne autour de l'axe."))
 	float SwirlWeight = 1.6f;
 
 	/** Pull back onto the wall of the cone. */
@@ -333,7 +345,8 @@ public:
 	 * Thickness of the wall of fish, as a fraction of the local radius. Thin
 	 * reads as a drawn cone, thick as a living mass.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Vortex", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Vortex",
+		meta = (ClampMin = "0.05", ClampMax = "1.0", DisplayName = "Vortex : épaisseur de la paroi", ToolTip = "Épaisseur de la paroi de bulles, en part du rayon local. Fine : un cône dessiné. Épaisse : une masse vivante."))
 	float ShellThickness = 0.4f;
 
 	/** Each fish slowly climbs and sinks along the cone; this is how firmly. */
@@ -354,11 +367,13 @@ public:
 	// ----------------------------------------------------- Families
 
 	/** How tightly the sisters of a family stay together when dispersed. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Familles", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Familles",
+		meta = (ClampMin = "0.0", DisplayName = "Familles : cohésion des sœurs", ToolTip = "À quel point les sœurs d'une famille restent groupées quand le banc est dispersé."))
 	float KinWeight = 3.0f;
 
 	/** Speed of the dispersed school relative to the vortex. Calmer reads better. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Familles", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Banc|Familles",
+		meta = (ClampMin = "0.05", ClampMax = "1.0", DisplayName = "Familles : vitesse relative", ToolTip = "Vitesse du banc dispersé par rapport au vortex. Plus calme, il se lit mieux."))
 	float DispersedSpeedFactor = 0.55f;
 
 	/** How fast each family's place drifts through the volume, in cycles per second. */

@@ -70,11 +70,11 @@ struct VIBH2O_API FVibH2OMaterialParameterNames
 	// --- Beyond the contract. Clear the name to stop sending them.
 
 	/** Collective synchrony of the room. Useful to tableau 2. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplement")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplément")
 	FName CollectiveSynchrony = TEXT("CollectiveSynchrony");
 
 	/** Position of the morph between the two tableaux. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplement")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplément")
 	FName BlendAlpha = TEXT("BlendAlpha");
 
 	// --- The room's mood, and synchrony. See FVibH2OBubbleMood.
@@ -184,7 +184,7 @@ struct VIBH2O_API FVibH2OBubbleMood
  * only says where it goes. Its beat phase does not even live here but in the
  * subsystem, keyed by individual - which is how it survives any room rebuild.
  */
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Bulle"))
 class VIBH2O_API AVibH2OBubbleActor : public AActor
 {
 	GENERATED_BODY()
@@ -257,14 +257,14 @@ public:
 	 * Component carrying the material to drive. Left empty, the first mesh
 	 * component found is used - which is enough for most Blueprints.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (DisplayName = "Mesh piloté (vide = le premier trouvé)"))
 	TObjectPtr<UMeshComponent> TargetMeshComponent;
 
 	/** Material slot to instance. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (ClampMin = "0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (DisplayName = "Emplacement de matériau", ClampMin = "0", UIMax = "8"))
 	int32 MaterialSlot = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", AdvancedDisplay, meta = (DisplayName = "Noms des paramètres du matériau"))
 	FVibH2OMaterialParameterNames ParameterNames;
 
 	/** Creates the dynamic instance, or returns the one already created. */

@@ -75,7 +75,7 @@ struct VIBH2O_API FVibH2OBackdropSnapshot
 /**
  * Fades the underwater environment to black and back.
  */
-UCLASS(Blueprintable, BlueprintType, meta = (DisplayName = "VibH2O — Fond"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Fond"))
 class VIBH2O_API AVibH2OBackdrop : public AActor
 {
 	GENERATED_BODY()
@@ -95,11 +95,19 @@ public:
 	 * behind the bubbles. This is the value Sequencer animates; the operator
 	 * commands below simply glide it.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Presence du fond", ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Présence du fond", ClampMin = "0.0", ClampMax = "1.0"))
 	float Presence = 1.0f;
 
+	/**
+	 * Presence forced at every Play. Presence itself is saved with the map, so
+	 * a map saved with the backdrop removed would otherwise open the show on
+	 * black. Applied at once, without a fade, and only in a game world.
+	 */
+	UPROPERTY(EditAnywhere, Category = "VibH2O|Fond", meta = (DisplayName = "Présence au lancement", ClampMin = "0", ClampMax = "1", ToolTip = "Valeur imposée à chaque Play. 1 = le fond est là au début du spectacle."))
+	float StartPresence = 1.0f;
+
 	/** Duration of the operator fade, in seconds. 0 cuts. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Duree du fondu", ClampMin = "0.0", ForceUnits = "s"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Durée du fondu", ClampMin = "0.0", UIMax = "20.0", ForceUnits = "s", ToolTip = "Durée du fondu, en secondes. 0 = coupe sèche."))
 	float FadeSeconds = 4.0f;
 
 	/**
@@ -109,13 +117,13 @@ public:
 	 * Measured in VIBH2o_PPCM_Fond, 0.6 makes the displayed background
 	 * follow Presence almost linearly (0.5 a little above, 1 far below).
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", meta = (DisplayName = "Courbe du fondu", ClampMin = "0.1", ClampMax = "4.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Fond", AdvancedDisplay, meta = (DisplayName = "Courbe du fondu", ClampMin = "0.1", ClampMax = "4.0", ToolTip = "0,6 : l'image s'assombrit régulièrement. 1 : elle tient puis chute d'un coup à la fin."))
 	float FadeCurve = 0.6f;
 
 	/**
 	 * What makes up the environment. Fogs and sky atmospheres are faded;
 	 * meshes are hidden once black is reached; lights (sky light included)
-	 * only if "Eteindre les lumieres" is ticked. Particle systems are never
+	 * only if "Éteindre les lumières" is ticked. Particle systems are never
 	 * touched, even inside these actors: they are what remains on black.
 	 * "Remplir depuis la carte" fills the list with the obvious candidates.
 	 */
@@ -127,7 +135,7 @@ public:
 	 * default: they light the bubbles too, and the point of removing the
 	 * backdrop is to change what is behind the bubbles, not the bubbles.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", meta = (DisplayName = "Eteindre les lumieres"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", meta = (DisplayName = "Éteindre les lumières"))
 	bool bFadeLights = false;
 
 	/**
@@ -135,10 +143,10 @@ public:
 	 * surface - so they can fade themselves smoothly rather than vanish at
 	 * the end. Receives Presence under the name below.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", meta = (DisplayName = "Collection de parametres"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", AdvancedDisplay, meta = (DisplayName = "Collection de paramètres"))
 	TObjectPtr<UMaterialParameterCollection> ParameterCollection;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", meta = (DisplayName = "Nom du parametre"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", AdvancedDisplay, meta = (DisplayName = "Nom du paramètre", ToolTip = "Nom du paramètre scalaire lu par les matériaux d'artiste (0 = noir, 1 = fond)."))
 	FName ParameterName = TEXT("Fond");
 
 	/**
@@ -148,15 +156,15 @@ public:
 	 * around every bubble would print smudges onto the tulle. Exposure is
 	 * deliberately not touched, so the bubbles keep their brightness.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", meta = (DisplayName = "Post-process au noir"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Fond", AdvancedDisplay, meta = (DisplayName = "Post-traitement au noir"))
 	FPostProcessSettings BlackPostProcess;
 
 	/** Key that toggles the backdrop in Play. B is free in the show's inputs. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Commande", meta = (DisplayName = "Touche"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Commande", meta = (DisplayName = "Touche", ToolTip = "Ne marche que si la fenêtre Unreal a le focus. Derrière Resolume, passer par l'iPad, l'OSC ou une cue."))
 	FKey ToggleKey = EKeys::B;
 
 	/** Obey /Fond messages (the iPad, or Max). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Commande", meta = (DisplayName = "Suivre l'OSC"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Commande", meta = (DisplayName = "Suivre l'OSC et l'iPad", ToolTip = "Coché : obéit aux messages /Fond, qu'ils viennent de l'iPad ou de Max."))
 	bool bFollowOsc = true;
 
 	/** Fades the environment out. */
@@ -168,7 +176,7 @@ public:
 	void RestoreBackdrop();
 
 	/** Removes it if it is (heading towards) present, brings it back otherwise. */
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Fond")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Fond", meta = (DisplayName = "Basculer le fond"))
 	void ToggleBackdrop();
 
 	/** Glides Presence to Target. Seconds < 0 uses FadeSeconds. */
@@ -228,7 +236,7 @@ private:
 	TWeakObjectPtr<UVibH2OSubsystem> BoundSubsystem;
 
 	/** Carries BlackPostProcess, weighted by 1 - Presence, above every volume. */
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Fond")
+	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Diagnostic")
 	TObjectPtr<UPostProcessComponent> BlackPostProcessComponent;
 
 	bool bFading = false;

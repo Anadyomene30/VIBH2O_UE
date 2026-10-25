@@ -104,6 +104,15 @@ void AVibH2OBackdrop::BeginPlay()
 	}
 
 	UWorld* World = GetWorld();
+
+	// Presence is saved with the map: a map saved on black would open the
+	// show on black. Every Play starts from the chosen presence, at once.
+	if (World != nullptr && World->IsGameWorld())
+	{
+		Presence = FMath::Clamp(StartPresence, 0.0f, 1.0f);
+		bFading = false;
+	}
+
 	if (ToggleKey.IsValid() && World != nullptr && World->IsGameWorld())
 	{
 		if (APlayerController* Controller = World->GetFirstPlayerController())

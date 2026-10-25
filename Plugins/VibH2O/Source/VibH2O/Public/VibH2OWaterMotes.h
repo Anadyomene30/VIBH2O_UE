@@ -4,9 +4,10 @@
 // the light, and their parallax is most of what tells the eye it is looking
 // through a volume rather than at a backdrop.
 //
-// They are one instanced mesh component, not particles: several thousand
-// instances cost one draw call, and the drift lives in the material's world
-// position offset, so the CPU does nothing at all once they are placed.
+// They are plain static mesh components, not particles - one per mote, so a
+// few hundred at most (the instanced path rendered black in this scene, see
+// Rebuild). The drift is a single rotation of the whole field per frame, so
+// the CPU does almost nothing once they are placed.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -18,7 +19,7 @@ class UStaticMeshComponent;
 class UStaticMesh;
 class UMaterialInterface;
 
-UCLASS(Blueprintable, BlueprintType, meta = (DisplayName = "VibH2O — Particules d'eau"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Particules d'eau"))
 class VIBH2O_API AVibH2OWaterMotes : public AActor
 {
 	GENERATED_BODY()
@@ -31,26 +32,26 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual bool ShouldTickIfViewportsOnly() const override;
 
-	/** How many motes. Several thousand stay cheap: it is one draw call. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (ClampMin = "0", ClampMax = "800"))
+	/** How many motes. Each one is a component: stay in the hundreds. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Nombre", ClampMin = "0", ClampMax = "800", NoSpinbox = "true", ToolTip = "Nombre de particules (800 au plus). Chacune est un composant : rester sous 400 si l'image rame."))
 	int32 Count = 320;
 
 	/** Radius of the volume they fill, in cm. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (ClampMin = "50.0", ForceUnits = "cm"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Rayon du volume", ClampMin = "50.0", UIMax = "6000.0", ForceUnits = "cm"))
 	float Radius = 2600.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (ClampMin = "50.0", ForceUnits = "cm"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Hauteur du volume", ClampMin = "50.0", UIMax = "5000.0", ForceUnits = "cm"))
 	float Height = 2000.0f;
 
 	/** Smallest and largest mote, in cm. The spread is what gives depth. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (ClampMin = "0.1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Taille min", ClampMin = "0.1", UIMax = "60.0", ForceUnits = "cm"))
 	float MinSize = 4.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (ClampMin = "0.1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Taille max", ClampMin = "0.1", UIMax = "60.0", ForceUnits = "cm"))
 	float MaxSize = 15.0f;
 
 	/** Same seed, same water. Changing it reshuffles the whole field. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Graine"))
 	int32 Seed = 7412;
 
 	/**
@@ -58,13 +59,13 @@ public:
 	 *
 	 * The field drifts as one body rather than mote by mote: suspended silt in
 	 * a current does exactly that, and it costs a single transform per frame
-	 * instead of two thousand six hundred.
+	 * instead of one per mote.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Particules", meta = (DisplayName = "Courant (tours/s)", UIMin = "-0.05", UIMax = "0.05"))
 	float CurrentSpeed = 0.006f;
 
 	/** Rebuilds the field. Called on construction; exposed for Blueprint too. */
-	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Particules")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O|Particules", meta = (DisplayName = "Régénérer"))
 	void Rebuild();
 
 private:

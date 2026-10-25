@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Layout/VibH2OLayoutMath.h"
 #include "Layout/VibH2OSchoolMath.h"
+#include "Misc/MessageDialog.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -19,6 +20,8 @@
 #include "VibH2OBubbleActor.h"
 #include "VibH2OMood.h"
 #include "VibH2OModule.h"
+#include "VibH2OSettings.h"
+#include "VibH2OSimulatorActor.h"
 #include "VibH2OSubsystem.h"
 
 AVibH2OStageActor::AVibH2OStageActor()
@@ -96,6 +99,7 @@ void AVibH2OStageActor::BindToSubsystem(UVibH2OSubsystem* Subsystem)
 	Subsystem->OnOscAttractorFadeScaleChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscAttractorFadeScale);
 	Subsystem->OnOscExclusionChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscExclusion);
 	Subsystem->OnOscExclusionMoved.AddDynamic(this, &AVibH2OStageActor::HandleOscExclusionMoved);
+	Subsystem->OnOscAmbianceChanged.AddDynamic(this, &AVibH2OStageActor::HandleOscAmbiance);
 	BoundSubsystem = Subsystem;
 
 	// A room may have arrived before this actor started up.
@@ -119,6 +123,7 @@ void AVibH2OStageActor::UnbindFromSubsystem()
 		Subsystem->OnOscAttractorFadeScaleChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAttractorFadeScale);
 		Subsystem->OnOscExclusionChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscExclusion);
 		Subsystem->OnOscExclusionMoved.RemoveDynamic(this, &AVibH2OStageActor::HandleOscExclusionMoved);
+		Subsystem->OnOscAmbianceChanged.RemoveDynamic(this, &AVibH2OStageActor::HandleOscAmbiance);
 	}
 	BoundSubsystem.Reset();
 }
@@ -180,12 +185,178 @@ void AVibH2OStageActor::HandleRoomChanged(const FVibH2ORoomSnapshot& NewRoom)
 
 void AVibH2OStageActor::HandleOscBlendAlpha(float Value)
 {
-	// We only write on reception. During Sequencer playback the track rewrites
-	// the property every frame and therefore wins on its own.
+	// A command glides rather than jumps: a cue or a quick swipe on the iPad
+	// must not teleport the room into the school. During Sequencer playback
+	// the track rewrites the property every frame and still wins.
 	if (bFollowOscBlend)
 	{
-		BlendAlpha = Value;
+		GlideBlendTo(Value);
 	}
+}
+
+void AVibH2OStageActor::GlideBlendTo(float Target, float Seconds)
+{
+	BlendGlideFrom = BlendAlpha;
+	BlendGlideTarget = FMath::Clamp(Target, 0.0f, 1.0f);
+	BlendGlideDuration = Seconds < 0.0f ? OscBlendGlideSeconds : Seconds;
+	BlendGlideElapsed = 0.0f;
+	bBlendGliding = BlendGlideDuration > 0.0f && !FMath::IsNearlyEqual(BlendGlideFrom, BlendGlideTarget);
+	if (!bBlendGliding)
+	{
+		BlendAlpha = BlendGlideTarget;
+	}
+}
+
+void AVibH2OStageActor::GoToTableau1()
+{
+	GlideBlendTo(0.0f);
+}
+
+void AVibH2OStageActor::GoToTableau2()
+{
+	GlideBlendTo(1.0f);
+}
+
+void AVibH2OStageActor::StepBlendGlide(float DeltaSeconds)
+{
+	if (!bBlendGliding)
+	{
+		return;
+	}
+	BlendGlideElapsed += DeltaSeconds;
+	const float Alpha = FMath::Clamp(BlendGlideElapsed / FMath::Max(BlendGlideDuration, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+	// Eased at both ends, like every other fade of the show.
+	BlendAlpha = FMath::Lerp(BlendGlideFrom, BlendGlideTarget, FMath::SmoothStep(0.0f, 1.0f, Alpha));
+	if (Alpha >= 1.0f)
+	{
+		BlendAlpha = BlendGlideTarget;
+		bBlendGliding = false;
+	}
+}
+
+void AVibH2OStageActor::HandleOscAmbiance(int32 MoodOverrideIndex)
+{
+	SetMoodOverride(static_cast<EVibH2OMoodOverride>(FMath::Clamp(MoodOverrideIndex, 0, 3)));
+}
+
+TArray<FName> AVibH2OStageActor::GetFocusGroupNames() const
+{
+	TArray<FName> Names;
+	Names.Add(NAME_None);
+	for (const FVibH2OFocusGroup& Group : FocusGroups)
+	{
+		Names.AddUnique(Group.GroupName);
+	}
+	return Names;
+}
+
+void AVibH2OStageActor::ResetForShowStart()
+{
+	Modify();
+	bBlendGliding = false;
+	BlendAlpha = 0.0f;
+	FocusAmount = 0.0f;
+	ActiveFocusGroup = NAME_None;
+	MoodOverride = EVibH2OMoodOverride::Auto;
+	AttractorFadeScale = 1.0f;
+
+	int32 Attractors = 0;
+	int32 Zones = 0;
+	int32 Backdrops = 0;
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AVibH2OAttractorActor> It(World); It; ++It)
+		{
+			It->Modify();
+			It->Activation = 0.0f;
+			++Attractors;
+		}
+		for (TActorIterator<AVibH2OExclusionZoneActor> It(World); It; ++It)
+		{
+			It->Modify();
+			It->Activation = 1.0f;
+			It->DragX = 0.0f;
+			It->DragY = 0.0f;
+			++Zones;
+		}
+		for (TActorIterator<AVibH2OBackdrop> It(World); It; ++It)
+		{
+			It->Modify();
+			It->FadeTo(1.0f, 0.0f);
+			++Backdrops;
+		}
+	}
+	UE_LOG(LogVibH2O, Display, TEXT("VibH2O: etat de debut de spectacle — tableau 1, ambiance automatique, %d attracteur(s) relache(s), %d zone(s) allumee(s), %d fond(s) present(s)."),
+		Attractors, Zones, Backdrops);
+}
+
+void AVibH2OStageActor::CheckBeforeShow()
+{
+	TArray<FString> Warnings;
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AVibH2OSimulatorActor> It(World); It; ++It)
+		{
+			if (It->bSimulateOnBeginPlay)
+			{
+				Warnings.Add(FString::Printf(TEXT("Le simulateur « %s » démarre au lancement : à décocher (ou supprimer) dans la carte du spectacle."), *It->GetActorNameOrLabel()));
+			}
+		}
+		for (TActorIterator<AVibH2OExclusionZoneActor> It(World); It; ++It)
+		{
+			if (It->Activation < 1.0f)
+			{
+				Warnings.Add(FString::Printf(TEXT("La zone « %s » est éteinte : les bulles peuvent passer devant une circassienne."), *It->GetActorNameOrLabel()));
+			}
+			if (!FMath::IsNearlyZero(It->DragX) || !FMath::IsNearlyZero(It->DragY))
+			{
+				Warnings.Add(FString::Printf(TEXT("La zone « %s » est décalée de sa place (déplacée depuis l'iPad)."), *It->GetActorNameOrLabel()));
+			}
+		}
+		for (TActorIterator<AVibH2OAttractorActor> It(World); It; ++It)
+		{
+			if (It->Activation > 0.0f)
+			{
+				Warnings.Add(FString::Printf(TEXT("L'attracteur « %s » est actif : il appellera des bulles dès le début."), *It->GetActorNameOrLabel()));
+			}
+		}
+		for (TActorIterator<AVibH2OBackdrop> It(World); It; ++It)
+		{
+			if (It->Presence < 1.0f)
+			{
+				Warnings.Add(TEXT("Le fond n'est pas entièrement présent."));
+			}
+		}
+	}
+	if (MoodOverride != EVibH2OMoodOverride::Auto)
+	{
+		Warnings.Add(TEXT("L'ambiance est forcée : la salle ne décidera pas."));
+	}
+	if (BlendAlpha > 0.0f)
+	{
+		Warnings.Add(TEXT("Le tableau n'est pas à 0 : le spectacle ne démarrera pas sur le plan de salle."));
+	}
+	if (FocusAmount > 0.0f)
+	{
+		Warnings.Add(TEXT("Le focus est allumé."));
+	}
+	if (UVibH2OSettings::Get()->bLogOscTraffic)
+	{
+		Warnings.Add(TEXT("« Journaliser tout le trafic OSC » est coché (Project Settings) : à décocher, cela ralentit."));
+	}
+	const int32 Expected = Bubbles.Num() * FMath::Max(1, DaughtersPerBubble + 1);
+	if (Expected > 400)
+	{
+		Warnings.Add(FString::Printf(TEXT("Le banc comptera environ %d bulles : surveiller la fluidité, ou baisser « Filles par bulle »."), Expected));
+	}
+
+	const FString Report = Warnings.Num() == 0
+		? FString(TEXT("Tout est prêt pour la représentation."))
+		: FString::Printf(TEXT("%d point(s) à vérifier :\n\n• %s"), Warnings.Num(), *FString::Join(Warnings, TEXT("\n• ")));
+	UE_LOG(LogVibH2O, Display, TEXT("VibH2O: verification avant representation\n%s"), *Report);
+#if WITH_EDITOR
+	FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Report));
+#endif
 }
 
 void AVibH2OStageActor::HandleOscFocusAmount(float Value)
@@ -509,6 +680,7 @@ void AVibH2OStageActor::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	StageTime += DeltaSeconds;
+	StepBlendGlide(DeltaSeconds);
 
 	const UWorld* World = GetWorld();
 	if (World != nullptr && World->IsGameWorld())
@@ -1179,6 +1351,14 @@ void AVibH2OStageActor::PublishRemoteState(float DeltaSeconds)
 		return;
 	}
 	RemotePublishTimer = 0.15f;
+
+	// Max is "talking" while its data count has moved in the last few seconds.
+	const int32 NetworkData = Subsystem->GetNetworkDataMessageCount();
+	if (NetworkData != LastNetworkDataCount)
+	{
+		LastNetworkDataCount = NetworkData;
+		LastNetworkDataTime = FPlatformTime::Seconds();
+	}
 	Subsystem->SetRemoteState(BuildRemoteStateJson());
 }
 
@@ -1250,7 +1430,16 @@ FString AVibH2OStageActor::BuildRemoteStateJson() const
 			Effects.Add(MakeShared<FJsonValueObject>(Entry));
 		}
 		Root->SetBoolField(TEXT("oscIgnored"), Subsystem->bIgnoreOscControl);
+
+		// Where the room comes from: the operator must never mistake a
+		// simulated audience for the real one.
+		const bool bMaxTalking = FPlatformTime::Seconds() - LastNetworkDataTime < 4.0;
+		Root->SetStringField(TEXT("source"), bMaxTalking ? TEXT("max") : (Subsystem->HasRoom() ? TEXT("simulateur") : TEXT("aucune")));
 	}
+	Root->SetStringField(TEXT("mood"), CurrentMood == EVibH2OMood::Calm ? TEXT("calme") : CurrentMood == EVibH2OMood::Excited ? TEXT("excite") : TEXT("normal"));
+	Root->SetBoolField(TEXT("moodForced"), MoodOverride != EVibH2OMoodOverride::Auto);
+	Root->SetNumberField(TEXT("roomExcitation"), RoomExcitation);
+	Root->SetNumberField(TEXT("blendTarget"), bBlendGliding ? BlendGlideTarget : BlendAlpha);
 	Root->SetArrayField(TEXT("effects"), Effects);
 
 	// The backdrop lives in its own actor; the pad shows where its fade is

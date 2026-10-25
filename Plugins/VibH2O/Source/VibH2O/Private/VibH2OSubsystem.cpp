@@ -79,6 +79,19 @@ namespace VibH2OConsole
 				}
 			}
 		}));
+
+	static FAutoConsoleCommandWithWorldAndArgs IgnoreControlCommand(
+		TEXT("VibH2O.IgnoreControl"),
+		TEXT("VibH2O.IgnoreControl 1 : l'OSC de controle et l'iPad sont ignores (les donnees passent toujours). 0 : ils reprennent la main. Sans argument : bascule."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UVibH2OSubsystem* Subsystem = FindSubsystem(World))
+			{
+				Subsystem->bIgnoreOscControl = Args.Num() > 0 ? FCString::Atoi(*Args[0]) != 0 : !Subsystem->bIgnoreOscControl;
+				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: controle OSC et iPad %s."),
+					Subsystem->bIgnoreOscControl ? TEXT("IGNORES") : TEXT("actifs"));
+			}
+		}));
 }
 
 // ---------------------------------------------------------------------------
@@ -499,6 +512,7 @@ void UVibH2OSubsystem::DrainQueue()
 		{
 			UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
 		}
+		TGuardValue<bool> FromNetwork(bDrainingNetwork, true);
 		HandleMessage(Message);
 	}
 
@@ -536,7 +550,7 @@ bool UVibH2OSubsystem::IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) 
 	const FString* Allowed[] = {
 		&Settings->BlendPrefix, &Settings->FocusGroupPrefix, &Settings->FocusAmountPrefix,
 		&Settings->EffectPrefix, &Settings->BackdropPrefix, &Settings->AttractorPrefix,
-		&Settings->AttractorsGlobalPrefix, &Settings->ExclusionPrefix, &Settings->CuePrefix };
+		&Settings->AttractorsGlobalPrefix, &Settings->ExclusionPrefix, &Settings->CuePrefix, &Settings->AmbiancePrefix };
 	for (const FString* Prefix : Allowed)
 	{
 		if (!Prefix->IsEmpty() && Message.MatchesPrefix(*Prefix))
@@ -557,12 +571,13 @@ void UVibH2OSubsystem::InjectOscMessage(const FVibH2OOscMessage& Message)
 
 void UVibH2OSubsystem::HandleMessage(const FVibH2OOscMessage& Message)
 {
-	if (HandleRoomMappingMessage(Message))
+	if (HandleRoomMappingMessage(Message) || HandleDataMessage(Message))
 	{
-		return;
-	}
-	if (HandleDataMessage(Message))
-	{
+		// Only what came off the socket: the simulator injects its own.
+		if (bDrainingNetwork)
+		{
+			++NetworkDataMessageCount;
+		}
 		return;
 	}
 	// Room plan and sensor data are never cue material; everything else is,
@@ -779,6 +794,49 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 		OscBackdropTarget = FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f);
 		const float FadeSeconds = Message.Args.Num() > 1 ? FMath::Max(0.0f, Message.GetFloatArg(1, 0.0f)) : -1.0f;
 		OnOscBackdropChanged.Broadcast(OscBackdropTarget, FadeSeconds);
+		return true;
+	}
+
+	if (!Settings->AmbiancePrefix.IsEmpty() && Message.MatchesPrefix(Settings->AmbiancePrefix))
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		// "/Ambiance calme", "/Ambiance/calme/" or "/Ambiance 1": a word as
+		// argument or last segment, or the index 0 auto, 1 calm, 2 normal,
+		// 3 excited - the order of EVibH2OMoodOverride.
+		FString Word;
+		if (Message.Args.Num() > 0 && Message.Args[0].Type == EVibH2OOscType::String)
+		{
+			Word = Message.Args[0].StringValue;
+		}
+		else if (Message.GetSegmentsAfterPrefix(Settings->AmbiancePrefix, Segments) && Segments.Num() > 0)
+		{
+			Word = Segments[0];
+		}
+		int32 Index = INDEX_NONE;
+		if (!Word.IsEmpty())
+		{
+			Word = Word.ToLower();
+			Index = Word.StartsWith(TEXT("auto")) ? 0
+				: Word.StartsWith(TEXT("calm")) ? 1
+				: Word.StartsWith(TEXT("norm")) ? 2
+				: (Word.StartsWith(TEXT("exc")) || Word.StartsWith(TEXT("exi"))) ? 3
+				: INDEX_NONE;
+		}
+		else if (Message.Args.Num() > 0)
+		{
+			Index = FMath::RoundToInt(Message.GetFloatArg(0, 0.0f));
+		}
+		if (Index >= 0 && Index <= 3)
+		{
+			OnOscAmbianceChanged.Broadcast(Index);
+		}
+		else
+		{
+			UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: ambiance inconnue dans %s (attendu : auto, calme, normal, excite)."), *Message.ToDebugString());
+		}
 		return true;
 	}
 
