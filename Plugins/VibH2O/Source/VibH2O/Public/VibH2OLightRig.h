@@ -152,13 +152,13 @@ private:
 	void UpdateRig(float DeltaSeconds, bool bSnap);
 	void ApplyLight(USpotLightComponent* Component, const FVibH2ORigLight& Settings, const FQuat& StageRotation) const;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
+	UPROPERTY()
 	TObjectPtr<USpotLightComponent> KeyLight;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
+	UPROPERTY()
 	TObjectPtr<USpotLightComponent> BackLight;
 
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Lumieres", meta = (ToolTip = "Réglé par le rig à chaque image — régler plutôt Face / Contre-jour / Débouchage."))
+	UPROPERTY()
 	TObjectPtr<USpotLightComponent> FillLight;
 
 	FVector SmoothedCenter = FVector::ZeroVector;

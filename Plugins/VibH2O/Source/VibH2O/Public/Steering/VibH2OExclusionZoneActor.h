@@ -38,7 +38,7 @@ enum class EVibH2OExclusionShape : uint8
  * selecting the component; its X extent only matters with bLimitDepth.
  */
 UCLASS(Blueprintable, BlueprintType,
-	HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	HideCategories = (Actor, Navigation, Tags, ComponentTags, Cooking, AssetUserData, Activation, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
 	PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Pilotage", "VibH2O|Forme"),
 	meta = (DisplayName = "VibH2O — Zone d'exclusion"))
 class VIBH2O_API AVibH2OExclusionZoneActor : public AActor
@@ -236,14 +236,14 @@ public:
 	void EndSteeringFrame();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O")
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O")
 	TObjectPtr<USceneComponent> ZoneRoot;
 
 	/** Moves with the live drag; its extent is the shape. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O")
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O")
 	TObjectPtr<UBoxComponent> Volume;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O")
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O")
 	TObjectPtr<UArrowComponent> Arrow;
 
 private:

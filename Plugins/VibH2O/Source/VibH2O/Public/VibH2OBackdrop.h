@@ -236,7 +236,7 @@ private:
 	TWeakObjectPtr<UVibH2OSubsystem> BoundSubsystem;
 
 	/** Carries BlackPostProcess, weighted by 1 - Presence, above every volume. */
-	UPROPERTY(VisibleAnywhere, Category = "VibH2O|Diagnostic")
+	UPROPERTY()
 	TObjectPtr<UPostProcessComponent> BlackPostProcessComponent;
 
 	bool bFading = false;

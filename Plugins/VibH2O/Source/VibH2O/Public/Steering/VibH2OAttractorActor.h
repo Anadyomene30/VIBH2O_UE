@@ -21,7 +21,7 @@ class USphereComponent;
  * volume their cloud fills on arrival.
  */
 UCLASS(Blueprintable, BlueprintType,
-	HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
+	HideCategories = (Actor, Navigation, Tags, ComponentTags, Cooking, AssetUserData, Activation, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance),
 	PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Pilotage", "VibH2O|Fondu"),
 	meta = (DisplayName = "VibH2O — Attracteur"))
 class VIBH2O_API AVibH2OAttractorActor : public AActor

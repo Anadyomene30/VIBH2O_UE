@@ -19,7 +19,7 @@ class UStaticMeshComponent;
 class UStaticMesh;
 class UMaterialInterface;
 
-UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Particules"), meta = (DisplayName = "VibH2O — Particules d'eau"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Navigation, Tags, ComponentTags, Cooking, AssetUserData, Activation, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Particules"), meta = (DisplayName = "VibH2O — Particules d'eau"))
 class VIBH2O_API AVibH2OWaterMotes : public AActor
 {
 	GENERATED_BODY()
