@@ -208,6 +208,13 @@ private:
 	double NextFeedTime = 0.0;
 	double NextRoomTime = 0.0;
 
+	/**
+	 * The subsystem last fed. The editor's stand-in is rebuilt after every
+	 * Play, empty: a new one gets the room again, or the editor would stay
+	 * without a room until the simulator restarted.
+	 */
+	TWeakObjectPtr<UVibH2OSubsystem> FedSubsystem;
+
 	/** Network yield: last seen receiver message count, and hold deadline. */
 	int32 LastNetworkMessageCount = 0;
 	double RealDataHoldUntil = 0.0;

@@ -402,6 +402,19 @@ void AVibH2OSimulatorActor::Tick(float DeltaSeconds)
 		return;
 	}
 
+	// A different subsystem than last time - the editor's stand-in rebuilt
+	// after Play - knows no room yet: send it. The very first one already
+	// got it when the simulation started.
+	if (FedSubsystem.Get() != Subsystem)
+	{
+		const bool bReplaced = !FedSubsystem.IsExplicitlyNull();
+		FedSubsystem = Subsystem;
+		if (bReplaced)
+		{
+			SendRoomNow();
+		}
+	}
+
 	const double Now = FPlatformTime::Seconds();
 
 	// Step aside for the real thing. The simulator is a stand-in for Max, not
