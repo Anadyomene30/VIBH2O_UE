@@ -5,6 +5,10 @@ artistique. Aucune connaissance du code n'est requise.
 
 > Le **pourquoi** des décisions est dans [`../CLAUDE.md`](../CLAUDE.md), la référence technique
 > dans [`../Plugins/VibH2O/README.md`](../Plugins/VibH2O/README.md).
+>
+> Pour jouer le spectacle dans le projet LUX, le **manuel de l'opérateur** illustré est dans
+> [`manuel/`](manuel/index.html) (page et PDF) : mise en place, ambiances, tableaux, attracteurs,
+> zones, iPad, Resolume, dépannage.
 
 ---
 
