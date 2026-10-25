@@ -7,8 +7,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Cues/VibH2OBackgroundGuard.h"
+#include "Cues/VibH2OCueTypes.h"
+#include "Cues/VibH2OKeyboardSink.h"
+#include "Cues/VibH2OMidiInput.h"
 #include "Osc/VibH2OOscReceiver.h"
 #include "Osc/VibH2OOscTypes.h"
+#include "Remote/VibH2ORemoteServer.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Tickable.h"
 #include "VibH2OTypes.h"
@@ -20,6 +25,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OEffectChangedSignature, FNam
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFocusGroupChangedSignature, FName, GroupName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFloatControlSignature, float, Value);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBeatSignature, int32, IndividualId, int32, BeatCount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, FName, TargetName, float, Value);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBackdropControlSignature, float, TargetPresence, float, FadeSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OAmbianceControlSignature, int32, MoodOverrideIndex);
+DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2OCueInputEvent, const FVibH2OCueInput&);
 
 /** Operational figures, for the debug overlay and for get-in. */
 USTRUCT(BlueprintType)
@@ -129,6 +140,38 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Reseau")
 	FVibH2ONetworkStats GetNetworkStats() const;
 
+	/**
+	 * Room plan and sensor messages received from the network so far - not
+	 * control, not injected. Moves only when Max (or another real sender of
+	 * data) is talking: the simulator steps aside on it.
+	 */
+	int32 GetNetworkDataMessageCount() const { return NetworkDataMessageCount; }
+
+	// ---------------------------------------------------------------- Remote
+
+	/** (Re)starts the iPad remote with the current project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	bool StartRemote();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	void StopRemote();
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	bool IsRemoteRunning() const;
+
+	/**
+	 * Addresses to type into Safari on the iPad, one per network card of this
+	 * PC: "http://192.168.1.20:8642/".
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	TArray<FString> GetRemoteUrls() const;
+
+	/**
+	 * Hands the remote the state it shows - the stage builds it, since only
+	 * the stage knows its attractors and zones. Cheap when no remote runs.
+	 */
+	void SetRemoteState(const FString& Json);
+
 	// ------------------------------------------------------------- Room plan
 
 	/**
@@ -230,6 +273,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
 	FName GetOscFocusGroup() const { return OscFocusGroup; }
 
+	/** Last backdrop presence asked for over OSC: 1 present, 0 removed. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	float GetOscBackdropTarget() const { return OscBackdropTarget; }
+
 	// ---------------------------------------------------------------- Events
 
 	/** Raised after the room plan has been rebuilt. */
@@ -252,6 +299,42 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
 	FVibH2OFloatControlSignature OnOscFocusAmountChanged;
 
+	/** /Attractor/<name>/ value - the attractor's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorChanged;
+
+	/** /Attractor/<name>/Share/ value - its share of the room. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorShareChanged;
+
+	/** /Attractors/Release/ - every attractor lets go. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OControlSignature OnOscAttractorsReleased;
+
+	/** /Attractors/FadeScale/ value - scales every fade time. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFloatControlSignature OnOscAttractorFadeScaleChanged;
+
+	/** /Exclusion/<name>/ value - the zone's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscExclusionChanged;
+
+	/** /Exclusion/<name>/Position/ x y - the zone's live position, -1 to 1. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedPositionControlSignature OnOscExclusionMoved;
+
+	/**
+	 * Raised on every /Fond message, even a repeated value: an operator who
+	 * presses "remove" again expects the fade to run, whatever the last state
+	 * was. FadeSeconds is negative when the message did not specify one.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OBackdropControlSignature OnOscBackdropChanged;
+
+	/** /Ambiance - 0 automatic, 1 calm, 2 normal, 3 excited (EVibH2OMoodOverride order). */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OAmbianceControlSignature OnOscAmbianceChanged;
+
 	// ------------------------------------------------------------- Injection
 
 	/**
@@ -264,6 +347,50 @@ public:
 	 * functions.
 	 */
 	void InjectOscMessage(const FVibH2OOscMessage& Message);
+
+	// ------------------------------------------------------------------ Cues
+
+	/**
+	 * Every cue input, whatever its device: OSC control messages (room plan
+	 * and sensor data excluded), MIDI notes, CCs and program changes, keys.
+	 * Raised on the game thread. Cue directors listen here.
+	 *
+	 * Silenced by bIgnoreOscControl, like the other control routes: a render
+	 * must not be disturbed by a cue either.
+	 */
+	FVibH2OCueInputEvent OnCueInput;
+
+	/** Raises OnCueInput as if the input had come from a device. For tests. */
+	void InjectCueInput(const FVibH2OCueInput& Input);
+
+	/** (Re)opens the MIDI inputs named in the project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	int32 StartMidiInput();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopMidiInput();
+
+	/** Names of the MIDI inputs currently open. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	TArray<FString> GetOpenMidiInputs() const;
+
+	/** Names of every MIDI input of this PC, open or not. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	static TArray<FString> GetAvailableMidiInputs();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	bool StartKeyboardCues();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopKeyboardCues();
+
+	/**
+	 * Opens the inputs for a learn capture, and says which ones answered.
+	 * Only the editor stand-in opens anything - the real subsystem already
+	 * listens. Pair with EndInputCapture.
+	 */
+	FString BeginInputCapture();
+	void EndInputCapture();
 
 	// ----------------------------------------------------------- Diagnostics
 
@@ -281,6 +408,7 @@ private:
 	bool HandleRoomMappingMessage(const FVibH2OOscMessage& Message);
 	bool HandleDataMessage(const FVibH2OOscMessage& Message);
 	bool HandleControlMessage(const FVibH2OOscMessage& Message);
+	bool HandleSteeringMessage(const FVibH2OOscMessage& Message);
 
 	void RebuildRoomFromPending();
 	void UpdateOccupiedOrdinals();
@@ -304,6 +432,31 @@ private:
 	 * there.
 	 */
 	TUniquePtr<FVibH2OOscReceiver> Receiver;
+
+	/** The iPad remote. Complete type above, for the same reason. */
+	TUniquePtr<FVibH2ORemoteServer> RemoteServer;
+
+	/** Cue inputs. Complete types above, for the same reason. */
+	TUniquePtr<FVibH2OMidiInput> MidiInput;
+	TUniquePtr<FVibH2OKeyboardSink> KeyboardSink;
+	FVibH2OBackgroundGuard BackgroundGuard;
+
+	/** Opens what the project settings ask for. Real subsystem only. */
+	void InitializeCueInputs();
+	void DrainCueInputs();
+	void BroadcastOscCueInput(const FVibH2OOscMessage& Message);
+
+	/**
+	 * Set while OnCueInput is being raised. A cue that sends an OSC message
+	 * must not see it come back as a new cue input: a cue on /Blend that
+	 * sends /Blend would otherwise call itself without end.
+	 */
+	bool bBroadcastingCueInput = false;
+
+	/** Next attempt at opening a MIDI input that was missing - a loopMIDI port created late. */
+	double NextMidiRetryTime = 0.0;
+
+	int32 InputCaptureCount = 0;
 
 	UPROPERTY(Transient)
 	FVibH2ORoomSnapshot Room;
@@ -344,6 +497,26 @@ private:
 	float OscBlendAlpha = 0.0f;
 	float OscFocusAmount = 0.0f;
 	FName OscFocusGroup = NAME_None;
+	float OscBackdropTarget = 1.0f;
+
+	/**
+	 * Set while a deliberate command is handled - a cue, the iPad. Max
+	 * repeats its control values, so they are only passed on when they
+	 * change; a command must act even when it repeats the last OSC value,
+	 * since Sequencer or the Details panel may have moved the stage since.
+	 */
+	bool bForceControlEcho = false;
+
+	/** Set while DrainQueue hands on what came off the socket. */
+	bool bDrainingNetwork = false;
+	int32 NetworkDataMessageCount = 0;
+
+	/** Only these addresses are taken from the iPad: control, never data. */
+	bool IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const;
+
+	/** The overlay's copy of GetRemoteUrls: listing adapters costs a syscall. */
+	TArray<FString> OverlayRemoteUrls;
+	double OverlayRemoteUrlsTime = -1.0;
 
 	/** Throughput counters, for the debug overlay. */
 	int32 MessagesThisSecond = 0;

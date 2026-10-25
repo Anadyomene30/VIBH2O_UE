@@ -8,6 +8,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "VibH2OMood.h"
 #include "VibH2OTypes.h"
 
 #include "VibH2OBubbleActor.generated.h"
@@ -69,12 +70,111 @@ struct VIBH2O_API FVibH2OMaterialParameterNames
 	// --- Beyond the contract. Clear the name to stop sending them.
 
 	/** Collective synchrony of the room. Useful to tableau 2. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplement")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplément")
 	FName CollectiveSynchrony = TEXT("CollectiveSynchrony");
 
 	/** Position of the morph between the two tableaux. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplement")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supplément")
 	FName BlendAlpha = TEXT("BlendAlpha");
+
+	// --- The room's mood, and synchrony. See FVibH2OBubbleMood.
+
+	/** Weight of the calm mood, 0 to 1. The three weights sum to one. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName MoodCalm = TEXT("MoodCalm");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName MoodNormal = TEXT("MoodNormal");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName MoodExcited = TEXT("MoodExcited");
+
+	/** Light of the striations, blended across moods. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName Glow = TEXT("MoodGlow");
+
+	/** Restlessness of the surface, blended across moods. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName Turbulence = TEXT("MoodTurbulence");
+
+	/**
+	 * This bubble's own striation phase, 0 to 1. Accumulated, never
+	 * time * speed: a change of mood changes how fast it runs, not where it is.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName StripePhase = TEXT("StripePhase");
+
+	/** The phase shared by the whole room, 0 to 1. What synchrony aligns on. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName RoomStripePhase = TEXT("RoomStripePhase");
+
+	/** How much this bubble falls in step with the room, 0 to 1. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName Coherence = TEXT("Coherence");
+
+	/** Strength of the synchrony halo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName SyncHalo = TEXT("SyncHalo");
+
+	/** The room's smoothed mean arousal, 0 to 1. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName RoomExcitation = TEXT("RoomExcitation");
+
+	/** Overall light of the bubbles, set on the stage. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName Brightness = TEXT("BubbleBrightness");
+
+	/**
+	 * A stable random value per bubble, 0 to 1, drawn from its seat. Unlike
+	 * one drawn from the object's position, it does not drift as the bubble
+	 * floats.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ambiance")
+	FName BubbleSeed = TEXT("BubbleSeed");
+};
+
+/**
+ * What the room's mood and synchrony mean for one bubble, this frame.
+ *
+ * Filled by the stage, readable from the bubble Blueprint, and pushed to the
+ * material under the names above.
+ */
+USTRUCT(BlueprintType)
+struct VIBH2O_API FVibH2OBubbleMood
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	FVibH2OMoodWeights Weights;
+
+	/** The mood the room is in, or heading for. */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	EVibH2OMood Mood = EVibH2OMood::Normal;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float Glow = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float Turbulence = 1.0f;
+
+	/** Bands per second this bubble's striations run at. */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float StripeSpeed = 0.3f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float RoomStripePhase = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float Coherence = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float SyncHalo = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float RoomExcitation = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Ambiance")
+	float Brightness = 1.0f;
 };
 
 /**
@@ -84,7 +184,7 @@ struct VIBH2O_API FVibH2OMaterialParameterNames
  * only says where it goes. Its beat phase does not even live here but in the
  * subsystem, keyed by individual - which is how it survives any room rebuild.
  */
-UCLASS(Blueprintable, BlueprintType)
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), meta = (DisplayName = "VibH2O — Bulle"))
 class VIBH2O_API AVibH2OBubbleActor : public AActor
 {
 	GENERATED_BODY()
@@ -118,6 +218,19 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
 	int32 Row = 0;
 
+	/**
+	 * 0 for the bubble of the seat itself, 1 and up for the daughters it
+	 * divides into on the way to tableau 2. A daughter shares her mother's
+	 * seat, individual and heartbeat, so she raises the same events: test this
+	 * in a Blueprint to play a sound once per spectator rather than once per
+	 * sister.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
+	int32 FamilyMember = 0;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Bulle")
+	bool IsDaughter() const { return FamilyMember > 0; }
+
 	/** Last known state of the individual. */
 	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
 	FVibH2OIndividualState State;
@@ -130,20 +243,28 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
 	float FocusMask = 1.0f;
 
+	/** The room's mood and synchrony, as they apply to this bubble. */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
+	FVibH2OBubbleMood Mood;
+
+	/** This bubble's striation phase, 0 to 1, accumulated frame by frame. */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Bulle")
+	float StripePhase = 0.0f;
+
 	// ------------------------------------------------------------- Material
 
 	/**
 	 * Component carrying the material to drive. Left empty, the first mesh
 	 * component found is used - which is enough for most Blueprints.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (DisplayName = "Mesh piloté (vide = le premier trouvé)"))
 	TObjectPtr<UMeshComponent> TargetMeshComponent;
 
 	/** Material slot to instance. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (ClampMin = "0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", meta = (DisplayName = "Emplacement de matériau", ClampMin = "0", UIMax = "8"))
 	int32 MaterialSlot = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Materiau", AdvancedDisplay, meta = (DisplayName = "Noms des paramètres du matériau"))
 	FVibH2OMaterialParameterNames ParameterNames;
 
 	/** Creates the dynamic instance, or returns the one already created. */
@@ -182,6 +303,15 @@ public:
 
 	/** Called by the stage actor on creation or reassignment. */
 	void AssignSeat(const FVibH2OSeat& Seat);
+
+	/**
+	 * Called by the stage actor every frame, before UpdateFromState: what the
+	 * room's mood means for this bubble. Advances the striation phase.
+	 */
+	void SetMood(const FVibH2OBubbleMood& InMood, float DeltaTime);
+
+	/** Called by the stage actor on a daughter: her seat is her mother's. */
+	void AssignDaughter(const FVibH2OSeat& Seat, int32 InFamilyMember);
 
 	/** Shows or hides the number floating over this bubble. */
 	void SetSeatLabelVisible(bool bVisible);
@@ -233,4 +363,7 @@ private:
 	bool bHasPreviousLocation = false;
 
 	int32 LastBeatCount = 0;
+
+	/** Stable per-bubble random value, from the seat index. */
+	float Seed = 0.0f;
 };

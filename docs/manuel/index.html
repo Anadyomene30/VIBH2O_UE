@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manuel VIBH2O</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Literata:opsz,wght@7..72,600;7..72,700&display=swap">
+<style>
+/* Layout: a field manual — sticky chapter index on the left, one readable column, every step numbered only where order matters. */
+:root {
+  --bg: #f4f7f8;
+  --paper: #ffffff;
+  --ink: #102229;
+  --muted: #4c6470;
+  --line: #d6e1e5;
+  --accent: #0f6f8c;
+  --accent-soft: #e2f1f5;
+  --warn: #9a5a00;
+  --warn-soft: #fff3df;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f4ea;
+  --code-bg: #eaf1f3;
+  --f-display: "Literata", Georgia, "Times New Roman", serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1418; --paper: #111e24; --ink: #e2eef2; --muted: #9db3bc; --line: #24363e;
+    --accent: #5cc3e0; --accent-soft: #12303a; --warn: #f0b45a; --warn-soft: #33260f;
+    --ok: #6fd3a0; --ok-soft: #12301f; --code-bg: #182a31; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1418; --paper: #111e24; --ink: #e2eef2; --muted: #9db3bc; --line: #24363e;
+  --accent: #5cc3e0; --accent-soft: #12303a; --warn: #f0b45a; --warn-soft: #33260f;
+  --ok: #6fd3a0; --ok-soft: #12301f; --code-bg: #182a31; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; padding-block: 40px 80px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; max-height: calc(100vh - 48px); overflow: auto; font-size: 15px; }
+nav.toc p { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); color: var(--accent); outline: none; }
+main { min-width: 0; }
+header.cover { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 32px; display: grid; gap: 12px; }
+header.cover .eyebrow { font-family: var(--f-mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(30px, 4.5vw, 44px); }
+h2 { font-size: 28px; padding-top: 8px; }
+h3 { font-size: 20px; font-family: var(--f-body); font-weight: 700; }
+section.ch { margin-top: 48px; display: grid; gap: 16px; scroll-margin-top: 24px; }
+p { margin: 0; max-width: 68ch; }
+.lead { font-size: 19px; color: var(--muted); }
+ol.steps, ul.plain { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; max-width: 68ch; }
+code, .k { font-family: var(--f-mono); font-size: .88em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+.k { background: var(--accent-soft); color: var(--accent); font-weight: 500; white-space: nowrap; }
+.path { font-family: var(--f-mono); font-size: 14px; color: var(--muted); word-break: break-all; }
+.box { border-radius: 10px; padding: 14px 18px; display: grid; gap: 6px; max-width: 74ch; }
+.box.warn { background: var(--warn-soft); border-left: 4px solid var(--warn); }
+.box.ok { background: var(--ok-soft); border-left: 4px solid var(--ok); }
+.box.info { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+.box strong:first-child { font-family: var(--f-mono); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+figure { margin: 0; display: grid; gap: 8px; }
+figure img { border-radius: 8px; border: 1px solid var(--line); display: block; max-width: 100%; height: auto; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 68ch; }
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
+.with-panel figure img { max-height: 760px; width: auto; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+.check { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; max-width: 74ch; }
+.check li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.check li::before { content: ""; width: 16px; height: 16px; border: 2px solid var(--accent); border-radius: 4px; margin-top: 4px; }
+footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 24px 48px; }
+  nav.toc { position: static; max-height: none; }
+  nav.toc ol { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .with-panel { grid-template-columns: minmax(0, 1fr); }
+  header.cover { padding: 22px; }
+  td:first-child { white-space: normal; }
+}
+@media print {
+  body { background: #fff; color: #000; font-size: 11pt; padding: 0; }
+  .wrap { display: block; max-width: none; padding: 0; }
+  nav.toc { display: none; }
+  section.ch { break-before: page; margin-top: 0; }
+  figure, .box, table, .check li { break-inside: avoid; }
+  .with-panel { grid-template-columns: minmax(0, 1fr) 230px; }
+  header.cover { border: 0; padding: 0; }
+  a { color: inherit; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Chapitres">
+  <p>Chapitres</p>
+  <ol>
+    <li><a href="#avant">Avant chaque représentation</a></li>
+    <li><a href="#ouvrir">Ouvrir et regarder</a></li>
+    <li><a href="#panneau">Le panneau Details</a></li>
+    <li><a href="#fond">Le fond en un clic</a></li>
+    <li><a href="#ambiances">Les trois ambiances</a></li>
+    <li><a href="#tableau2">Tableau 2 : division et vortex</a></li>
+    <li><a href="#attracteurs">Attracteurs</a></li>
+    <li><a href="#zones">Zones d'exclusion</a></li>
+    <li><a href="#ipad">La télécommande iPad</a></li>
+    <li><a href="#cues">Piloter depuis Resolume</a></li>
+    <li><a href="#max">Max et le simulateur</a></li>
+    <li><a href="#spout">Spout vers Resolume</a></li>
+    <li><a href="#scenes">Pluie, point clouds, arbre</a></li>
+    <li><a href="#depannage">Dépannage</a></li>
+    <li><a href="#fichiers">Où sont les fichiers</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="cover">
+  <p class="eyebrow">VIBH2O · projet LUX · Unreal 5.8 · version du 26 octobre 2026</p>
+  <h1>Manuel de l'opérateur</h1>
+  <p class="lead">Tout ce qu'il faut pour mettre en place et jouer VIBH2O seul : où cliquer, ce qu'on doit voir, et quoi faire quand ce n'est pas le cas. Chaque capture a été prise dans le projet du spectacle avec la version installée.</p>
+  <p class="path">D:\VIBH2O\09-2026\VIBH2O_LUX\VIBH2O\VIBH2O.uproject — carte de travail : MAPS/VIBH2o_PPCM_Fond</p>
+</header>
+
+<section class="ch" id="avant">
+  <h2>Avant chaque représentation</h2>
+  <p>Deux boutons font l'essentiel. Ils sont en haut du panneau Details de l'acteur <b>VibH2O_Stage</b> (dossier <b>VibH2O</b> de l'Outliner).</p>
+  <ul class="check">
+    <li><span><span class="k">Remettre en état de début de spectacle</span> — tableau 1, pas de focus, ambiance automatique, attracteurs relâchés, zones allumées et recentrées, fond présent. Puis enregistrer la carte.</span></li>
+    <li><span><span class="k">Vérifier avant la représentation</span> — une fenêtre liste ce qui surprendrait : simulateur qui démarre seul, zone éteinte, attracteur actif, fond enlevé, ambiance forcée, trop de bulles, log OSC trop bavard. « Tout est prêt pour la représentation » : c'est bon.</span></li>
+    <li><span>Max envoie ses données en OSC sur le port <code>9002</code> de ce PC. En Play, la pastille de l'iPad passe à <b>MAX</b> (vert).</span></li>
+    <li><span>Le simulateur ne démarre pas seul : dans <b>VibH2O_Simulateur</b>, <span class="k">Simuler au lancement</span> décoché, ou acteur supprimé. Il se tait de toute façon dès que Max parle (<span class="k">Se taire dès que Max parle</span>).</span></li>
+    <li><span>L'iPad affiche la télécommande et la pastille verte « connecté ». Verrouille-la (🔒) avant le début.</span></li>
+    <li><span>Resolume reçoit le flux Spout ; la fenêtre Unreal n'est <b>pas réduite</b> (derrière Resolume, ou sur un autre écran).</span></li>
+  </ul>
+  <figure>
+    <img src="img/details_scene.png" alt="Panneau Details de VibH2O_Stage : les boutons d'action en haut, puis la catégorie Ambiance dépliée." width="388" height="1042" style="max-width:320px">
+    <figcaption>Le panneau de <b>VibH2O_Stage</b> : les actions en haut, l'ambiance dépliée juste dessous.</figcaption>
+  </figure>
+</section>
+
+<section class="ch" id="ouvrir">
+  <h2>Ouvrir et regarder</h2>
+  <ol class="steps">
+    <li>Ouvre <b>VIBH2O.uproject</b> (Unreal 5.8), puis la carte <b>MAPS/VIBH2o_PPCM_Fond</b>.</li>
+    <li>Si la vue est toute blanche : ce n'est pas l'éclairage, c'est la caméra de l'éditeur, posée au-dessus de la surface. Double-clique sur <b>VibH2O_Stage</b> dans l'Outliner (ou sélectionne-le et appuie sur <kbd>F</kbd>), puis recule à la molette. <kbd>Ctrl</kbd>+<kbd>1</kbd> mémorise cette vue, <kbd>1</kbd> la rappelle.</li>
+    <li>Pour voir exactement l'image du spectacle : menu <b>Perspective</b> du viewport → <b>Cameras</b> → la caméra du rail ; ou <b>Play</b>.</li>
+    <li>Menu <b>Lit → Exposure</b> : <b>Game Settings</b> coché, sinon l'exposition n'est pas celle du spectacle.</li>
+  </ol>
+  <figure>
+    <img src="img/vue_salle.jpg" alt="La salle vue de trois-quarts : 96 bulles bleu-vert dans l'eau profonde." width="1521" height="762">
+    <figcaption>Ce que tu dois voir : l'eau profonde, des rayons, des particules, et la salle de 12 × 8 bulles. Le message jaune « Multiple directional lights » est sans conséquence.</figcaption>
+  </figure>
+  <div class="box info"><strong>Sans Play</strong><span>Les bulles vivent déjà dans l'éditeur grâce au simulateur. Rends le viewport temps réel avec <kbd>Ctrl</kbd>+<kbd>R</kbd> si rien ne bouge.</span></div>
+</section>
+
+<section class="ch" id="panneau">
+  <h2>Le panneau Details</h2>
+  <p>Tous les acteurs VibH2O sont rangés pareil, pour qu'on s'y retrouve dans le noir :</p>
+  <ul class="plain">
+    <li><b>En haut, « Vib H2O »</b> : les boutons d'action de l'acteur (classés par ordre alphabétique).</li>
+    <li><b>Juste dessous</b> : la catégorie principale, déjà dépliée (Ambiance, Fond, Simulation, Pilotage…).</li>
+    <li><b>Les réglages fins</b> sont sous la petite flèche « Avancé » en bas de chaque catégorie. On n'y touche qu'en connaissance de cause.</li>
+    <li><b>Survole un réglage</b> : une bulle d'aide en français dit ce qu'il change à l'écran.</li>
+    <li>Les curseurs ont des bornes : impossible de casser l'image avec une valeur absurde.</li>
+  </ul>
+  <div class="box info"><strong>Astuce</strong><span>Le panneau est étroit : élargis la colonne des noms en tirant le séparateur, ou tape le début d'un réglage dans la barre <b>Search</b> du panneau.</span></div>
+</section>
+
+<section class="ch" id="fond">
+  <h2>Le fond en un clic</h2>
+  <p>L'acteur <b>VibH2O_Fond</b> (dossier <b>Fond</b>) fait disparaître l'environnement sous-marin en fondu vers le <b>noir pur</b>. Les bulles restent. Sur le tulle, le noir est transparent : on voit alors la scène derrière.</p>
+  <div class="with-panel">
+    <div class="duo" style="grid-template-columns:minmax(0,1fr)">
+      <figure><img src="img/fond_present.jpg" alt="Fond présent : eau bleue profonde derrière les bulles." width="1521" height="762"><figcaption>Fond présent.</figcaption></figure>
+      <figure><img src="img/fond_noir.jpg" alt="Fond enlevé : bulles rayées sur fond noir pur." width="1521" height="762"><figcaption>Fond enlevé : noir pur, les bulles restent.</figcaption></figure>
+    </div>
+    <figure><img src="img/details_fond.png" alt="Panneau Details de VibH2O_Fond." width="388" height="1042"><figcaption>Panneau de VibH2O_Fond.</figcaption></figure>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Pour…</th><th>Fais</th></tr></thead>
+    <tbody>
+      <tr><td>Enlever / remettre dans l'éditeur</td><td>Boutons <span class="k">Enlever le fond</span>, <span class="k">Remettre le fond</span> ou <span class="k">Basculer le fond</span>.</td></tr>
+      <tr><td>Pendant le spectacle</td><td>Bouton <b>Fond</b> de l'iPad (maintenir pour passer au noir), ou une cue Resolume qui envoie <code>/Fond 0</code> / <code>/Fond 1</code>, ou la touche <kbd>B</kbd> si Unreal a le focus.</td></tr>
+      <tr><td>Dans Sequencer</td><td>Ajoute VibH2O_Fond, piste <span class="k">Présence du fond</span> (0 = noir, 1 = eau).</td></tr>
+      <tr><td>Changer la durée</td><td><span class="k">Durée du fondu</span> (4 s par défaut, 0 = coupe sèche). Un message OSC peut en donner une autre : <code>/Fond 0 2</code> = noir en 2 s.</td></tr>
+      <tr><td>Couper aussi les lumières</td><td>Coche <span class="k">Éteindre les lumières</span>.</td></tr>
+      <tr><td>État au lancement</td><td><span class="k">Présence au lancement</span> = 1 : chaque Play commence avec le fond, même si la carte a été enregistrée au noir.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Les réglages de l'eau elle-même sont dans les acteurs du dossier <b>Fond</b> : <b>VibH2O_Eau</b> (brouillard : densité, couleurs du lointain), <b>VibH2O_Soleil</b> (inclinaison, rayons, caustiques), <b>VibH2O_Particules</b> (<span class="k">Nombre</span>, <span class="k">Taille min</span>/<span class="k">Taille max</span>, <span class="k">Courant (tours/s)</span>).</p>
+</section>
+
+<section class="ch" id="ambiances">
+  <h2>Les trois ambiances</h2>
+  <p>La salle passe d'elle-même en <b>calme</b>, <b>normal</b> ou <b>excité</b> selon l'écart moyen du public à sa baseline. La synchronie est un axe à part : on peut être synchrones dans le calme comme dans l'excitation (elle aligne les stries et resserre les teintes).</p>
+  <div class="trio">
+    <figure><img src="img/ambiance_calme.jpg" alt="Ambiance calme : bulles bleu profond, plus petites." width="1521" height="762"><figcaption>Calme</figcaption></figure>
+    <figure><img src="img/ambiance_normale.jpg" alt="Ambiance normale : bulles bleu-vert." width="1521" height="762"><figcaption>Normal</figcaption></figure>
+    <figure><img src="img/ambiance_excitee.jpg" alt="Ambiance excitée : bulles orange, jaune et rouge." width="1521" height="762"><figcaption>Excité</figcaption></figure>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Réglage (VibH2O_Stage → Ambiance)</th><th>Ce qu'il fait</th></tr></thead>
+    <tbody>
+      <tr><td><span class="k">Excitation de la salle</span></td><td>La mesure en direct (0 à 1). Règle les seuils en la regardant.</td></tr>
+      <tr><td><span class="k">Seuil calme</span> / <span class="k">Seuil excité</span></td><td>Sous 0,25 : calme. Au-dessus de 0,55 : excité. Une marge évite le clignotement à la frontière.</td></tr>
+      <tr><td><span class="k">Forcer l'ambiance</span></td><td>Automatique (la salle décide) ou forcé : calme / normal / excité. Aussi depuis l'iPad, section Ambiance.</td></tr>
+      <tr><td><span class="k">Lumière des bulles</span></td><td>À monter si les bulles se fondent dans l'eau, à baisser si elles brûlent en blanc.</td></tr>
+      <tr><td><span class="k">Taille des bulles</span></td><td>Taille au repos.</td></tr>
+      <tr><td><span class="k">Preset d'ambiance</span></td><td>Les couleurs des trois ambiances. Glisse un preset (DA_VibH2O_Ambiance_Aqua, _FroidChaud) ; <span class="k">Enregistrer dans le preset</span> sauve tes réglages, <span class="k">Recharger le preset</span> les annule.</td></tr>
+      <tr><td><span class="k">Palettes par ambiance</span> (Avancé)</td><td>Chaque couleur, la vitesse des stries, le flottement et la taille de chaque ambiance. Animable dans Sequencer.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box warn"><strong>À juger sur le tulle</strong><span>En calme, les bulles bleu profond se détachent peu de l'eau bleue. Si c'est trop discret en salle : monte la <span class="k">Lumière des bulles</span>, ou éclaircis la couleur du calme dans les palettes, puis enregistre dans le preset.</span></div>
+  <p>Pour voir les ambiances changer seules : sélectionne <b>VibH2O_Simulateur</b>, <span class="k">Scénario</span> = « Vague collective : calme, normal, excité ». Le bouton <span class="k">Appliquer l'ambiance sans fondu</span> saute la bascule de 4 s.</p>
+</section>
+
+<section class="ch" id="tableau2">
+  <h2>Tableau 2 : division et vortex</h2>
+  <p>Le passage du plan de salle au banc est un curseur continu, réversible, qu'on peut arrêter à mi-chemin : <span class="k">Tableau : salle (0) → banc (1)</span>. Au début du passage, chaque bulle se divise en plusieurs sœurs (même cœur, même couleur) ; puis les familles rejoignent le banc. En synchronie, le banc tourne en vortex ; hors synchronie, il s'éparpille en restant lisible.</p>
+  <div class="duo">
+    <figure><img src="img/division.jpg" alt="Division : chaque bulle s'est scindée en une grappe de quatre." width="1521" height="762"><figcaption>Tableau à 0,2 : la division.</figcaption></figure>
+    <figure><img src="img/vortex.jpg" alt="Le banc vu du dessus, en tourbillon." width="1521" height="762"><figcaption>Tableau à 1 : le banc, vu de la caméra du rail.</figcaption></figure>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Pour…</th><th>Fais</th></tr></thead>
+    <tbody>
+      <tr><td>Passer d'un tableau à l'autre</td><td>Boutons <span class="k">Aller au tableau 2 (banc)</span> / <span class="k">Aller au tableau 1 (salle)</span> ; iPad « → Banc » / « → Salle » ; cue Resolume ; ou Sequencer sur le curseur.</td></tr>
+      <tr><td>Régler la vitesse du passage commandé</td><td><span class="k">Transition commandée : durée</span> (6 s). Vaut pour l'iPad, Max et les cues ; Sequencer garde la main sur sa courbe.</td></tr>
+      <tr><td>Plus ou moins de bulles au banc</td><td><span class="k">Filles par bulle</span> (3 : chaque bulle devient 4). 176 places × 4 = 704 bulles : si l'image rame, baisse.</td></tr>
+      <tr><td>Quand le vortex se forme</td><td><span class="k">Synchronie : dispersion sous</span> (0,35) et <span class="k">Synchronie : vortex au-dessus de</span> (0,70).</td></tr>
+      <tr><td>Forme du vortex</td><td><span class="k">Vortex : hauteur</span>, <span class="k">Vortex : rayon en bas</span>, <span class="k">Vortex : rayon en haut</span>, <span class="k">Vortex : décalage vertical</span>, <span class="k">Vortex : sens de rotation</span>.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box warn"><strong>À régler en salle</strong><span>En synchronie moyenne, le banc déborde de l'emprise de la salle vers le haut. Si le cadrage de la caméra du rail le coupe, réduis les rayons ou la hauteur du vortex.</span></div>
+  <div class="box info"><strong>Bon à savoir</strong><span>Un son branché sur l'événement « battement » des bulles sonne aussi pour chaque fille (×4) : dans le Blueprint, filtre avec <code>Is Daughter</code>.</span></div>
+</section>
+
+<section class="ch" id="attracteurs">
+  <h2>Attracteurs</h2>
+  <p>Un attracteur appelle une partie des bulles vers une zone choisie, en douceur, puis les renvoie à leur place exacte. Les pilotes de base ne s'arrêtent jamais : le retour est toujours juste.</p>
+  <div class="with-panel">
+    <figure><img src="img/attracteur.jpg" alt="Vue du dessus : une partie des bulles regroupée dans la sphère de l'attracteur." width="1521" height="762"><figcaption>Attracteur actif : 40 % des bulles dans sa sphère.</figcaption></figure>
+    <figure><img src="img/details_attracteur.png" alt="Panneau Details d'un attracteur." width="388" height="1042"><figcaption>Panneau d'un attracteur.</figcaption></figure>
+  </div>
+  <ol class="steps">
+    <li><b>Place Actors</b> (bouton ➕ de la barre d'outils) → cherche « Attracteur » → glisse <b>VibH2O — Attracteur</b> dans la salle. Sa taille : <b>Shape → Sphere Radius</b> (et l'échelle de l'acteur).</li>
+    <li>Donne-lui un nom d'acteur parlant (« HautGauche ») : c'est lui que l'iPad affiche. <span class="k">Nom affiché</span> et <span class="k">Couleur sur l'iPad</span> permettent de les distinguer dans le noir.</li>
+    <li>Règle <span class="k">Part des bulles</span> (0,3 = 30 % de la salle) et, pour partager la salle entre deux attracteurs, <span class="k">Début de la part</span>.</li>
+    <li>Teste avec <span class="k">Appeler</span> et <span class="k">Renvoyer</span>. <span class="k">Durée d'arrivée</span> / <span class="k">Durée de retour</span> règlent la douceur ; <span class="k">Étalement</span> fait partir les bulles les unes après les autres.</li>
+  </ol>
+  <div class="box warn"><strong>Avant d'enregistrer</strong><span>Un attracteur enregistré actif le sera au lancement. « Remettre en état de début de spectacle » les relâche tous.</span></div>
+</section>
+
+<section class="ch" id="zones">
+  <h2>Zones d'exclusion</h2>
+  <p>Une zone protège un espace où les bulles ne doivent pas passer : devant une circassienne, sur le tulle. Elle se place à la main et se déplace en direct depuis l'iPad.</p>
+  <figure><img src="img/zone.jpg" alt="Vue du dessus : les bulles contournent la zone d'exclusion et laissent un couloir." width="1521" height="762"><figcaption>Zone active : les bulles s'écartent et laissent un couloir dans l'axe de la flèche.</figcaption></figure>
+  <ol class="steps">
+    <li><b>Place Actors</b> → cherche « Zone » → <b>VibH2O — Zone d'exclusion</b>.</li>
+    <li>Sa taille : <span class="k">Demi-largeur, demi-hauteur</span> (catégorie Forme) ; sa forme : <span class="k">Forme</span> (ellipse ou rectangle arrondi) ; <span class="k">Marge douce</span> écarte un peu plus.</li>
+    <li>Oriente sa flèche vers la caméra du spectacle et désigne la <span class="k">Caméra de projection</span> : la zone protège alors tout ce qui est entre la caméra et l'artiste.</li>
+    <li>Dans l'iPad, la zone se fait glisser du doigt dans la limite de <span class="k">Amplitude (demi-largeur, demi-hauteur)</span>. Gauche et droite inversés ? Coche <span class="k">Inverser gauche / droite</span>.</li>
+    <li><span class="k">Recentrer</span> la remet à sa place ; <span class="k">Basculer</span> l'allume ou l'éteint.</li>
+  </ol>
+  <div class="box warn"><strong>Sécurité</strong><span>Une zone éteinte laisse passer les bulles devant l'artiste. L'iPad le signale en orange (« 1 zone éteinte »), et la vérification avant représentation aussi.</span></div>
+</section>
+
+<section class="ch" id="ipad">
+  <h2>La télécommande iPad</h2>
+  <p>Unreal sert lui-même la page de commande. Rien à installer.</p>
+  <ol class="steps">
+    <li>iPad et PC sur le <b>même Wi-Fi</b> (ou le PC en filaire sur le même routeur).</li>
+    <li>Lance <b>Play</b> (ou Standalone Game). Le log Unreal écrit l'adresse : <code>VibH2O: telecommande iPad — ouvrir http://192.168.1.12:8642/ dans Safari.</code></li>
+    <li>Au premier lancement, Windows demande d'autoriser Unreal sur le réseau : <b>réseaux privés : oui</b>. C'est la panne n° 1.</li>
+    <li>Sur l'iPad : Safari → l'adresse → <b>Partager → Sur l'écran d'accueil</b>. L'icône ouvre ensuite la télécommande en plein écran.</li>
+    <li>Pour le spectacle : <b>Réglages → Luminosité → Verrouillage automatique : Jamais</b>.</li>
+  </ol>
+  <figure><img src="img/ipad.jpg" alt="La télécommande : pastilles d'état en haut, attracteurs, zones et tableaux." width="1180" height="820" style="max-width:760px"><figcaption>La télécommande, connectée à Unreal.</figcaption></figure>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Élément</th><th>Comportement</th></tr></thead>
+    <tbody>
+      <tr><td>Pastilles d'en-tête</td><td><b>MAX</b> (vert) : les vraies données arrivent. <b>SIMULATION</b> (orange, clignote) : public simulé. <b>AUCUNE DONNÉE</b> (rouge). Puis l'ambiance, l'état du fond, les zones éteintes.</td></tr>
+      <tr><td>Appui simple</td><td>Allume : appeler un attracteur, remettre le fond, allumer une zone ou un effet.</td></tr>
+      <tr><td>Appui maintenu (anneau)</td><td>Éteint : passer le fond au noir, éteindre une zone, couper un effet. Relâcher trop tôt n'envoie rien.</td></tr>
+      <tr><td>→ Salle / → Banc</td><td>Passe d'un tableau à l'autre en douceur. Le curseur manuel est derrière « Déverrouiller le curseur ».</td></tr>
+      <tr><td>Ambiance</td><td>Auto / Calme / Normal / Excité.</td></tr>
+      <tr><td>TOUT RELÂCHER</td><td>Tous les attracteurs rentrent. La sortie de secours.</td></tr>
+      <tr><td>🔒</td><td>Un appui verrouille ; maintenir 1,5 s déverrouille. Rien ne part tant que c'est verrouillé.</td></tr>
+      <tr><td>☾</td><td>Mode nuit lisible, mémorisé.</td></tr>
+      <tr><td>Bandeau rouge</td><td>« Commande non reçue » : Wi-Fi, pare-feu ou jeu arrêté. La touche revient à l'état réel.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="ch" id="cues">
+  <h2>Piloter depuis Resolume</h2>
+  <p>Tu restes dans Resolume ; Unreal suit. Le plus simple : Resolume envoie de l'OSC à Unreal quand tu lances une colonne.</p>
+  <ol class="steps">
+    <li>Resolume → <b>Preferences → OSC</b> : <i>OSC Output</i> coché, destination <b>Localhost</b>, port <b>9002</b>.</li>
+    <li>Place un <b>VibH2O — Directeur de cues</b> dans la carte (Place Actors → « cues »).</li>
+    <li>Dans son panneau, ajoute une cue : <span class="k">Nom</span> (ex. « Vortex »), <span class="k">Source</span> = OSC, <span class="k">Action</span> (ex. « Tableau - Régler salle → banc », « Séquence - Lancer »…).</li>
+    <li>Dans Resolume (<b>Shortcuts → Edit OSC</b>), donne à la colonne la <i>Custom Address</i> <code>/Cue/Vortex</code> : la cue nommée « Vortex » se déclenche, rien à apprendre.</li>
+    <li>Sinon : choisis la cue dans <span class="k">Cue à apprendre (-1 = nouvelle)</span>, clique <span class="k">Apprendre</span>, et lance la colonne ou appuie sur le pad MIDI.</li>
+    <li>En Play, teste avec <span class="k">Cue à tester</span> + <span class="k">Déclencher la cue choisie</span>.</li>
+  </ol>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Entrée</th><th>Unreal en arrière-plan ?</th></tr></thead>
+    <tbody>
+      <tr><td>OSC (Resolume, Max, iPad)</td><td>Oui, toujours.</td></tr>
+      <tr><td>MIDI via loopMIDI (port nommé <code>VibH2O</code>)</td><td>Oui. Project Settings → Plugins → VibH2O → Cues → <span class="k">Entrées MIDI</span>.</td></tr>
+      <tr><td>Clavier</td><td>Seulement si <span class="k">Lire le clavier en arrière-plan</span> est coché (désactivé par défaut : la touche part aussi à Resolume).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box warn"><strong>Ne jamais réduire la fenêtre Unreal</strong><span>Une fenêtre réduite n'est plus rendue : le Spout se fige. La laisser derrière Resolume. <span class="k">Pleine vitesse en arrière-plan</span> (coché) garde le rendu fluide.</span></div>
+</section>
+
+<section class="ch" id="max">
+  <h2>Max et le simulateur</h2>
+  <p>Max envoie le plan de salle, les BPM, l'excitation et la synchronie en OSC sur le port <b>9002</b>. Le simulateur remplace Max pour répéter.</p>
+  <figure><img src="img/details_simulateur.png" alt="Panneau Details du simulateur." width="388" height="1042" style="max-width:320px"><figcaption>Panneau de VibH2O_Simulateur.</figcaption></figure>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Réglage</th><th>Usage</th></tr></thead>
+    <tbody>
+      <tr><td><span class="k">Scénario</span></td><td>Nominal, Vague d'excitation, Balayage de synchronie, Pic collectif, Coupure de capteurs, Vague collective (calme → excité).</td></tr>
+      <tr><td><span class="k">Colonnes</span> / <span class="k">Rangées</span></td><td>Taille de la salle simulée. Bouton <span class="k">Charger la salle d'Alès (23 × 4)</span> pour le vrai plan.</td></tr>
+      <tr><td><span class="k">Simuler dans l'éditeur</span></td><td>Les bulles vivent sans Play.</td></tr>
+      <tr><td><span class="k">Simuler au lancement</span></td><td>À décocher dans la carte du spectacle.</td></tr>
+      <tr><td><span class="k">Se taire dès que Max parle</span></td><td>Dès que de vraies données arrivent, le simulateur s'arrête jusqu'à la fin de la partie. À laisser coché.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Réglages réseau : <b>Edit → Project Settings → Plugins → VibH2O</b> : <span class="k">Port d'écoute OSC</span>, <span class="k">Ordre des sièges</span>, <span class="k">Excitation reçue : min</span>/<span class="k">max</span>, <span class="k">BPM plausible : min</span>/<span class="k">max</span>, <span class="k">Capteur muet après</span>. Pris en compte au prochain Play (ou commande <code>VibH2O.Restart</code>).</p>
+</section>
+
+<section class="ch" id="spout">
+  <h2>Spout vers Resolume</h2>
+  <p>Le plugin SpoutUE (version du 24 octobre, source <b>caméra active</b>) envoie l'image finale de la caméra du jeu, avec tous ses post-process, vers Resolume. Dans Resolume, le flux apparaît dans les sources Spout. Pour garantir l'image exacte, utilise la source <b>caméra active</b> (ou viewport), pas une SceneCapture.</p>
+  <div class="box info"><strong>Vérifier</strong><span>En Play, le log Unreal écrit « Spout sender … is live ». Si Resolume reçoit une image plus sombre ou délavée, vérifie que la source est bien la caméra active.</span></div>
+</section>
+
+<section class="ch" id="scenes">
+  <h2>Pluie, point clouds, arbre</h2>
+  <div class="trio">
+    <figure><img src="img/pluie.jpg" alt="Pluie fine et dense sur fond noir." width="1600" height="669"><figcaption><b>VIBH2O/FX/Pluie/LVL_Pluie_Test</b> — réglages : acteur Pluie → Niagara → User Parameters (<code>Densite</code>, <code>Vitesse</code>, <code>Taille</code>, <code>Couleur</code>, <code>Lueur</code>…).</figcaption></figure>
+    <figure><img src="img/katja.jpg" alt="Deux danseuses en point cloud lumineux." width="1600" height="900"><figcaption><b>MAPS/KatjaDissolveFORVIDEOv4</b> (et v3, KatjaDissolve) — fonctionnent sous 5.8.</figcaption></figure>
+    <figure><img src="img/corinne.jpg" alt="Une artiste en point cloud, suspendue." width="1600" height="900"><figcaption><b>MAPS/OLD/corinnedissolve</b> — réparée.</figcaption></figure>
+  </div>
+  <div class="duo">
+    <figure><img src="img/arbre.jpg" alt="L'arbre en point cloud." width="1521" height="762"><figcaption><b>MAPS/TESTS/GS_TREESolo</b> — ton arbre, fonctionne.</figcaption></figure>
+    <div class="box warn" style="align-self:start"><strong>À éviter</strong><span><b>MAPS/OLD/rainmine</b> fait planter Unreal 5.8 (EasyRain) — elle est dans <code>_ARCHIVE</code>. <b>MAPS/TESTS/TREE_Number</b> n'affiche rien (mesh corrompu). <b>/Game/KatjaDissolveFORVIDEO</b> (à la racine) a perdu ses systèmes Niagara. Ne jamais enregistrer d'asset dans un dossier de plugin : il disparaît à la réinstallation.</span></div>
+  </div>
+  <p>La pluie dans Sequencer : ouvre <b>SEQ_Pluie_Demo</b>, sur l'acteur Pluie ajoute une piste de paramètre (<code>Densite</code>, <code>Lueur</code>…) et anime-la.</p>
+</section>
+
+<section class="ch" id="depannage">
+  <h2>Dépannage</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Symptôme</th><th>Cause et solution</th></tr></thead>
+    <tbody>
+      <tr><td>Vue toute blanche, surexposée</td><td>La caméra de l'éditeur est au-dessus de la surface. Double-clic sur VibH2O_Stage, ou pilote la caméra du rail. Lit → Exposure → Game Settings.</td></tr>
+      <tr><td>Unreal plantait à l'arrêt du Play</td><td>Corrigé le 25 octobre. Si un crash revient, note la carte et l'heure : le rapport est dans <code>Saved/Crashes</code>.</td></tr>
+      <tr><td>Max envoie mais rien ne bouge</td><td>Dans les cartes issues de VIBH2o_PPCM, l'ancien <b>Matrix_Controller_BP</b> écoute aussi le port 9002 sur l'adresse 192.168.3.246 et peut capter le flux. Supprime-le de la carte utilisée, ou change le <span class="k">Port d'écoute OSC</span> de VibH2O et l'envoi de Max.</td></tr>
+      <tr><td>iPad : point rouge, page qui ne charge pas</td><td>Pas le même Wi-Fi, pare-feu Windows (autoriser Unreal sur réseau privé), jeu arrêté, ou l'adresse du PC a changé (relire le log).</td></tr>
+      <tr><td>iPad : un appui ne fait rien</td><td>Verrouillé (🔒) ; ou bandeau « Contrôle coupé dans Unreal » : console <code>VibH2O.IgnoreControl 0</code> ; ou la tuile dit « piloté par Sequencer ».</td></tr>
+      <tr><td>Pastille SIMULATION en représentation</td><td>Max n'envoie rien sur 9002. Vérifie Max, le réseau et le port.</td></tr>
+      <tr><td>Bulles qui passent devant une artiste</td><td>Zone éteinte, trop petite, ou flèche mal orientée / caméra de projection non désignée.</td></tr>
+      <tr><td>Image qui rame au tableau 2</td><td>Baisse <span class="k">Filles par bulle</span> (2 ou 1).</td></tr>
+      <tr><td>Spout saccadé</td><td>Fenêtre Unreal réduite : la remettre, derrière Resolume.</td></tr>
+      <tr><td>Une cue ne part pas</td><td>Le nom dans <code>/Cue/&lt;Nom&gt;</code> doit être celui de la cue ; la cue doit être <span class="k">Active</span> ; en MIDI, le port loopMIDI doit être lancé.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Commandes console utiles (touche <kbd>²</kbd> en Play) : <code>VibH2O.ShowDebug</code> (réseau, salle, iPad, cues à l'écran), <code>VibH2O.DumpRoom</code>, <code>VibH2O.Restart</code>, <code>VibH2O.Cue Vortex</code>, <code>VibH2O.Midi</code>, <code>VibH2O.IgnoreControl 0|1</code>.</p>
+</section>
+
+<section class="ch" id="fichiers">
+  <h2>Où sont les fichiers</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Quoi</th><th>Où</th></tr></thead>
+    <tbody>
+      <tr><td>Projet du spectacle</td><td class="path">D:\VIBH2O\09-2026\VIBH2O_LUX\VIBH2O</td></tr>
+      <tr><td>Assets rangés (rien de supprimé)</td><td class="path">Content/_ARCHIVE — même arborescence qu'avant</td></tr>
+      <tr><td>Sauvegardes du projet</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_LUX_2026-10-24_avant_archivage, …_2026-10-25_avant_reprise_archivage</td></tr>
+      <tr><td>Anciens plugins</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_PLUGINS_2026-10-24</td></tr>
+      <tr><td>Code du plugin VibH2O</td><td class="path">Documents\GitHub\VIBH2O_UE (branche main) — docs/ : TUTORIEL, CUES, ATTRACTEURS_ET_IPAD, DECISIONS_NUIT</td></tr>
+      <tr><td>Rapports de la nuit</td><td class="path">VIBH2O_LUX\VIBH2O\_RAPPORT_CLAUDE</td></tr>
+      <tr><td>Page de la télécommande</td><td class="path">Plugins/VibH2O/Resources/Remote/index.html</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>VIBH2O — manuel de l'opérateur. Plugin VibH2O vérifié le 26 octobre 2026 : 32 tests au vert, Unreal 5.5 et 5.8, Editor, Game et Shipping.</footer>
+</main>
+</div>
+
+</html>

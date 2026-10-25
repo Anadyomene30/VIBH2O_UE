@@ -73,15 +73,20 @@ void AVibH2OSimulatorActor::StartSimulation()
 	bSimulating = true;
 	bAnnouncedFirstFeed = false;
 	bReportedYield = false;
+	// An explicit start overrides an earlier silencing by real data.
+	bSilencedByRealData = false;
 	SimTime = 0.0f;
 	NextFeedTime = 0.0;
 	NextRoomTime = (RoomResendInterval > 0.0f) ? (FPlatformTime::Seconds() + RoomResendInterval) : 0.0;
 
 	// Prime the network-yield watermark so pre-existing traffic does not count.
+	// Only data messages are counted: Resolume's "Output all" or the iPad must
+	// not pass for Max.
 	if (UVibH2OSubsystem* Subsystem = GetSubsystem())
 	{
-		LastNetworkMessageCount = Subsystem->GetNetworkStats().MessagesReceived;
+		LastNetworkMessageCount = Subsystem->GetNetworkDataMessageCount();
 	}
+	RealDataHoldUntil = 0.0;
 
 	SendRoomNow();
 
@@ -104,6 +109,8 @@ void AVibH2OSimulatorActor::ConfigureAles()
 {
 	// The real venue, read from RoomMapping_Presets/ALES_FINAL.json: 23 x 4
 	// with two centre aisles. Non-square AND holed - the best test room there is.
+	// Also a Details-panel button: mark the map dirty so the change is saved.
+	Modify();
 	Columns = 23;
 	Rows = 4;
 	AisleColumns = { 6, 16 };
@@ -254,6 +261,32 @@ void AVibH2OSimulatorActor::ScenarioTargets(int32 Column, int32 Row, int32 Id, f
 		OutSynchrony = 0.4f + OutExcitation * 0.5f;
 		return;
 
+	case EVibH2OSimulatorScenario::MoodWave:
+	{
+		// A 96-second tide in four slots - calm, normal, excited, normal -
+		// each held for three quarters of its slot and ramping into the next
+		// over the last quarter, so every mood stays long enough to be read.
+		// Tools/vibh2o_osc_sim.py --scenario moods plays the very same tide.
+		static const float Levels[] = { 0.08f, 0.40f, 0.85f, 0.40f };
+		const float Slot = FMath::Fmod(T, 96.0f) / 24.0f;
+		const int32 Index = FMath::FloorToInt(Slot) % 4;
+		const float Ramp = FMath::SmoothStep(0.75f, 1.0f, Slot - FMath::FloorToFloat(Slot));
+		const float Room = FMath::Lerp(Levels[Index], Levels[(Index + 1) % 4], Ramp);
+
+		// Each person around the room's level, and a small crest crossing the
+		// room on top: the palette's nuance needs people to differ.
+		const float Personal = 0.12f * FMath::Sin(T * 0.37f + Id * 1.9f);
+		const float Position = (Columns > 1) ? static_cast<float>(Column) / (Columns - 1) : 0.0f;
+		const float Head = FMath::Fmod(T * 0.12f, 1.4f) - 0.2f;
+		const float Crest = 0.25f * FMath::Max(0.0f, 1.0f - FMath::Abs(Position - Head) * 5.0f);
+		OutExcitation = FMath::Clamp(Room + Personal + Crest, 0.0f, 1.0f);
+
+		// Synchrony on a 37-second period, unrelated to the tide's: the two
+		// axes drift past each other and meet in every combination.
+		OutSynchrony = FMath::Clamp(0.5f - 0.42f * FMath::Cos(T * 2.0f * PI / 37.0f) + 0.06f * FMath::Sin(Id * 2.3f), 0.0f, 1.0f);
+		return;
+	}
+
 	case EVibH2OSimulatorScenario::Nominal:
 	case EVibH2OSimulatorScenario::Dropout:
 	default:
@@ -376,32 +409,64 @@ void AVibH2OSimulatorActor::Tick(float DeltaSeconds)
 		return;
 	}
 
+	// A different subsystem than last time - the editor's stand-in rebuilt
+	// after Play - knows no room yet: send it. The very first one already
+	// got it when the simulation started.
+	if (FedSubsystem.Get() != Subsystem)
+	{
+		const bool bReplaced = !FedSubsystem.IsExplicitlyNull();
+		FedSubsystem = Subsystem;
+		if (bReplaced)
+		{
+			// Its counters are its own: watch them from where they stand now.
+			LastNetworkMessageCount = Subsystem->GetNetworkDataMessageCount();
+			SendRoomNow();
+		}
+	}
+
 	const double Now = FPlatformTime::Seconds();
 
 	// Step aside for the real thing. The simulator is a stand-in for Max, not
-	// a competitor: the moment genuine packets come off the socket, feeding
-	// pauses, and it resumes only after a few seconds of network silence.
+	// a competitor: the moment genuine data comes off the socket, feeding
+	// pauses - for good if asked, otherwise until a few seconds of silence.
+	// Only data messages count (room plan, BPM, excitation, synchrony, beat):
+	// other OSC traffic on the port must not silence the room.
 	if (bYieldToRealNetwork && Subsystem->IsListening())
 	{
-		const int32 Received = Subsystem->GetNetworkStats().MessagesReceived;
+		const int32 Received = Subsystem->GetNetworkDataMessageCount();
 		if (Received > LastNetworkMessageCount)
 		{
 			LastNetworkMessageCount = Received;
 			RealDataHoldUntil = Now + VibH2OSimulatorInternal::RealDataHoldSeconds;
+
+			if (bStopForGoodOnRealData)
+			{
+				// A patch paused mid-show must leave the room quiet, not let
+				// fake heart rates back in front of the audience.
+				bSimulating = false;
+				bReportedYield = false;
+				if (!bSilencedByRealData)
+				{
+					bSilencedByRealData = true;
+					UE_LOG(LogVibH2O, Display,
+						TEXT("VibH2O: Max envoie des données — le simulateur se tait jusqu'à la fin de la partie."));
+				}
+				return;
+			}
 		}
 		if (Now < RealDataHoldUntil)
 		{
 			if (!bReportedYield)
 			{
 				bReportedYield = true;
-				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation en pause — de vraies donnees reseau arrivent."));
+				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation en pause — de vraies données réseau arrivent."));
 			}
 			return;
 		}
 		if (bReportedYield)
 		{
 			bReportedYield = false;
-			UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation reprise — le reseau est silencieux."));
+			UE_LOG(LogVibH2O, Display, TEXT("VibH2O: simulation reprise — le réseau est silencieux."));
 		}
 	}
 

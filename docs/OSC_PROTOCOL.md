@@ -162,10 +162,47 @@ contrôleur physique entrant dans Max et ressortant en OSC.
 /Blend/        0.0–1.0    morph du tableau 1 vers le tableau 2
 /Focus/Group/  <nom>      sélectionne un groupe de focus défini dans Unreal
 /Focus/Amount/ 0.0–1.0    intensité du focus
+/Cue/<Nom>/    [1]        déclenche la cue de ce nom (directeur de cues) ; 0 est ignoré
+
+/Attractor/<nom>/           0.0–1.0   activation d'un attracteur (sans argument : 1)
+/Attractor/<nom>/Share/     0.0–1.0   sa part de la salle
+/Attractors/Release/                  tous les attracteurs lâchent
+/Attractors/FadeScale/      0.1–10    multiplicateur de toutes les durées de fondu
+/Exclusion/<nom>/           0|1       activation d'une zone d'exclusion
+/Exclusion/<nom>/Position/  x y       position en direct, chacune de −1 à 1
+/Fond/         0.0–1.0 [s] présence du fond sous-marin : 0 = noir pur derrière les bulles,
+                           1 = l'eau ; 2e argument facultatif = durée du fondu en secondes
 ```
+
+Les messages `/Attractor`, `/Attractors` et `/Exclusion` pilotent les attracteurs et les zones d'exclusion placés à la main dans le niveau —
+voir [`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md). Le `<nom>` est le *Nom de contrôle* de
+l'acteur ; la casse ne compte pas.
+
+**La télécommande iPad envoie ces mêmes messages**, par HTTP plutôt qu'en UDP — une page web ne
+peut pas émettre d'UDP. Le plugin sert lui-même la page sur le port TCP **8642**, distinct de 9002 où
+écoutent Max et l'ancien `Matrix_Controller_BP` du projet du spectacle. `POST /api/cmd` prend une
+commande par ligne, au format `adresse argument…` ; `GET /api/state` rend l'état affiché par l'iPad,
+en JSON. Les commandes rejoignent la même file que l'OSC, sur le game thread.
+
+Deux protections, depuis la nuit du 24 octobre : `POST /api/cmd` exige l'en-tête `X-VibH2O: 1`
+(la page de la télécommande l'envoie ; une page web d'un autre site ne peut pas l'ajouter sans
+autorisation préalable, que le serveur ne donne jamais), et seules les adresses **de contrôle**
+passent — `/Blend`, `/Focus/*`, `/Effect`, `/Fond`, `/Attractor(s)`, `/Exclusion`, `/Cue`. Le plan
+de salle et les données des capteurs ne viennent que de Max. Au plus 256 commandes sont traitées
+par image ; le reste attend l'image suivante.
+
+
+`/Fond` est lu par l'acteur **VibH2O — Fond** (`AVibH2OBackdrop`), qui fait glisser sa présence
+vers la valeur reçue. Chaque message relance le fondu, même s'il répète la valeur précédente :
+un bouton bascule d'iPad qui envoie 1 puis 0 convient tel quel. Sur le tulle de projection, le
+noir est transparent — enlever le fond, c'est laisser voir la scène derrière.
 
 Ces mêmes commandes sont accessibles depuis le panneau Details, depuis Blueprint, et animables
 dans Sequencer.
+
+**Cues.** Tout message de contrôle — c'est-à-dire tout ce qui n'est ni plan de salle ni donnée
+capteur — peut aussi servir de déclencheur à une cue apprise : `/composition/columns/3/connect`
+émis par Resolume, par exemple. Voir [`CUES.md`](CUES.md).
 
 **Arbitrage OSC / Sequencer :** l'OSC écrit à la réception d'un message, Sequencer réécrit à
 chaque frame pendant la lecture — Sequencer l'emporte donc naturellement pendant une séquence. Un

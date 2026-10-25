@@ -3,8 +3,13 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Interfaces/IPluginManager.h"
 #include "Layout/VibH2OLayoutMath.h"
+#include "Misc/Paths.h"
 #include "Osc/VibH2OOscReceiver.h"
+#include "Remote/VibH2ORemoteServer.h"
+#include "SocketSubsystem.h"
+#include "UObject/GCObject.h"
 #include "UObject/ObjectKey.h"
 #include "UObject/Package.h"
 #include "VibH2OModule.h"
@@ -66,6 +71,25 @@ namespace VibH2OConsole
 			if (UVibH2OSubsystem* Subsystem = FindSubsystem(World))
 			{
 				Subsystem->StartListening();
+				// The remote too - which also reloads its page from disk, so an
+				// edit made on site needs no restart of the game.
+				if (UVibH2OSettings::Get()->bEnableRemote)
+				{
+					Subsystem->StartRemote();
+				}
+			}
+		}));
+
+	static FAutoConsoleCommandWithWorldAndArgs IgnoreControlCommand(
+		TEXT("VibH2O.IgnoreControl"),
+		TEXT("VibH2O.IgnoreControl 1 : l'OSC de controle et l'iPad sont ignores (les donnees passent toujours). 0 : ils reprennent la main. Sans argument : bascule."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UVibH2OSubsystem* Subsystem = FindSubsystem(World))
+			{
+				Subsystem->bIgnoreOscControl = Args.Num() > 0 ? FCString::Atoi(*Args[0]) != 0 : !Subsystem->bIgnoreOscControl;
+				UE_LOG(LogVibH2O, Display, TEXT("VibH2O: controle OSC et iPad %s."),
+					Subsystem->bIgnoreOscControl ? TEXT("IGNORES") : TEXT("actifs"));
 			}
 		}));
 }
@@ -105,6 +129,11 @@ void UVibH2OSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		StartListening();
 	}
+	if (UVibH2OSettings::Get()->bEnableRemote)
+	{
+		StartRemote();
+	}
+	InitializeCueInputs();
 }
 
 void UVibH2OSubsystem::RegisterBuiltInEffects()
@@ -123,6 +152,10 @@ void UVibH2OSubsystem::RegisterBuiltInEffects()
 void UVibH2OSubsystem::Deinitialize()
 {
 	StopListening();
+	StopRemote();
+	StopMidiInput();
+	StopKeyboardCues();
+	BackgroundGuard.Release();
 	Individuals.Reset();
 	Room.Reset();
 	Super::Deinitialize();
@@ -154,9 +187,14 @@ UVibH2OSubsystem* UVibH2OSubsystem::Get(const UObject* WorldContextObject)
 namespace VibH2OEditorPreviewInternal
 {
 	/**
-	 * One stand-in per editor world. Weak pointers plus rooting rather than
-	 * TStrongObjectPtr: a static holding strong pointers would be destroyed
-	 * after the object system at exit, which is a crash on quit.
+	 * One stand-in per editor world, weakly held here.
+	 *
+	 * Kept alive by a referencer, never by rooting: when Play stops, the
+	 * editor marks every UGameInstance as garbage (PlayLevel.cpp, 5.5 and
+	 * 5.8 alike), ours included, and MarkAsGarbage asserts on a rooted
+	 * object - Stop crashed the editor in any map holding a stage. Not
+	 * rooted, the stand-in simply dies there and is rebuilt on the next
+	 * editor tick; the simulator re-sends the room by itself.
 	 */
 	struct FEntry
 	{
@@ -167,16 +205,38 @@ namespace VibH2OEditorPreviewInternal
 	static TMap<TObjectKey<UWorld>, FEntry> Entries;
 	static FDelegateHandle CleanupHandle;
 
+	/**
+	 * Allocated once and never freed: a static FGCObject would be destroyed
+	 * after the object system at exit, which is a crash on quit.
+	 */
+	class FReferencer : public FGCObject
+	{
+	public:
+		TArray<TObjectPtr<UObject>> Objects;
+
+		virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+		{
+			Collector.AddReferencedObjects(Objects);
+		}
+
+		virtual FString GetReferencerName() const override
+		{
+			return TEXT("VibH2OEditorPreview");
+		}
+	};
+
+	static FReferencer& GetReferencer()
+	{
+		static FReferencer* Referencer = new FReferencer();
+		return *Referencer;
+	}
+
 	static void Release(FEntry& Entry)
 	{
-		if (UVibH2OSubsystem* Subsystem = Entry.Subsystem.Get())
-		{
-			Subsystem->RemoveFromRoot();
-		}
-		if (UGameInstance* Outer = Entry.Outer.Get())
-		{
-			Outer->RemoveFromRoot();
-		}
+		TArray<TObjectPtr<UObject>>& Objects = GetReferencer().Objects;
+		Objects.Remove(Entry.Subsystem.Get());
+		Objects.Remove(Entry.Outer.Get());
+		Objects.Remove(nullptr);
 	}
 }
 
@@ -221,8 +281,8 @@ UVibH2OSubsystem* UVibH2OSubsystem::GetEditorPreview(UWorld* World)
 	// also how the integration tests build theirs.
 	UGameInstance* Outer = NewObject<UGameInstance>(GetTransientPackage(), NAME_None, RF_Transient);
 	UVibH2OSubsystem* Subsystem = NewObject<UVibH2OSubsystem>(Outer, NAME_None, RF_Transient);
-	Outer->AddToRoot();
-	Subsystem->AddToRoot();
+	GetReferencer().Objects.Add(Outer);
+	GetReferencer().Objects.Add(Subsystem);
 
 	// No Initialize(): that would start the receiver. Effects only.
 	Subsystem->bEditorPreview = true;
@@ -298,6 +358,103 @@ FVibH2ONetworkStats UVibH2OSubsystem::GetNetworkStats() const
 	return Stats;
 }
 
+// ------------------------------------------------------------------ Remote
+
+bool UVibH2OSubsystem::StartRemote()
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+
+	FString WebRoot = Settings->RemoteWebRoot;
+	if (WebRoot.IsEmpty())
+	{
+		// Inside the plugin, so copying the plugin folder into the show's
+		// project brings the page along. Staged next to the game as loose
+		// files - see VibH2O.Build.cs - so it stays editable once packaged.
+		if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("VibH2O")))
+		{
+			WebRoot = FPaths::Combine(Plugin->GetBaseDir(), TEXT("Resources"), TEXT("Remote"));
+		}
+	}
+	else if (FPaths::IsRelative(WebRoot))
+	{
+		WebRoot = FPaths::Combine(FPaths::ProjectDir(), WebRoot);
+	}
+
+	if (!RemoteServer.IsValid())
+	{
+		RemoteServer = MakeUnique<FVibH2ORemoteServer>();
+	}
+	if (!RemoteServer->Start(Settings->RemoteListenAddress, Settings->RemotePort, WebRoot))
+	{
+		return false;
+	}
+
+	for (const FString& Url : GetRemoteUrls())
+	{
+		UE_LOG(LogVibH2O, Display, TEXT("VibH2O: telecommande iPad — ouvrir %s dans Safari."), *Url);
+	}
+	return true;
+}
+
+void UVibH2OSubsystem::StopRemote()
+{
+	if (RemoteServer.IsValid())
+	{
+		RemoteServer->Shutdown();
+		RemoteServer.Reset();
+	}
+}
+
+bool UVibH2OSubsystem::IsRemoteRunning() const
+{
+	return RemoteServer.IsValid() && RemoteServer->IsRunning();
+}
+
+TArray<FString> UVibH2OSubsystem::GetRemoteUrls() const
+{
+	TArray<FString> Urls;
+	if (!IsRemoteRunning())
+	{
+		return Urls;
+	}
+
+	const int32 Port = RemoteServer->GetPort();
+	if (ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM))
+	{
+		TArray<TSharedPtr<FInternetAddr>> Addresses;
+		if (SocketSubsystem->GetLocalAdapterAddresses(Addresses))
+		{
+			for (const TSharedPtr<FInternetAddr>& Address : Addresses)
+			{
+				if (!Address.IsValid() || Address->GetProtocolType() != FNetworkProtocolTypes::IPv4)
+				{
+					continue;
+				}
+				// Loopback and self-assigned addresses are no use to an iPad.
+				const FString Ip = Address->ToString(/*bAppendPort=*/false);
+				if (Ip.StartsWith(TEXT("127.")) || Ip.StartsWith(TEXT("169.254.")) || Ip == TEXT("0.0.0.0"))
+				{
+					continue;
+				}
+				Urls.AddUnique(FString::Printf(TEXT("http://%s:%d/"), *Ip, Port));
+			}
+		}
+	}
+	if (Urls.Num() == 0)
+	{
+		Urls.Add(FString::Printf(TEXT("http://127.0.0.1:%d/"), Port));
+	}
+	return Urls;
+}
+
+void UVibH2OSubsystem::SetRemoteState(const FString& Json)
+{
+	if (RemoteServer.IsValid())
+	{
+		RemoteServer->SetStateJson(Json);
+	}
+}
+
 // -------------------------------------------------------------------- Tick
 
 TStatId UVibH2OSubsystem::GetStatId() const
@@ -325,6 +482,7 @@ void UVibH2OSubsystem::Tick(float DeltaTime)
 	const double Now = FPlatformTime::Seconds();
 
 	DrainQueue();
+	DrainCueInputs();
 
 	// End of burst: the plan carries no end marker, silence stands in for one.
 	if (Pending.bDirty && (Now - Pending.LastMessageTime) >= Settings->RoomMappingSettleSeconds)
@@ -342,40 +500,89 @@ void UVibH2OSubsystem::Tick(float DeltaTime)
 
 void UVibH2OSubsystem::DrainQueue()
 {
-	if (!Receiver.IsValid())
-	{
-		return;
-	}
-
 	const bool bLog = UVibH2OSettings::Get()->bLogOscTraffic;
 
 	FVibH2OOscMessage Message;
-	while (Receiver->Dequeue(Message))
+	// Re-checked every time: a message may end a learn capture, which closes
+	// the editor stand-in's receiver from inside HandleMessage.
+	while (Receiver.IsValid() && Receiver->Dequeue(Message))
 	{
 		++MessagesThisSecond;
 		if (bLog)
 		{
 			UE_LOG(LogVibH2O, Verbose, TEXT("OSC < %s"), *Message.ToDebugString());
 		}
+		TGuardValue<bool> FromNetwork(bDrainingNetwork, true);
+		HandleMessage(Message);
+	}
+
+	// The iPad's commands join the very same path as Max's: one control
+	// route, whatever sent it. Bounded per frame, so a flood from the LAN
+	// costs a few frames of latency, never a hitch; the rest waits its turn.
+	constexpr int32 MaxRemoteCommandsPerFrame = 256;
+	int32 RemoteHandled = 0;
+	while (RemoteHandled < MaxRemoteCommandsPerFrame && RemoteServer.IsValid() && RemoteServer->Dequeue(Message))
+	{
+		++RemoteHandled;
+		if (!IsRemoteAddressAllowed(Message))
+		{
+			// Once a second at most: a flood must not become a flood of logs.
+			static double LastRefusalLog = -1.0;
+			if (FPlatformTime::Seconds() - LastRefusalLog > 1.0)
+			{
+				LastRefusalLog = FPlatformTime::Seconds();
+				UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: commande iPad refusee (adresse de donnees) : %s"), *Message.Address);
+			}
+			continue;
+		}
+		if (bLog)
+		{
+			UE_LOG(LogVibH2O, Verbose, TEXT("iPad < %s"), *Message.ToDebugString());
+		}
+		TGuardValue<bool> Echo(bForceControlEcho, true);
 		HandleMessage(Message);
 	}
 }
 
+bool UVibH2OSubsystem::IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+	const FString* Allowed[] = {
+		&Settings->BlendPrefix, &Settings->FocusGroupPrefix, &Settings->FocusAmountPrefix,
+		&Settings->EffectPrefix, &Settings->BackdropPrefix, &Settings->AttractorPrefix,
+		&Settings->AttractorsGlobalPrefix, &Settings->ExclusionPrefix, &Settings->CuePrefix, &Settings->AmbiancePrefix };
+	for (const FString* Prefix : Allowed)
+	{
+		if (!Prefix->IsEmpty() && Message.MatchesPrefix(*Prefix))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UVibH2OSubsystem::InjectOscMessage(const FVibH2OOscMessage& Message)
 {
+	// Injected messages are deliberate - cues above all: a control value
+	// reaches the stage even when it repeats the last one.
+	TGuardValue<bool> Echo(bForceControlEcho, true);
 	HandleMessage(Message);
 }
 
 void UVibH2OSubsystem::HandleMessage(const FVibH2OOscMessage& Message)
 {
-	if (HandleRoomMappingMessage(Message))
+	if (HandleRoomMappingMessage(Message) || HandleDataMessage(Message))
 	{
+		// Only what came off the socket: the simulator injects its own.
+		if (bDrainingNetwork)
+		{
+			++NetworkDataMessageCount;
+		}
 		return;
 	}
-	if (HandleDataMessage(Message))
-	{
-		return;
-	}
+	// Room plan and sensor data are never cue material; everything else is,
+	// the plugin's own control routes included.
+	BroadcastOscCueInput(Message);
 	HandleControlMessage(Message);
 }
 
@@ -555,7 +762,7 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			return true;
 		}
 		const float Value = FMath::Clamp(Message.GetFloatArg(0, 0.0f), 0.0f, 1.0f);
-		if (!FMath::IsNearlyEqual(Value, OscBlendAlpha))
+		if (bForceControlEcho || !FMath::IsNearlyEqual(Value, OscBlendAlpha))
 		{
 			OscBlendAlpha = Value;
 			OnOscBlendAlphaChanged.Broadcast(Value);
@@ -570,10 +777,65 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			return true;
 		}
 		const float Value = FMath::Clamp(Message.GetFloatArg(0, 0.0f), 0.0f, 1.0f);
-		if (!FMath::IsNearlyEqual(Value, OscFocusAmount))
+		if (bForceControlEcho || !FMath::IsNearlyEqual(Value, OscFocusAmount))
 		{
 			OscFocusAmount = Value;
 			OnOscFocusAmountChanged.Broadcast(Value);
+		}
+		return true;
+	}
+
+	if (!Settings->BackdropPrefix.IsEmpty() && Message.MatchesPrefix(Settings->BackdropPrefix))
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		OscBackdropTarget = FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f);
+		const float FadeSeconds = Message.Args.Num() > 1 ? FMath::Max(0.0f, Message.GetFloatArg(1, 0.0f)) : -1.0f;
+		OnOscBackdropChanged.Broadcast(OscBackdropTarget, FadeSeconds);
+		return true;
+	}
+
+	if (!Settings->AmbiancePrefix.IsEmpty() && Message.MatchesPrefix(Settings->AmbiancePrefix))
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		// "/Ambiance calme", "/Ambiance/calme/" or "/Ambiance 1": a word as
+		// argument or last segment, or the index 0 auto, 1 calm, 2 normal,
+		// 3 excited - the order of EVibH2OMoodOverride.
+		FString Word;
+		if (Message.Args.Num() > 0 && Message.Args[0].Type == EVibH2OOscType::String)
+		{
+			Word = Message.Args[0].StringValue;
+		}
+		else if (Message.GetSegmentsAfterPrefix(Settings->AmbiancePrefix, Segments) && Segments.Num() > 0)
+		{
+			Word = Segments[0];
+		}
+		int32 Index = INDEX_NONE;
+		if (!Word.IsEmpty())
+		{
+			Word = Word.ToLower();
+			Index = Word.StartsWith(TEXT("auto")) ? 0
+				: Word.StartsWith(TEXT("calm")) ? 1
+				: Word.StartsWith(TEXT("norm")) ? 2
+				: (Word.StartsWith(TEXT("exc")) || Word.StartsWith(TEXT("exi"))) ? 3
+				: INDEX_NONE;
+		}
+		else if (Message.Args.Num() > 0)
+		{
+			Index = FMath::RoundToInt(Message.GetFloatArg(0, 0.0f));
+		}
+		if (Index >= 0 && Index <= 3)
+		{
+			OnOscAmbianceChanged.Broadcast(Index);
+		}
+		else
+		{
+			UE_LOG(LogVibH2O, Warning, TEXT("VibH2O: ambiance inconnue dans %s (attendu : auto, calme, normal, excite)."), *Message.ToDebugString());
 		}
 		return true;
 	}
@@ -596,7 +858,7 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 			GroupName = FName(*Segments[0]);
 		}
 
-		if (GroupName != OscFocusGroup)
+		if (bForceControlEcho || GroupName != OscFocusGroup)
 		{
 			OscFocusGroup = GroupName;
 			OnOscFocusGroupChanged.Broadcast(GroupName);
@@ -604,8 +866,82 @@ bool UVibH2OSubsystem::HandleControlMessage(const FVibH2OOscMessage& Message)
 		return true;
 	}
 
+	return HandleSteeringMessage(Message);
+}
+
+bool UVibH2OSubsystem::HandleSteeringMessage(const FVibH2OOscMessage& Message)
+{
+	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
+
+	TArray<FString> Segments;
+
+	// Segments are compared whole, so "/Attractors" and "/Attractor" cannot
+	// swallow each other. Each route still guards against a cleared prefix,
+	// which would match every address.
+	if (!Settings->AttractorsGlobalPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->AttractorsGlobalPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		if (Segments[0].Equals(TEXT("Release"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorsReleased.Broadcast();
+		}
+		else if (Segments[0].Equals(TEXT("FadeScale"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorFadeScaleChanged.Broadcast(FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.1f, 10.0f));
+		}
+		return true;
+	}
+
+	if (!Settings->AttractorPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->AttractorPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		const FName Name(*Segments[0]);
+		// No argument means "on": a bare address is the simplest cue to send.
+		const float Value = FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f);
+		if (Segments.Num() >= 2 && Segments[1].Equals(TEXT("Share"), ESearchCase::IgnoreCase))
+		{
+			OnOscAttractorShareChanged.Broadcast(Name, Value);
+		}
+		else
+		{
+			OnOscAttractorChanged.Broadcast(Name, Value);
+		}
+		return true;
+	}
+
+	if (!Settings->ExclusionPrefix.IsEmpty()
+		&& Message.GetSegmentsAfterPrefix(Settings->ExclusionPrefix, Segments) && Segments.Num() >= 1)
+	{
+		if (bIgnoreOscControl)
+		{
+			return true;
+		}
+		const FName Name(*Segments[0]);
+		if (Segments.Num() >= 2 && Segments[1].Equals(TEXT("Position"), ESearchCase::IgnoreCase))
+		{
+			const FVector2D Position(
+				FMath::Clamp(Message.GetFloatArg(0, 0.0f), -1.0f, 1.0f),
+				FMath::Clamp(Message.GetFloatArg(1, 0.0f), -1.0f, 1.0f));
+			OnOscExclusionMoved.Broadcast(Name, Position);
+		}
+		else
+		{
+			OnOscExclusionChanged.Broadcast(Name, FMath::Clamp(Message.GetFloatArg(0, 1.0f), 0.0f, 1.0f));
+		}
+		return true;
+	}
+
 	return false;
 }
+
 
 // --------------------------------------------------------------- Room plan
 
@@ -1087,4 +1423,29 @@ void UVibH2OSubsystem::UpdateDebugOverlay(float DeltaTime)
 		TEXT("   controle  blend %.2f   focus %.2f sur '%s'   OSC de controle %s   battements externes %d"),
 		OscBlendAlpha, OscFocusAmount, *OscFocusGroup.ToString(),
 		bIgnoreOscControl ? TEXT("IGNORE") : TEXT("actif"), ExternalBeatCount));
+
+	if (IsRemoteRunning())
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (Now - OverlayRemoteUrlsTime > 2.0)
+		{
+			OverlayRemoteUrls = GetRemoteUrls();
+			OverlayRemoteUrlsTime = Now;
+		}
+		Line(770007, FColor::Green, FString::Printf(
+			TEXT("   iPad     %s   %d requetes, %d commandes"),
+			*FString::Join(OverlayRemoteUrls, TEXT("  ")), RemoteServer->GetRequestCount(), RemoteServer->GetCommandCount()));
+	}
+	else
+	{
+		const FString Error = RemoteServer.IsValid() ? RemoteServer->GetLastError() : FString();
+		Line(770007, FColor::Silver, FString::Printf(TEXT("   iPad     telecommande inactive%s"),
+			Error.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("  [%s]"), *Error)));
+	}
+	const TArray<FString> MidiNames = GetOpenMidiInputs();
+	Line(770008, FColor::Silver, FString::Printf(
+		TEXT("   cues     MIDI %s   clavier %s   %s"),
+		MidiNames.Num() > 0 ? *FString::Join(MidiNames, TEXT(", ")) : TEXT("aucune entree"),
+		KeyboardSink.IsValid() && KeyboardSink->IsRunning() ? TEXT("actif") : TEXT("inactif"),
+		*FVibH2OBackgroundGuard::DescribeState()));
 }

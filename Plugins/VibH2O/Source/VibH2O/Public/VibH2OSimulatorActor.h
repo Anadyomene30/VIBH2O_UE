@@ -36,7 +36,14 @@ enum class EVibH2OSimulatorScenario : uint8
 	Peak UMETA(DisplayName = "Pic collectif"),
 
 	/** Some sensors stop talking after a delay - the staleness path. */
-	Dropout UMETA(DisplayName = "Coupure de capteurs")
+	Dropout UMETA(DisplayName = "Coupure de capteurs"),
+
+	/**
+	 * The room's three moods in turn: a collective tide holding calm, then
+	 * normal, then excited, then back, with synchrony on a period of its own
+	 * so every mood is seen in step and out of step.
+	 */
+	MoodWave UMETA(DisplayName = "Vague collective : calme, normal, excité")
 };
 
 /**
@@ -47,7 +54,7 @@ enum class EVibH2OSimulatorScenario : uint8
  * downstream - burst settling, seat-order mapping, smoothing, staleness,
  * averages - therefore runs the real code, not a shortcut.
  */
-UCLASS(Blueprintable, BlueprintType, meta = (DisplayName = "VibH2O — Simulateur"))
+UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Simulation"), meta = (DisplayName = "VibH2O — Simulateur"))
 class VIBH2O_API AVibH2OSimulatorActor : public AActor
 {
 	GENERATED_BODY()
@@ -63,18 +70,18 @@ public:
 
 	// ================================================== Room plan
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (ClampMin = "1", ClampMax = "64"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (DisplayName = "Colonnes", ClampMin = "1", ClampMax = "64", ToolTip = "Nombre de colonnes de la salle simulée, allées comprises."))
 	int32 Columns = 7;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (ClampMin = "1", ClampMax = "32"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (DisplayName = "Rangées", ClampMin = "1", ClampMax = "32", ToolTip = "Nombre de rangées de la salle simulée."))
 	int32 Rows = 3;
 
 	/** Columns left entirely empty - the aisles. Ales has 6 and 16. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (DisplayName = "Allées (colonnes vides, 0 = 1re colonne)"))
 	TArray<int32> AisleColumns;
 
 	/** Extra empty seats, by OSC seat index (1-based), for scattered holes. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (DisplayName = "Sièges vides en plus (n° OSC, 1 = premier)"))
 	TArray<int32> ExtraEmptySeatIndices;
 
 	/**
@@ -82,45 +89,45 @@ public:
 	 * once at start. Resending exercises the rebuild-by-difference path: the
 	 * room must NOT flicker when an identical plan comes in again.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Salle", AdvancedDisplay, meta = (DisplayName = "Renvoyer le plan toutes les", ClampMin = "0.0", ForceUnits = "s", ToolTip = "0 : le plan part une fois au démarrage."))
 	float RoomResendInterval = 0.0f;
 
 	// ================================================== Data stream
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (DisplayName = "Scénario", ToolTip = "Ce que fait le public simulé : calme, vague d'excitation, balayage de synchronie, pic collectif, coupure de capteurs, ou les trois ambiances à tour de rôle."))
 	EVibH2OSimulatorScenario Scenario = EVibH2OSimulatorScenario::Nominal;
 
 	/** Messages per individual per second. Max sends in this ballpark. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "0.5", ClampMax = "60.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", AdvancedDisplay, meta = (DisplayName = "Cadence d'envoi", ClampMin = "0.5", ClampMax = "60.0"))
 	float SendRateHz = 10.0f;
 
 	/** Resting heart-rate range the simulated audience is drawn from. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "30.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (DisplayName = "BPM au repos : min", ClampMin = "30.0", ClampMax = "200.0", UIMin = "40.0", UIMax = "140.0"))
 	float BaseBpmMin = 58.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "30.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (DisplayName = "BPM au repos : max", ClampMin = "30.0", ClampMax = "200.0", UIMin = "40.0", UIMax = "140.0", ToolTip = "Chaque spectateur simulé tire son BPM au repos entre le min et le max ; l'excitation l'élève ensuite."))
 	float BaseBpmMax = 92.0f;
 
 	/** Time scale of the scenario waveforms. 1 matches the Python simulator. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "0.1", ClampMax = "10.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", AdvancedDisplay, meta = (DisplayName = "Vitesse du scénario", ClampMin = "0.1", ClampMax = "10.0"))
 	float ScenarioSpeed = 1.0f;
 
 	/** Dropout scenario: seconds before sensors start going quiet. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (DisplayName = "Coupure : après", ClampMin = "0.0", ForceUnits = "s", EditCondition = "Scenario == EVibH2OSimulatorScenario::Dropout", EditConditionHides))
 	float DropoutAfterSeconds = 8.0f;
 
 	/** Dropout scenario: how many sensors go quiet. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", meta = (DisplayName = "Coupure : capteurs muets", ClampMin = "1", UIMax = "50", EditCondition = "Scenario == EVibH2OSimulatorScenario::Dropout", EditConditionHides))
 	int32 DropoutCount = 5;
 
 	/** Seed of every deterministic variation. Same seed, same audience. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation|Donnees", AdvancedDisplay, meta = (DisplayName = "Graine (même graine, même public)"))
 	int32 Seed = 1730;
 
 	// ================================================== Control
 
 	/** Start simulating as soon as the game starts. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler au lancement", ToolTip = "Décocher dans la carte du spectacle, ou supprimer l'acteur. Coché, il remplace Max tant que Max n'a rien envoyé."))
 	bool bSimulateOnBeginPlay = true;
 
 	/**
@@ -131,36 +138,54 @@ public:
 	 * the network port - so pressing Play still gets a clean, real subsystem,
 	 * and Max still reaches it. Untick to freeze the editor room and clear it.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler dans l'editeur"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Simuler dans l'éditeur"))
 	bool bSimulateInEditor = true;
 
 	/**
 	 * Step aside when real network data arrives.
 	 *
 	 * The whole point of this actor is to be replaced by the real Max patch
-	 * without touching anything: as soon as OSC messages come off the socket,
-	 * the simulator pauses, and it resumes only after the network has been
-	 * silent for a few seconds. Disable to force both at once (they will fight
-	 * over the same individuals - only useful to observe exactly that).
+	 * without touching anything: as soon as data messages (room plan, BPM,
+	 * excitation, synchrony, beat) come off the socket, the simulator pauses,
+	 * and it resumes only after the network has been silent for a few seconds.
+	 * Other traffic - Resolume, the iPad - does not count. Disable to force
+	 * both at once (they will fight over the same individuals - only useful to
+	 * observe exactly that).
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "S'effacer quand Max émet", ToolTip = "Coché : dès que Max envoie des données (plan de salle, BPM, excitation, synchronie, battements), le simulateur se met en pause. Les messages de Resolume ou de l'iPad ne comptent pas."))
 	bool bYieldToRealNetwork = true;
 
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	/**
+	 * Once Max has spoken, never resume.
+	 *
+	 * Without it, the simulator takes the stage back after a few seconds of
+	 * network silence - and a patch that pauses mid-show would see fake heart
+	 * rates injected in front of the audience. Ticked, the first real data
+	 * message silences the simulator until the end of the game; only an
+	 * explicit start (button, console, Blueprint) brings it back.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Se taire dès que Max parle", EditCondition = "bYieldToRealNetwork", ToolTip = "Coché : dès que Max a envoyé des données une fois, le simulateur se tait jusqu'à la fin de la partie. À laisser coché en représentation."))
+	bool bStopForGoodOnRealData = true;
+
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Démarrer la simulation"))
 	void StartSimulation();
 
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	/**
+	 * In the editor world, with bSimulateInEditor ticked, the next frame
+	 * starts it again: untick that box to freeze the editor room.
+	 */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Arrêter la simulation", ToolTip = "Arrête la simulation. Hors Play, décocher plutôt « Simuler dans l'éditeur » : sinon elle repart à l'image suivante."))
 	void StopSimulation();
 
 	UFUNCTION(BlueprintPure, Category = "VibH2O|Simulation")
 	bool IsSimulating() const { return bSimulating; }
 
 	/** Sends the full room plan immediately, as one burst. */
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Renvoyer le plan de salle"))
 	void SendRoomNow();
 
 	/** Configures the real Ales room: 23 x 4, aisles at columns 6 and 16. */
-	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Charger la salle d'Alès (23 × 4)"))
 	void ConfigureAles();
 
 	/**
@@ -195,13 +220,26 @@ private:
 	bool bAnnouncedFirstFeed = false;
 	bool bReportedYield = false;
 
+	/** Set when real data silenced the simulator for good; reset by StartSimulation. */
+	bool bSilencedByRealData = false;
+
 	/** Scenario clock, seconds since the simulation started. */
 	float SimTime = 0.0f;
 
 	double NextFeedTime = 0.0;
 	double NextRoomTime = 0.0;
 
-	/** Network yield: last seen receiver message count, and hold deadline. */
+	/**
+	 * The subsystem last fed. The editor's stand-in is rebuilt after every
+	 * Play, empty: a new one gets the room again, or the editor would stay
+	 * without a room until the simulator restarted.
+	 */
+	TWeakObjectPtr<UVibH2OSubsystem> FedSubsystem;
+
+	/**
+	 * Network yield: last seen count of network DATA messages (see
+	 * UVibH2OSubsystem::GetNetworkDataMessageCount), and hold deadline.
+	 */
 	int32 LastNetworkMessageCount = 0;
 	double RealDataHoldUntil = 0.0;
 };

@@ -43,6 +43,7 @@ Trois apports qui ne figuraient pas dans le découpage initial, chacun compilé 
 | **Prévisualisation animée en éditeur** | ✅ | `VibH2O.PreviewProbe` mesure `StageTime` sur trois secondes de tick éditeur : 0,000 → 1,311, hors Play. La documentation l'affirmait, la sonde le prouve. |
 | **Passe artistique** | ✅ | Silhouette organique, rampe de couleur à trois paliers, **vrais boids** pour le tableau 2, numéros de siège, particules, éclairage volumétrique. |
 | **Isolement des effets** (`VibH2O.EffectIsolation`) | ✅ | Le point 8 de la recette, devenu mesurable. Voir ci-dessous. |
+| **Cues MIDI / OSC / clavier** (`AVibH2OCueDirector`) | ✅ sauf Resolume réel | Compilé en 5.5 **et** 5.8, Editor et Shipping ; 19 tests au vert sous les deux moteurs, dont 4 pour les cues. Essai en jeu le 24 octobre, **Resolume Arena au premier plan** : note MIDI, OSC de colonne, `/Cue/<nom>` et Ctrl+Maj+F12 ont lancé, mis en pause, fait sauter et arrêté une Level Sequence. Reste à brancher la sortie OSC de Resolume elle-même. Voir [`CUES.md`](CUES.md) et [`DECISIONS_NUIT.md`](DECISIONS_NUIT.md). |
 
 ### Passe du 22 octobre 2026 — réalisme, lumière, éditeur — **compilée et testée, reste à juger à l'œil**
 
@@ -81,6 +82,120 @@ Reste à faire, à l'œil :
 2. Juger, puis régler : exposition (`PostProcess`), niveaux du rig, taille des caustiques
    (`ridge_of` dans `make_demo_material.py`). Sur les captures, les bulles se lisent plutôt comme
    des **perles** que comme des bulles : la transparence feinte par Fresnel reste discrète.
+
+### Passe du 23 octobre 2026 — trois états de salle, bulle à stries — **compilée, testée, capturée**
+
+Demande de Dimitri : trois états lisibles (calme, normal, excité) selon l'écart collectif à la
+baseline, distincts de la synchronie ; le look des bulles de `VIBH2o_PPCM`, en mieux ; des couleurs
+réglables dans l'éditeur ; une interface rapide sur place. Détail dans le
+[README du plugin](../Plugins/VibH2O/README.md), section *L'ambiance de la salle*.
+
+| Demande | Réponse |
+|---|---|
+| Trois états | `FVibH2OMoodTracker` : moyenne lissée (1,5 s), hystérésis (±0,04), fondu de 4 s. Seuils réglables, forçage manuel, état tenu sans capteur actif. |
+| Ce qui change | Couleur (palette par état), énergie (lumière, vitesse et agitation des stries), mouvement (flottement, dérive), taille et battement. Les vitesses passent par des **accumulateurs de phase** : un changement d'état ne fait rien sauter. |
+| Synchronie à part | Elle règle la **cohérence** : stries alignées sur la salle, teintes resserrées, halo. Jamais la palette. |
+| Look PPCM en mieux | Relevé en lecture seule dans le projet LUX : `Sphere_BP` → `Bubble_Mat` (Masked, tramage temporel, tout émissif, stries `sin` sur V). Refait en **Subsurface masked deux faces** : éclairé, ombres et caustiques reçues, stries pilotées par l'état, anneau de lumière à chaque battement. |
+| Couleurs dans l'éditeur | Catégorie `VibH2O|Ambiance` en tête ; palettes animables ; presets `UVibH2OMoodPreset` (deux livrés, `Tools/make_mood_presets.py`), bouton d'enregistrement. |
+
+Vérifié le 23 octobre 2026, dans la branche `claude/bulles-look-etats-6977f1` :
+
+| Vérification | Résultat |
+|---|---|
+| UE 5.5 Editor et Shipping | ✅ propre, sans avertissement |
+| Tests d'automation | ✅ **19 / 19** — les 15 d'avant et 4 nouveaux `VibH2O.Ambiance.*` (trois états, pas de clignotement sur une minute de bruit à cheval sur le seuil, fondu de 4 s sans saut, palettes) |
+| `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — après correction : couper la teinte coupe désormais **aussi** la couleur d'état |
+| Les trois états au simulateur | ✅ `VibH2O.DemoSweep` phases 15 à 22, par le vrai chemin de données : calme à 0,09, normal à 0,40, excité à 0,85, puis chaque état synchrone et désynchrone. `VibH2O.DemoSweep ambiance` rejoue ces seules phases en une minute. |
+| Images par seconde, salle de 176 | 🟡 **182 images/s**, contre 303 avant — mesure faite pendant qu'un éditeur 5.8 d'une autre session occupait le même GPU. Large marge, mais à remesurer seul. |
+| UE 5.8, Editor et Shipping (copie au chemin court `C:\VB58bulles`) | ✅ propre, zéro avertissement ; **19 / 19** tests |
+
+Captures avant / après : `Saved/VibH2OSweep_ambiance_2026-10-23/PLANCHE_avant_apres.png` à la
+racine du dépôt principal (hors git). Les choix faits sans Dimitri, à valider, sont dans
+[`DECISIONS_NUIT.md`](DECISIONS_NUIT.md). Non fait : l'essai dans une copie de PPCM, l'éditeur LUX
+étant occupé et son plugin partagé entre branches (décision 10).
+
+Trois pièges rencontrés, notés pour la suite :
+
+1. **Exposition manuelle +10 EV** dans la carte de démo (+10,5 dans PPCM) : un émissif de 1 y est
+   mille fois blanc. Les niveaux du matériau sont donc minuscules (`StripeLight` 0,05). Le nœud
+   `EyeAdaptationInverse`, essayé pour rendre l'émissif indépendant de l'exposition, n'a rien changé
+   de mesurable sous exposition manuelle. Pour une autre scène : `Lumiere des bulles` sur l'acteur.
+2. **Nœud `Sine`** : il a déjà une période de 1, il calcule sin(2π·x). Multiplier encore par 2π
+   donne quatre cents bandes par bulle, qui se fondent en une lueur uniforme.
+3. **Broche d'exposant du nœud `Power`** : refusée sous le nom `Exponent`, et le repli sur l'entrée
+   sans nom branchait… la base. Les stries valaient 9 partout. Le générateur n'a plus de repli
+   silencieux pour cette broche.
+
+Et un problème hors périmètre : dans ce worktree, `make_demo_material.py` plante **après** avoir
+écrit la bulle et les particules, à la recréation des caustiques (assertion Slate dans
+`AssetTools.CreateAsset`). Bulle et particules sont bien écrites ; seule la bulle est commitée.
+
+### Attracteurs, zones d'exclusion, télécommande iPad — 23 octobre 2026
+
+Demandés pour piloter la salle à la main pendant le spectacle. Mode d'emploi complet :
+[`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md).
+
+### Tableau 2 enrichi — division et vortex — **24 octobre 2026, compilé, testé, mesuré**
+
+Choix artistiques de Dimitri, posés avant d'écrire le code :
+
+| Question | Choix |
+|---|---|
+| Forme de la division | **Mitose égale** : sœurs de même taille, volume de la mère conservé à chaque instant, même cœur, même couleur. |
+| Moment | **Au début du morph** : division sur place entre `BlendAlpha` 0 et 0,35 ; départ vers le banc à mi-division. |
+| Hors synchronie | **Les familles** restent groupées, réparties dans tout le volume : chaque spectateur reste lisible. |
+| Bascule | **Fondu entre deux seuils** de synchronie collective (0,35 → 0,70), lissé sur 2 s. |
+| Forme en synchronie | **Cône évasé** — les réglages `Vortex` existants. |
+| Taille | **3 filles par bulle** : 704 bulles pour 176 places, plafond réglable à 1 000. |
+
+Comment c'est construit, et pourquoi :
+
+- **Les filles sont des bulles à part entière**, possédées par l'acteur de scène, nées avec la salle
+  et jamais pendant le morph. La division est une **fonction pure de `BlendAlpha`** : aucun état,
+  donc réversible ; au retour, les sœurs se refondent et la mère retrouve sa place exacte.
+- **Des acteurs plutôt que des meshes instanciés**, sur mesure : 704 bulles tiennent **120 à 145
+  images/s** en rendu réel avec Lumen (380 à 411 avec les 176 mères seules). Les instances gardent
+  par ailleurs le problème de matériau noir déjà constaté sur les particules, et obligeraient à un
+  autre contrat matériau.
+- **Le banc ne coûte presque rien** : 0,88 ms par pas pour 704 bulles, grâce à un hachage spatial.
+- **Deux réglages mesurés, pas devinés** (simulation numpy du pilote, puis tests) : la cohésion de
+  voisinage effondrait le vortex en boule au bout de 15 s, et l'alignement à plein poids figeait les
+  mouvements verticaux. Le cône tient désormais seul la forme, avec la force centripète exacte.
+
+| Vérification | Résultat |
+|---|---|
+| Compilation UE 5.5, Editor **et** Shipping | ✅ propre, sans avertissement |
+| Compilation UE 5.8, Editor, Game **et** Shipping (`RunUAT BuildPlugin`, copie au chemin court) | ✅ propre, sans avertissement ; la page de la télécommande part bien avec le plugin |
+| Tests d'automation | ✅ **19 / 19** sous 5.5, dont les quatre nouveaux : `Steering.FonduActivation`, `Steering.PartDeLaSalle`, `Steering.ProjectionHorsZone`, `Remote.Telecommande` |
+| De bout en bout, jeu lancé sur la carte de démo | ✅ `Tools/vibh2o_remote_check.py` : page, état, appel d'un attracteur (mi-chemin à 0,8 s, ni recul ni saut), contre-ordre, retour exact à 0, zone déplacée, éteinte, rallumée |
+| Interface vue dans un navigateur au format iPad | ✅ appui sur un attracteur et glisser d'une zone reçus par Unreal |
+
+Reste à faire, sur place :
+
+1. Ouvrir la page **sur le vrai iPad**, l'ajouter à l'écran d'accueil, la juger dans le noir.
+2. Placer les zones devant les deux circassiennes réelles, la *Camera de projection* désignée, et
+   vérifier à l'image que les bulles s'écartent bien.
+
+| Compilation UE 5.8, Editor, Game **et** Shipping (`RunUAT BuildPlugin`, copie au chemin court) | ✅ propre, sans avertissement |
+| Tests d'automation | ✅ **18 / 18** — les 15 d'avant + `Tableau2.Division`, `Tableau2.BancVortex`, `Integration.DivisionReversible` |
+| `VibH2O.EffectIsolation` | ✅ six effets, six CONFORME — rien ne change au tableau 1 |
+| Vortex (test, 176 × 4) | ✅ rotation d'ensemble **0,98**, **100 %** des bulles sur la paroi du cône |
+| Dispersion (test) | ✅ rotation 0,0, familles de **39 cm** de rayon, **124 cm** entre familles |
+| Balayage de synchronie (`VibH2O.SchoolSweep`, simulateur) | ✅ dispersé → vortex (ordre 0,99, rotation 0,90) → dispersé (familles à 50 cm), filles refondues au retour |
+
+Le balayage se rejoue d'une commande (une minute et demie, captures dans `Saved/VibH2OSchool/`). Il
+attend chaque état **sur mesure de l'ordre du banc**, pas sur un minutage supposé :
+
+```bash
+"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" "C:/Users/dimit/Documents/GitHub/VIBH2O_UE/VIBH2O_UE.uproject" -game -Windowed -ResX=1280 -ResY=720 -ExecCmds="VibH2O.SchoolSweep" -NoSound -unattended -nosplash -abslog="C:/Users/dimit/Documents/GitHub/VIBH2O_UE/Saved/Logs/SchoolSweep.log"
+```
+
+Reste à faire, à l'œil :
+
+1. Juger la lisibilité des familles dispersées : nettes en périphérie, plus serrées au centre du
+   volume. Si besoin, agrandir `Bounds Radius` dans `Flock Driver`.
+2. Juger la vitesse de formation : le vortex se forme en ~5 s, les familles se reforment en ~6 s.
+3. Valider les choix pris seul pendant la nuit : [`DECISIONS_NUIT.md`](DECISIONS_NUIT.md).
 
 ### Rejouer les vérifications
 
@@ -390,6 +505,11 @@ première livraison.**
 ## Après cette livraison
 
 - ~~Le **comportement de banc** du tableau 2~~ — fait : vrais boids (séparation, alignement, cohésion, attracteur mouvant), pilote par défaut du tableau 2, la synchronie collective serrant ou dispersant le banc. Reste à le juger en salle.
+- La **direction artistique** des bulles : avancée le 23 octobre — bulle à stries façon PPCM, en
+  subsurface masked, et trois états de salle (voir plus haut). Reste à la juger dans `VIBH2o_PPCM`,
+  sur le tulle, et à la régler en salle.
+
+- ~~Le **comportement de banc** du tableau 2~~ — fait : vrais boids, pilote par défaut du tableau 2. Enrichi le 24 octobre : **division** de chaque bulle en sœurs au début du morph, **vortex en cône** en synchronie, **familles lisibles** hors synchronie. Reste à le juger en salle.
 - La **direction artistique** des bulles : mesh, matériau subsurface, stries, anneaux.
 - Un éventuel **pilotage MIDI direct**, à brancher sur les fonctions existantes.
 - Les **tableaux suivants**, chacun étant une nouvelle classe de pilote de position.
