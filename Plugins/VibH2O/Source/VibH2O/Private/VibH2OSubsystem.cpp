@@ -9,6 +9,7 @@
 #include "Osc/VibH2OOscReceiver.h"
 #include "Remote/VibH2ORemoteServer.h"
 #include "SocketSubsystem.h"
+#include "UObject/GCObject.h"
 #include "UObject/ObjectKey.h"
 #include "UObject/Package.h"
 #include "VibH2OModule.h"
@@ -173,9 +174,14 @@ UVibH2OSubsystem* UVibH2OSubsystem::Get(const UObject* WorldContextObject)
 namespace VibH2OEditorPreviewInternal
 {
 	/**
-	 * One stand-in per editor world. Weak pointers plus rooting rather than
-	 * TStrongObjectPtr: a static holding strong pointers would be destroyed
-	 * after the object system at exit, which is a crash on quit.
+	 * One stand-in per editor world, weakly held here.
+	 *
+	 * Kept alive by a referencer, never by rooting: when Play stops, the
+	 * editor marks every UGameInstance as garbage (PlayLevel.cpp, 5.5 and
+	 * 5.8 alike), ours included, and MarkAsGarbage asserts on a rooted
+	 * object - Stop crashed the editor in any map holding a stage. Not
+	 * rooted, the stand-in simply dies there and is rebuilt on the next
+	 * editor tick; the simulator re-sends the room by itself.
 	 */
 	struct FEntry
 	{
@@ -186,16 +192,38 @@ namespace VibH2OEditorPreviewInternal
 	static TMap<TObjectKey<UWorld>, FEntry> Entries;
 	static FDelegateHandle CleanupHandle;
 
+	/**
+	 * Allocated once and never freed: a static FGCObject would be destroyed
+	 * after the object system at exit, which is a crash on quit.
+	 */
+	class FReferencer : public FGCObject
+	{
+	public:
+		TArray<TObjectPtr<UObject>> Objects;
+
+		virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+		{
+			Collector.AddReferencedObjects(Objects);
+		}
+
+		virtual FString GetReferencerName() const override
+		{
+			return TEXT("VibH2OEditorPreview");
+		}
+	};
+
+	static FReferencer& GetReferencer()
+	{
+		static FReferencer* Referencer = new FReferencer();
+		return *Referencer;
+	}
+
 	static void Release(FEntry& Entry)
 	{
-		if (UVibH2OSubsystem* Subsystem = Entry.Subsystem.Get())
-		{
-			Subsystem->RemoveFromRoot();
-		}
-		if (UGameInstance* Outer = Entry.Outer.Get())
-		{
-			Outer->RemoveFromRoot();
-		}
+		TArray<TObjectPtr<UObject>>& Objects = GetReferencer().Objects;
+		Objects.Remove(Entry.Subsystem.Get());
+		Objects.Remove(Entry.Outer.Get());
+		Objects.Remove(nullptr);
 	}
 }
 
@@ -240,8 +268,8 @@ UVibH2OSubsystem* UVibH2OSubsystem::GetEditorPreview(UWorld* World)
 	// also how the integration tests build theirs.
 	UGameInstance* Outer = NewObject<UGameInstance>(GetTransientPackage(), NAME_None, RF_Transient);
 	UVibH2OSubsystem* Subsystem = NewObject<UVibH2OSubsystem>(Outer, NAME_None, RF_Transient);
-	Outer->AddToRoot();
-	Subsystem->AddToRoot();
+	GetReferencer().Objects.Add(Outer);
+	GetReferencer().Objects.Add(Subsystem);
 
 	// No Initialize(): that would start the receiver. Effects only.
 	Subsystem->bEditorPreview = true;

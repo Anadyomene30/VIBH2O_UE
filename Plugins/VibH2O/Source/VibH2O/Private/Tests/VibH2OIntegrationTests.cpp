@@ -15,6 +15,7 @@
 #include "Osc/VibH2OOscReceiver.h"
 #include "SocketSubsystem.h"
 #include "Sockets.h"
+#include "UObject/Package.h"
 #include "UObject/StrongObjectPtr.h"
 #include "VibH2OSettings.h"
 #include "VibH2OSubsystem.h"
@@ -490,6 +491,20 @@ bool FVibH2OEditorPreviewTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("La salle se construit sans Play"), Preview->HasRoom());
 	TestEqual(TEXT("Cinq sieges occupes"), Preview->GetRoomRef().GetOccupiedCount(), 5);
+
+	// What the editor does when Play stops (PlayLevel.cpp): every game
+	// instance and everything inside it is marked as garbage, the stand-in's
+	// included. A rooted stand-in asserted there and took the editor down.
+	// Both objects by hand: the flags of ForEachObjectWithOuter differ
+	// between 5.5 and 5.8, and these two are all the stand-in owns.
+	if (UGameInstance* PreviewOuter = Cast<UGameInstance>(Preview->GetOuter()))
+	{
+		Preview->MarkAsGarbage();
+		PreviewOuter->MarkAsGarbage();
+	}
+	UVibH2OSubsystem* Rebuilt = UVibH2OSubsystem::Get(EditorWorld);
+	TestTrue(TEXT("Apres l'arret du Play, une nouvelle doublure remplace l'ancienne"),
+		Rebuilt != nullptr && Rebuilt != Preview && Rebuilt->IsEditorPreview());
 
 	// A game world with no game instance gets nothing: only plain editor
 	// worlds simulate.
