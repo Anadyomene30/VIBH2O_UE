@@ -68,6 +68,15 @@ enum class EVibH2OCueAction : uint8
 	 */
 	SendOsc UMETA(DisplayName = "Message OSC interne"),
 
+	/** The running order of the control desk: plays up to the next step. */
+	ConduiteGo UMETA(DisplayName = "Conduite - GO (étape suivante)"),
+
+	/** The running order: back one step, stopped. */
+	ConduitePrevious UMETA(DisplayName = "Conduite - Précédent"),
+
+	/** The running order: on one step without playing, stopped. */
+	ConduiteNext UMETA(DisplayName = "Conduite - Suivant"),
+
 	/** Only raises OnCueFired, for a Blueprint to act on. */
 	BlueprintEvent UMETA(DisplayName = "Événement Blueprint seulement")
 };

@@ -120,9 +120,10 @@ body.locked #shield { display: block; }
 .banner.show { display: block; }
 #nack { border-left: 8px solid var(--bad); }
 
-nav { flex: none; display: flex; gap: 8px; padding: 10px 12px 0; }
+nav { flex: none; display: flex; gap: 8px; padding: 10px 12px 0; overflow-x: auto; scrollbar-width: none; }
+nav::-webkit-scrollbar { display: none; }
 nav button {
-  flex: 1 1 auto; min-height: 52px; padding: 6px 16px; border-radius: 12px; color: var(--dim);
+  flex: 1 0 auto; white-space: nowrap; min-height: 52px; padding: 6px 16px; border-radius: 12px; color: var(--dim);
   border: 1px solid var(--line); background: transparent; font-weight: 600;
 }
 nav button.sel { color: var(--strong); border-color: var(--dim); background: var(--panel); }
@@ -252,6 +253,7 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 .rg output { text-align: right; color: var(--strong); font-variant-numeric: tabular-nums; }
 .rg input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: none; padding: 2px; }
 .rg .chip { grid-column: 2 / 4; justify-self: start; }
+.rg .hint { grid-column: 1 / 4; margin-top: -6px; color: var(--dim); font-size: 13px; line-height: 1.3; }
 [data-regie] { display: flex; flex-direction: column; gap: 14px; }
 .cam { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cam .chip { justify-content: center; }
@@ -260,6 +262,9 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 .preset .chip { flex: 1; justify-content: flex-start; }
 .preset .del { flex: none; }
 .saveRow { display: flex; gap: 8px; }
+.big.go { min-height: 120px; font-size: 44px; letter-spacing: .1em; border-color: var(--ok); color: var(--ok); }
+.condNow { font-size: 30px; font-weight: 700; color: var(--strong); }
+.preset .chip.cur { border-color: var(--ok); color: var(--strong); }
 .saveRow .big { flex: none; min-width: 0; padding: 0 20px; font-size: 18px; }
 .saveRow input { flex: 1; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--strong); font: inherit; padding: 0 14px; }
 .page.sel#page2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
@@ -315,6 +320,9 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 }
 @media (max-width: 560px) {
   #title { display: none; }
+  header { gap: 8px; padding: 6px 8px; }
+  .pill { height: 28px; padding: 0 8px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  #status { display: none; }
 }
 </style>
 </head>
@@ -339,8 +347,10 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
   <div class="banner" id="banner"></div>
   <div class="banner" id="nack"></div>
   <nav id="nav">
-    <button data-page="pageS" class="sel">Spectacle</button>
+    <button data-page="pageC" class="sel">Conduite</button>
+    <button data-page="pageS">Spectacle</button>
     <button data-page="page2" id="tab2">Tableaux · Fond · Focus</button>
+    <button data-page="pageT">Tableau 2</button>
     <button data-page="pageI">Image</button>
     <button data-page="pageA">Ambiance</button>
     <button data-page="pageB">Bulles · Réaction</button>
@@ -353,11 +363,26 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
       <p id="noconnText">La télécommande attend la réponse du PC Unreal.</p>
     </div></div>
 
-    <div class="page grid sel" id="pageS">
+    <div class="page grid sel" id="pageC">
+      <section>
+        <h2>Conduite</h2>
+        <div id="condNow" class="condNow">—</div>
+        <div id="condNext" class="ends"><span>—</span></div>
+        <button class="big go" id="condGo">GO</button>
+        <div class="cam">
+          <button class="chip" id="condPrev"><span class="lbl">◀ Précédent</span></button>
+          <button class="chip" id="condNextBtn"><span class="lbl">Suivant ▶</span></button>
+          <button class="chip" id="condPause"><span class="lbl">Pause / reprise</span></button>
+        </div>
+        <p class="ends"><span id="condHelp">GO joue jusqu'à l'étape suivante et s'arrête. Précédent et Suivant changent d'étape sans jouer.</span></p>
+      </section>
+      <section><h2>Étapes <small id="condSeq"></small></h2><div class="presets" id="condSteps"></div></section>
+    </div>
+    <div class="page grid" id="pageS">
       <section>
         <h2>Caméra</h2>
         <div class="cam">
-          <button class="big" id="camDescent">Descente <small>(touche 0)</small></button>
+          <button class="big" id="camDescent">Descente <small>(maintenir)</small></button>
           <button class="big" id="camArrival">Arrivée <small>(touche 1)</small></button>
           <button class="chip" id="camStop"><span class="lbl">Stop</span></button>
           <button class="chip" id="camTop"><span class="lbl">Haut du rail</span></button>
@@ -367,6 +392,10 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
         <div class="ends"><span id="railText">Rail —</span><span id="railFrame"></span></div>
       </section>
       <section><h2>Image et descente</h2><div data-regie="Spectacle"></div></section>
+    </div>
+    <div class="page grid" id="pageT">
+      <section><h2>Tableau 2 : division et vortex</h2><div data-regie="Tableau 2"></div>
+        <p class="ends"><span>Le passage salle → banc se commande dans l'onglet Tableaux. Ces réglages disent comment il se fait.</span></p></section>
     </div>
     <div class="page grid" id="pageI">
       <section>
@@ -993,7 +1022,7 @@ function renderPage2() {
   // Ambiance - only with a plugin that reports it.
   const hasMood = has(s, "mood");
   $("#ambiance").hidden = !hasMood;
-  $("#tab2").textContent = hasMood ? "Tableaux · Fond · Ambiance · Focus · Effets" : "Tableaux · Fond · Focus · Effets";
+  $("#tab2").textContent = "Tableaux · Fond · Focus";
   if (hasMood) {
     const forced = s.moodForced === true;
     const sel = shown("mood", forced ? String(s.mood) : "auto");
@@ -1107,7 +1136,10 @@ document.querySelectorAll("#moods .chip").forEach((c) => pressable(c, { tap: () 
 // ---------------------------------------------------------------------- Régie
 // The desk publishes its own table of controls: the tabs are built from it,
 // so a setting added in Unreal appears here without touching this page.
-let regieSig = null, presetsSig = null;
+let regieSig = null, presetsSig = null, noticeSerial = -1;
+// A preset name travels as one token: "~" then percent-encoded, so spaces,
+// dashes and leading zeros reach Unreal untouched.
+const encName = (name) => "~" + encodeURIComponent(name);
 const decimals = (step) => (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3);
 function regieRow(c) {
   const key = "rg:" + c.id;
@@ -1122,16 +1154,25 @@ function regieRow(c) {
     input.type = "range"; input.min = c.min; input.max = c.max; input.step = c.step || "any";
     input.setAttribute("aria-label", c.label);
     const out = document.createElement("output");
+    // A finger that slides off the slider still ends the drag: listen on
+    // the window, or the slider would stop following Unreal for good.
     let active = false;
-    input.addEventListener("pointerdown", () => { active = true; });
-    input.addEventListener("pointerup", () => { active = false; });
-    input.addEventListener("pointercancel", () => { active = false; });
-    input.addEventListener("input", () => {
+    const release = () => { active = false; window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release); };
+    input.addEventListener("pointerdown", () => { active = true; window.addEventListener("pointerup", release); window.addEventListener("pointercancel", release); });
+    // A setting that rebuilds things in Unreal (the daughters) is sent on
+    // release only: dragging it would rebuild the school at every step.
+    const heavy = c.id === "Daughters";
+    const push = () => {
       const v = parseFloat(input.value);
       hold(key, v);
       out.textContent = v.toFixed(decimals(c.step));
       send(key, "/Regie/Set " + c.id + " " + v, c.label + " : " + v.toFixed(decimals(c.step)), [key]);
+    };
+    input.addEventListener("input", () => {
+      if (heavy) { out.textContent = parseFloat(input.value).toFixed(decimals(c.step)); return; }
+      push();
     });
+    input.addEventListener("change", () => { release(); push(); });
     row.appendChild(input); row.appendChild(out);
     row.update = (v) => { if (!active) input.value = v; out.textContent = Number(v).toFixed(decimals(c.step)); };
   } else if (c.kind === "color") {
@@ -1139,13 +1180,23 @@ function regieRow(c) {
     input.type = "color";
     input.setAttribute("aria-label", c.label);
     const out = document.createElement("output");
+    // While the picker is open the colour follows the finger, not Unreal;
+    // once it closes - or after a pause - Unreal's value shows again.
+    let picking = 0;
     input.addEventListener("input", () => {
+      picking = performance.now();
       hold(key, input.value);
       out.textContent = input.value.toUpperCase();
-      send(key, "/Regie/Set " + c.id + " " + input.value, c.label);
+      send(key, "/Regie/Set " + c.id + " " + input.value, c.label, [key]);
     });
+    input.addEventListener("change", () => { picking = 0; });
+    input.addEventListener("blur", () => { picking = 0; });
     row.appendChild(input); row.appendChild(out);
-    row.update = (v) => { if (document.activeElement !== input) input.value = String(v).toLowerCase(); out.textContent = String(v).toUpperCase(); };
+    row.update = (v) => {
+      const hex = /^#[0-9a-f]{6}$/i.test(String(v)) ? String(v).toLowerCase() : "#000000";
+      if (performance.now() - picking > 1500) input.value = hex;
+      out.textContent = hex.toUpperCase();
+    };
   } else {
     const chip = document.createElement("button");
     chip.className = "chip";
@@ -1160,12 +1211,18 @@ function regieRow(c) {
     row.appendChild(chip);
     row.update = (v) => { chip.classList.toggle("on", !!v); chip.querySelector(".lbl").textContent = v ? "OUI" : "NON"; };
   }
+  if (c.help) {
+    const hint = document.createElement("small");
+    hint.className = "hint";
+    hint.textContent = c.help;
+    row.appendChild(hint);
+  }
   return row;
 }
 function renderRegie() {
   const r = state.regie;
-  document.querySelectorAll("#nav button[data-page=pageS], #nav button[data-page=pageI], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
-  if (!r && ["pageS", "pageI", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
+  document.querySelectorAll("#nav button[data-page=pageC], #nav button[data-page=pageS], #nav button[data-page=pageT], #nav button[data-page=pageI], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
+  if (!r && ["pageC", "pageS", "pageT", "pageI", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
   if (!r || !Array.isArray(r.controls)) return;
   const sig = r.controls.map((c) => c.id + c.label + c.kind).join(",");
   if (sig !== regieSig) {
@@ -1194,6 +1251,15 @@ function renderRegie() {
   $("#railText").textContent = "Rail " + rail.toFixed(3) + (r.move ? " — " + r.move : "");
   $("#railFrame").textContent = framed >= 0 ? "vue d'ensemble à " + framed.toFixed(3) : "vue d'ensemble : pas de salle";
 
+  renderConduite(r.conduite);
+
+  // What Unreal says about the last command: saved, recalled, refused...
+  const n = r.notice;
+  if (n && typeof n.serial === "number") {
+    if (noticeSerial >= 0 && n.serial !== noticeSerial && n.text) toast(n.text);
+    noticeSerial = n.serial;
+  }
+
   const names = Array.isArray(r.presets) ? r.presets : [];
   const psig = names.join("|");
   if (psig !== presetsSig) {
@@ -1208,30 +1274,74 @@ function renderRegie() {
       load.innerHTML = '<span class="lbl"></span>';
       load.querySelector(".lbl").textContent = name;
       pressable(load, { holdMs: () => CONFIRM_MS, ringColor: "var(--ok)", hint: "Maintenir pour rappeler « " + name + " ».",
-        confirm: () => { send("preset", "/Regie/Preset/Load " + name, "Préréglage " + name); toast("Rappel : " + name); } });
+        confirm: () => { send("preset", "/Regie/Preset/Load " + encName(name), "Préréglage " + name); toast("Rappel : " + name); } });
       const del = document.createElement("button");
       del.className = "chip del";
       del.innerHTML = '<span class="lbl">Supprimer</span>';
       pressable(del, { holdMs: () => UNLOCK_MS, hint: "Maintenir 1,5 s pour supprimer « " + name + " ».",
-        confirm: () => { send("presetDel", "/Regie/Preset/Delete " + name, "Suppression " + name); toast("Supprimé : " + name); } });
+        confirm: () => { send("presetDel", "/Regie/Preset/Delete " + encName(name), "Suppression " + name); toast("Supprimé : " + name); } });
       line.appendChild(load); line.appendChild(del);
       box.appendChild(line);
     }
   }
 }
+let condSig = null;
+function renderConduite(c) {
+  const steps = c && Array.isArray(c.steps) ? c.steps : [];
+  const cur = c ? num(c.current, -1) : -1;
+  if (!steps.length) {
+    $("#condNow").textContent = "Pas de séquence du spectacle";
+    $("#condNext").firstChild.textContent = "Dans Unreal : Régie → Séquence du spectacle, une Level Sequence avec des marqueurs nommés.";
+  } else {
+    $("#condNow").textContent = (cur >= 0 ? steps[cur] : "—") + (c.playing ? "  ▶" : "");
+    $("#condNext").firstChild.textContent = cur + 1 < steps.length ? "Suivante : " + steps[cur + 1] : "Dernière étape : GO joue jusqu'à la fin.";
+  }
+  $("#condSeq").textContent = c && c.sequence ? "— " + c.sequence : "";
+  const sig = steps.join("|") + "#" + cur;
+  if (sig === condSig) return;
+  condSig = sig;
+  const box = $("#condSteps");
+  box.innerHTML = "";
+  steps.forEach((name, i) => {
+    const line = document.createElement("div");
+    line.className = "preset";
+    const b = document.createElement("button");
+    b.className = "chip" + (i === cur ? " cur on" : "");
+    b.innerHTML = '<span class="lbl"></span>';
+    b.querySelector(".lbl").textContent = (i + 1) + ". " + name;
+    pressable(b, { holdMs: () => CONFIRM_MS, ringColor: "var(--ok)", hint: "Maintenir pour aller à « " + name + " ».",
+      confirm: () => { send("condGoTo", "/Regie/Conduite/Aller " + i, "Conduite : " + name); toast("Étape : " + name); } });
+    line.appendChild(b);
+    box.appendChild(line);
+  });
+}
+pressable($("#condGo"), { tap: () => { send("condGo", "/Regie/Conduite/Go", "GO"); toast("GO"); } });
+pressable($("#condPrev"), { tap: () => { send("condPrev", "/Regie/Conduite/Precedent", "Précédent"); } });
+pressable($("#condNextBtn"), { tap: () => { send("condNext", "/Regie/Conduite/Suivant", "Suivant"); } });
+pressable($("#condPause"), { tap: () => { send("condPause", "/Regie/Conduite/Pause", "Pause"); } });
 function cam(word, label) { send("cam", "/Regie/Camera " + word, label); toast(label); }
-pressable($("#camDescent"), { tap: () => cam("descente", "Caméra : descente") });
+// The descent starts from the top of the rail: held, never tapped, so a
+// stray touch never sends the camera back up during the show.
+pressable($("#camDescent"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour lancer la descente depuis le haut du rail.", confirm: () => cam("descente", "Caméra : descente") });
 pressable($("#camArrival"), { tap: () => cam("arrivee", "Caméra : arrivée") });
 pressable($("#camStop"), { tap: () => cam("stop", "Caméra : stop") });
 pressable($("#camTop"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour remonter en haut du rail.", confirm: () => cam("depart", "Caméra : haut du rail") });
 pressable($("#camFrame"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour aller à la vue d'ensemble.", confirm: () => cam("ensemble", "Caméra : vue d'ensemble") });
 pressable($("#imageReset"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour revenir à l'image d'origine.",
   confirm: () => { send("imageReset", "/Regie/Image/Reset", "Image d'origine"); toast("Image d'origine"); } });
+let overwriteAsked = "", overwriteAt = 0;
 pressable($("#presetSave"), { tap: () => {
   const name = $("#presetName").value.trim();
   if (!name) { toast("Donner un nom au préréglage."); return; }
-  send("presetSave", "/Regie/Preset/Save " + name, "Enregistrement " + name);
-  toast("Enregistré : " + name);
+  const names = state.regie && Array.isArray(state.regie.presets) ? state.regie.presets : [];
+  // An existing name: a second press within 5 s replaces it.
+  if (names.includes(name) && !(overwriteAsked === name && performance.now() - overwriteAt < 5000)) {
+    overwriteAsked = name; overwriteAt = performance.now();
+    toast("« " + name + " » existe déjà : appuyer encore pour le remplacer.");
+    return;
+  }
+  overwriteAsked = "";
+  send("presetSave", "/Regie/Preset/Save " + encName(name), "Enregistrement " + name);
   $("#presetName").value = "";
 } });
 
@@ -1363,6 +1473,7 @@ if (store.get("vibh2o.locked") === "1") setLocked(true);
 const savedPage = store.get("vibh2o.page");
 if (savedPage) showPage(savedPage);
 
+$("#pageA").prepend($("#ambiance"));
 keepAwake();
 safeRender();
 poll();

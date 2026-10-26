@@ -26,6 +26,8 @@
 #include "VibH2ORegie.generated.h"
 
 class ACameraRig_Rail;
+class ALevelSequenceActor;
+class ULevelSequencePlayer;
 class AExponentialHeightFog;
 class APostProcessVolume;
 class AVibH2OStageActor;
@@ -102,6 +104,56 @@ struct VIBH2O_API FVibH2ORegieSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Grain", ClampMin = "0.0", ClampMax = "1.0", ToolTip = "Grain de pellicule. 0 = image lisse."))
 	float ImageGrain = 0.0f;
+
+	// -------------------------------------------------------------- Tableau 2
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "La caméra garde tout le banc", ToolTip = "En tableau 2, la caméra recule ou avance doucement pour que tout le banc reste dans l'image. Elle revient à la vue d'ensemble au retour en tableau 1."))
+	bool bFollowSchool = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Transition salle → banc : durée (s)", ClampMin = "1", ClampMax = "60", ToolTip = "Temps du passage entre les deux tableaux quand on le commande."))
+	float TransitionSeconds = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Bulles filles par spectateur", ClampMin = "0", ClampMax = "8", ToolTip = "Chaque bulle se divise en ce nombre de sœurs au début de la transition. 0 = pas de division."))
+	float Daughters = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Écart entre les sœurs", ClampMin = "0", ClampMax = "150", ToolTip = "Distance entre une bulle et ses filles pendant la division."))
+	float SisterSpread = 35.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Vortex : hauteur", ClampMin = "100", ClampMax = "5000", ToolTip = "Hauteur du cône que forme le banc."))
+	float VortexHeight = 1200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Vortex : largeur en bas", ClampMin = "0", ClampMax = "3000", ToolTip = "Rayon du cône à sa base."))
+	float VortexBaseRadius = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Vortex : largeur en haut", ClampMin = "0", ClampMax = "3000", ToolTip = "Rayon du cône en haut : plus grand qu'en bas, il s'évase."))
+	float VortexTopRadius = 900.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Vortex : nombre de tours", ClampMin = "0", ClampMax = "10", ToolTip = "Combien de fois la spirale fait le tour de bas en haut."))
+	float VortexTurns = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Vortex : vitesse de rotation", ClampMin = "-1", ClampMax = "1", ToolTip = "Vitesse de rotation du vortex. Négatif : dans l'autre sens."))
+	float VortexSpin = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Banc : vitesse lente", ClampMin = "1", ClampMax = "1000", ToolTip = "Vitesse des poissons les plus calmes."))
+	float SchoolMinSpeed = 90.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Banc : vitesse rapide", ClampMin = "1", ClampMax = "1500", ToolTip = "Vitesse des plus excités."))
+	float SchoolMaxSpeed = 420.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Banc : force du tourbillon", ClampMin = "0", ClampMax = "6", ToolTip = "Combien le banc est entraîné dans la rotation du vortex."))
+	float SchoolSwirl = 1.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Banc : nager ensemble", ClampMin = "0", ClampMax = "6", ToolTip = "Plus haut : les bulles prennent la même direction que leurs voisines."))
+	float SchoolAlignment = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Banc : se resserrer", ClampMin = "0", ClampMax = "1", ToolTip = "Plus haut : le banc reste groupé."))
+	float SchoolCohesion = 0.06f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Synchronie : vortex au-dessus de", ClampMin = "0", ClampMax = "1", ToolTip = "Au-dessus de ce niveau de synchronie de la salle, le banc tourne en vortex."))
+	float SyncVortexAbove = 0.7f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Synchronie : dispersion sous", ClampMin = "0", ClampMax = "1", ToolTip = "Sous ce niveau, le banc s'éparpille en familles."))
+	float SyncDisperseBelow = 0.35f;
 
 	// --------------------------------------------------------------- Ambiance
 
@@ -188,6 +240,8 @@ struct VIBH2O_API FVibH2ORegieControl
 	float Min;
 	float Max;
 	float Step;
+	/** One line for the operator: what the setting changes on screen. */
+	const TCHAR* Help = nullptr;
 };
 
 UENUM(BlueprintType)
@@ -246,9 +300,59 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "VibH2O|Branchements", meta = (DisplayName = "Mettre à jour le contrôleur de caméra"))
 	bool bDriveCameraController = true;
 
-	/** Particle actors and components whose name contains this text appear through the fog. */
+	/**
+	 * Particle systems whose effect, class or component name contains this
+	 * text appear through the fog. The effect's own name - not the actor's
+	 * label, which a packaged game does not have.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "VibH2O|Branchements", meta = (DisplayName = "Particules : nom cherché"))
 	FString ParticleNameFilter = TEXT("Dirt");
+
+	// ------------------------------------------------------------- Conduite
+
+	/**
+	 * The show's Level Sequence. Its named markers are the steps of the cue
+	 * list: GO plays up to the next marker and stops there. Empty: the first
+	 * Level Sequence of the level that has markers.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Conduite", meta = (DisplayName = "Séquence du spectacle", ToolTip = "La Level Sequence du spectacle. Chaque marqueur nommé est une étape : GO joue jusqu'au marqueur suivant puis s'arrête. Vide = la première séquence de la carte qui a des marqueurs."))
+	TObjectPtr<ALevelSequenceActor> ShowSequence;
+
+	/**
+	 * In Play, the keyboard drives the cue list too: Space or Page Down is
+	 * GO, Page Up goes back a step. A presentation remote sends exactly
+	 * these keys.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Conduite", meta = (DisplayName = "Clavier : Espace = GO", ToolTip = "En Play : Espace ou Page suivante = GO, Page précédente = étape précédente. Une télécommande de présentation envoie justement ces touches."))
+	bool bConduiteKeys = true;
+
+	/** Plays from where the show stands to the next step, and stops there. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
+	void ConduiteGo();
+
+	/** Back to the step before, stopped. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
+	void ConduitePrevious();
+
+	/** On to the next step without playing what is in between, stopped. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
+	void ConduiteNext();
+
+	/** To a step by its number (0 = the start), stopped. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
+	void ConduiteGoTo(int32 Step);
+
+	/** Pauses or resumes the show's sequence. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
+	void ConduitePause();
+
+	/** The steps' names, in order: "Début", then every marker. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Conduite")
+	TArray<FString> GetConduiteSteps() const;
+
+	/** The step the show stands at or has last passed. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Conduite")
+	int32 GetConduiteStep() const;
 
 	// ------------------------------------------------------------- Readouts
 
@@ -271,6 +375,10 @@ public:
 	/** Reads the current values of the driven actors into the desk, so placing it changes nothing. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Lire l'état actuel de la scène"))
 	void CaptureFromScene();
+
+	/** Takes the image as it looks now as the new "original image" the reset returns to. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Prendre l'image actuelle comme image d'origine"))
+	void RecaptureImage();
 
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Recalculer le cadrage"))
 	void RefreshFraming();
@@ -347,7 +455,16 @@ public:
 
 private:
 	void ResolveConnections();
+	/** Resolves again only when something is still missing, at most every few seconds. */
+	void ResolveMissingConnections();
 	void ApplyChanged(bool bForce);
+	/** Reads the driven actors into the settings, without touching the image or the output format. */
+	void ReadScene();
+	/** True when this setting is to be pushed in the current apply. */
+	bool Changed(const TCHAR* Name) const;
+	/** A line for the tablet: what just happened, or why it did not. */
+	void Notice(const FString& Text);
+	bool IsEditorWorld() const;
 	void ApplyToStage();
 	void ApplyToExposure();
 	void ApplyToWater();
@@ -355,13 +472,26 @@ private:
 	void ApplyToOutput();
 	void ApplyToImage();
 	void CaptureImage();
+	void ApplyToTableau2();
+	void CaptureTableau2();
 	class UCameraComponent* FindRailCamera() const;
 	void TickCamera(float DeltaSeconds);
 	void TickParticles();
 	void GatherParticles();
 	float GetRailPosition() const;
 	void SetRailPosition(float Position);
-	bool ComputeFramedRailPosition(float& OutPosition) const;
+	bool ComputeFramedRailPosition(float& OutPosition, bool bForSchool = false) const;
+	void TickFollowSchool(float DeltaSeconds);
+
+	struct FConduiteStep
+	{
+		FString Label;
+		/** In the sequence's display rate. */
+		FFrameTime Time;
+	};
+	ULevelSequencePlayer* GetShowPlayer() const;
+	TArray<FConduiteStep> GatherConduiteSteps() const;
+	void JumpConduite(const TArray<FConduiteStep>& Steps, int32 Index);
 
 	UPROPERTY(Transient)
 	FVibH2ORegieSettings Applied;
@@ -377,6 +507,10 @@ private:
 	 */
 	UPROPERTY()
 	bool bImageCaptured = false;
+
+	/** False until the tableau 2 settings have been read from the stage: a desk placed before they existed reads them once. */
+	UPROPERTY()
+	bool bTableau2Captured = false;
 
 	UPROPERTY()
 	FVector4 BaseContrast = FVector4(1.0, 1.0, 1.0, 1.0);
@@ -406,12 +540,27 @@ private:
 	bool bHasApplied = false;
 	bool bWaterPending = false;
 
+	/** Names of the settings that differ from what was last pushed; empty with bApplyAll. */
+	TSet<FName> ChangedNow;
+	bool bApplyAll = false;
+	double LastResolveTime = -1000.0;
+	TWeakObjectPtr<class AVibH2OBackdrop> CachedBackdrop;
+
+	FString NoticeText;
+	int32 NoticeSerial = 0;
+
 	// Camera move.
 	float MoveFrom = 0.0f;
 	float MoveTo = 0.0f;
 	float MoveElapsed = 0.0f;
 	float MoveDuration = 0.0f;
 	float LastWrittenRail = -1.0f;
+	/** Last time something other than the desk moved the rail: the desk keeps off for a moment. */
+	double ExternalRailMoveTime = -1000.0;
+	float PreviousRail = -1.0f;
+	bool bFollowingSchool = false;
+	float SchoolTarget = -1.0f;
+	double LastSchoolFramingTime = 0.0;
 	double LastFramingTime = 0.0;
 
 	// Particles.

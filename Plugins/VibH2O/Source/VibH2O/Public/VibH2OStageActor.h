@@ -545,6 +545,15 @@ public:
 	FBox GetRoomBounds() const;
 
 	/**
+	 * Bounds of the seating plan at rest, in WORLD space: where every
+	 * occupied seat's bubble sits in tableau 1 before float, drift, beat,
+	 * attractors or zones move it. What a camera frames the room on - it
+	 * does not breathe with the audience.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O")
+	FBox GetSeatPlanBounds() const;
+
+	/**
 	 * Distance at which a camera of the given horizontal field of view frames
 	 * the whole group.
 	 *
