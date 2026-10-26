@@ -17,6 +17,7 @@
 #include "Steering/VibH2OExclusionZoneActor.h"
 #include "Steering/VibH2OSteeringMath.h"
 #include "VibH2OBackdrop.h"
+#include "VibH2ORegie.h"
 #include "VibH2OBubbleActor.h"
 #include "VibH2OMood.h"
 #include "VibH2OModule.h"
@@ -1455,6 +1456,11 @@ FString AVibH2OStageActor::BuildRemoteStateJson() const
 		for (TActorIterator<AVibH2OBackdrop> It(World); It; ++It)
 		{
 			Root->SetNumberField(TEXT("backdrop"), It->GetTargetPresence());
+			break;
+		}
+		for (TActorIterator<AVibH2ORegie> It(World); It; ++It)
+		{
+			It->WriteRemoteState(Root);
 			break;
 		}
 	}

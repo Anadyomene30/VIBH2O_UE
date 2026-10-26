@@ -29,7 +29,10 @@ public class VibH2O : ModuleRules
 			// The cue director plays Level Sequences. Also used by the
 			// non-shipping VibH2O.DemoSweep console command.
 			"LevelSequence",
-			"MovieScene"
+			"MovieScene",
+			// The control desk: the camera rail it frames, and the JSON of its presets.
+			"CinematicCamera",
+			"JsonUtilities"
 		});
 
 		// The remote's page ships as loose files next to the packaged game,

@@ -158,6 +158,15 @@ public:
 	FString AmbiancePrefix = TEXT("/Ambiance");
 
 	/**
+	 * The control desk: "/Regie/<setting> value", "/Regie/Camera descente",
+	 * "/Regie/Preset/Load <name>". The tablet's tabs, and any OSC sender.
+	 */
+	UPROPERTY(config, EditAnywhere, AdvancedDisplay, Category = "Adresses OSC",
+		meta = (DisplayName = "Adresse : régie",
+			ToolTip = "« /Regie/<réglage> valeur », « /Regie/Camera descente|arrivee|stop|depart|ensemble », « /Regie/Preset/Save|Load|Delete nom »."))
+	FString RegiePrefix = TEXT("/Regie");
+
+	/**
 	 * Attractor prefix: "/Attractor/<name>/ 0..1" sets its activation,
 	 * "/Attractor/<name>/Share/ 0..1" its share of the room.
 	 */

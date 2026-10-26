@@ -67,6 +67,9 @@ struct VIBH2O_API FVibH2ONetworkStats
 	float MessagesPerSecond = 0.0f;
 };
 
+/** Native: the OSC message type is not a reflected struct. The control desk binds to it. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2ORegieMessageSignature, const FVibH2OOscMessage&);
+
 /**
  * The VibH2O subsystem.
  *
@@ -334,6 +337,9 @@ public:
 	/** /Ambiance - 0 automatic, 1 calm, 2 normal, 3 excited (EVibH2OMoodOverride order). */
 	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
 	FVibH2OAmbianceControlSignature OnOscAmbianceChanged;
+
+	/** /Regie/... - for the control desk, which reads the message itself. */
+	FVibH2ORegieMessageSignature OnRegieMessage;
 
 	// ------------------------------------------------------------- Injection
 

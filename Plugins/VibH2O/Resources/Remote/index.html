@@ -245,6 +245,23 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 #effects .chip:not(.on) .lbl { text-decoration: line-through; }
 
 /* --------------------------------------------------------------- Page 2 */
+.page.sel.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
+.grid section { min-height: auto; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); }
+.rg { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.4fr) 64px; align-items: center; gap: 10px; }
+.rg label { color: var(--text); font-size: 15px; line-height: 1.2; }
+.rg output { text-align: right; color: var(--strong); font-variant-numeric: tabular-nums; }
+.rg input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: none; padding: 2px; }
+.rg .chip { grid-column: 2 / 4; justify-self: start; }
+[data-regie] { display: flex; flex-direction: column; gap: 14px; }
+.cam { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cam .chip { justify-content: center; }
+.presets { display: flex; flex-direction: column; gap: 8px; }
+.preset { display: flex; gap: 8px; align-items: center; }
+.preset .chip { flex: 1; justify-content: flex-start; }
+.preset .del { flex: none; }
+.saveRow { display: flex; gap: 8px; }
+.saveRow .big { flex: none; min-width: 0; padding: 0 20px; font-size: 18px; }
+.saveRow input { flex: 1; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--strong); font: inherit; padding: 0 14px; }
 .page.sel#page2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
 #page2 section { min-height: auto; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); }
 .ends { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 15px; }
@@ -322,8 +339,12 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
   <div class="banner" id="banner"></div>
   <div class="banner" id="nack"></div>
   <nav id="nav">
-    <button data-page="page1" class="sel">Attracteurs</button>
-    <button data-page="page2" id="tab2">Tableaux · Fond · Focus · Effets</button>
+    <button data-page="pageS" class="sel">Spectacle</button>
+    <button data-page="page2" id="tab2">Tableaux · Fond · Focus</button>
+    <button data-page="pageA">Ambiance</button>
+    <button data-page="pageB">Bulles · Réaction</button>
+    <button data-page="pageP">Préréglages</button>
+    <button data-page="page1">Attracteurs · Zones</button>
   </nav>
   <main>
     <div id="noconn"><div>
@@ -331,7 +352,42 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
       <p id="noconnText">La télécommande attend la réponse du PC Unreal.</p>
     </div></div>
 
-    <div class="page sel" id="page1">
+    <div class="page grid sel" id="pageS">
+      <section>
+        <h2>Caméra</h2>
+        <div class="cam">
+          <button class="big" id="camDescent">Descente <small>(touche 0)</small></button>
+          <button class="big" id="camArrival">Arrivée <small>(touche 1)</small></button>
+          <button class="chip" id="camStop"><span class="lbl">Stop</span></button>
+          <button class="chip" id="camTop"><span class="lbl">Haut du rail</span></button>
+          <button class="chip" id="camFrame"><span class="lbl">Vue d'ensemble</span></button>
+        </div>
+        <div class="meter" id="railMeter"><div class="fill" id="railFill"></div><div class="mark" id="railMark" hidden></div></div>
+        <div class="ends"><span id="railText">Rail —</span><span id="railFrame"></span></div>
+      </section>
+      <section><h2>Image et descente</h2><div data-regie="Spectacle"></div></section>
+    </div>
+    <div class="page grid" id="pageA">
+      <section><h2>Couleurs des ambiances</h2><div data-regie="Ambiance" data-kind="color"></div></section>
+      <section><h2>Lumière et eau</h2><div data-regie="Ambiance" data-kind="other"></div></section>
+    </div>
+    <div class="page grid" id="pageB">
+      <section><h2>Bulles</h2><div data-regie="Bulles"></div></section>
+      <section><h2>Réaction aux capteurs</h2><div data-regie="Réaction"></div></section>
+    </div>
+    <div class="page grid" id="pageP">
+      <section>
+        <h2>Rappeler un préréglage</h2>
+        <p class="ends"><span>Maintenir pour rappeler : tout l'aspect change d'un coup.</span></p>
+        <div class="presets" id="presets"></div>
+      </section>
+      <section>
+        <h2>Enregistrer l'aspect actuel</h2>
+        <div class="saveRow"><input id="presetName" type="text" placeholder="Nom (ex. Final bleu)" maxlength="40" autocomplete="off"><button class="big" id="presetSave">Enregistrer</button></div>
+        <p class="ends"><span>Les préréglages sont gardés sur le PC Unreal, d'une session à l'autre.</span></p>
+      </section>
+    </div>
+    <div class="page" id="page1">
       <section id="left">
         <h2>Attracteurs</h2>
         <div id="tiles"></div>
@@ -608,6 +664,7 @@ function render() {
   renderAttractors();
   renderZones(list(state.zones));
   renderPage2();
+  renderRegie();
 }
 
 function renderHeader() {
@@ -1036,6 +1093,136 @@ document.querySelectorAll("#moods .chip").forEach((c) => pressable(c, { tap: () 
   send("mood", "/Ambiance " + m, "Ambiance : " + (m === "auto" ? "Auto" : moodName(m)));
   safeRender();
 } }));
+
+
+// ---------------------------------------------------------------------- Régie
+// The desk publishes its own table of controls: the tabs are built from it,
+// so a setting added in Unreal appears here without touching this page.
+let regieSig = null, presetsSig = null;
+const decimals = (step) => (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3);
+function regieRow(c) {
+  const key = "rg:" + c.id;
+  const row = document.createElement("div");
+  row.className = "rg";
+  row.dataset.id = c.id;
+  const label = document.createElement("label");
+  label.textContent = c.label;
+  row.appendChild(label);
+  if (c.kind === "float") {
+    const input = document.createElement("input");
+    input.type = "range"; input.min = c.min; input.max = c.max; input.step = c.step || "any";
+    input.setAttribute("aria-label", c.label);
+    const out = document.createElement("output");
+    let active = false;
+    input.addEventListener("pointerdown", () => { active = true; });
+    input.addEventListener("pointerup", () => { active = false; });
+    input.addEventListener("pointercancel", () => { active = false; });
+    input.addEventListener("input", () => {
+      const v = parseFloat(input.value);
+      hold(key, v);
+      out.textContent = v.toFixed(decimals(c.step));
+      send(key, "/Regie/Set " + c.id + " " + v, c.label + " : " + v.toFixed(decimals(c.step)), [key]);
+    });
+    row.appendChild(input); row.appendChild(out);
+    row.update = (v) => { if (!active) input.value = v; out.textContent = Number(v).toFixed(decimals(c.step)); };
+  } else if (c.kind === "color") {
+    const input = document.createElement("input");
+    input.type = "color";
+    input.setAttribute("aria-label", c.label);
+    const out = document.createElement("output");
+    input.addEventListener("input", () => {
+      hold(key, input.value);
+      out.textContent = input.value.toUpperCase();
+      send(key, "/Regie/Set " + c.id + " " + input.value, c.label);
+    });
+    row.appendChild(input); row.appendChild(out);
+    row.update = (v) => { if (document.activeElement !== input) input.value = String(v).toLowerCase(); out.textContent = String(v).toUpperCase(); };
+  } else {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.dataset.key = key;
+    chip.innerHTML = '<span class="lbl"></span>';
+    pressable(chip, { tap: () => {
+      const next = !shown(key, !!state.regie.values[c.id]);
+      hold(key, next);
+      send(key, "/Regie/Set " + c.id + " " + (next ? 1 : 0), c.label + (next ? " : oui" : " : non"), [key]);
+      safeRender();
+    } });
+    row.appendChild(chip);
+    row.update = (v) => { chip.classList.toggle("on", !!v); chip.querySelector(".lbl").textContent = v ? "OUI" : "NON"; };
+  }
+  return row;
+}
+function renderRegie() {
+  const r = state.regie;
+  document.querySelectorAll("#nav button[data-page=pageS], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
+  if (!r && ["pageS", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
+  if (!r || !Array.isArray(r.controls)) return;
+  const sig = r.controls.map((c) => c.id + c.label + c.kind).join(",");
+  if (sig !== regieSig) {
+    regieSig = sig;
+    document.querySelectorAll("[data-regie]").forEach((box) => {
+      box.innerHTML = "";
+      const kind = box.dataset.kind;
+      for (const c of r.controls) {
+        if (c.tab !== box.dataset.regie) continue;
+        if (kind === "color" && c.kind !== "color") continue;
+        if (kind === "other" && c.kind === "color") continue;
+        box.appendChild(regieRow(c));
+      }
+    });
+  }
+  document.querySelectorAll(".rg").forEach((row) => {
+    const id = row.dataset.id;
+    if (row.update && r.values && r.values[id] !== undefined) row.update(shown("rg:" + id, r.values[id]));
+  });
+
+  // The camera's place on the rail, and where the whole room is framed.
+  const rail = num(r.rail, 0), framed = num(r.framed, -1);
+  $("#railFill").style.width = Math.round(rail * 100) + "%";
+  $("#railMark").hidden = framed < 0;
+  if (framed >= 0) $("#railMark").style.left = (framed * 100) + "%";
+  $("#railText").textContent = "Rail " + rail.toFixed(3) + (r.move ? " — " + r.move : "");
+  $("#railFrame").textContent = framed >= 0 ? "vue d'ensemble à " + framed.toFixed(3) : "vue d'ensemble : pas de salle";
+
+  const names = Array.isArray(r.presets) ? r.presets : [];
+  const psig = names.join("|");
+  if (psig !== presetsSig) {
+    presetsSig = psig;
+    const box = $("#presets");
+    box.innerHTML = names.length ? "" : "<p class=\"ends\"><span>Aucun préréglage pour l'instant.</span></p>";
+    for (const name of names) {
+      const line = document.createElement("div");
+      line.className = "preset";
+      const load = document.createElement("button");
+      load.className = "chip";
+      load.innerHTML = '<span class="lbl"></span>';
+      load.querySelector(".lbl").textContent = name;
+      pressable(load, { holdMs: () => CONFIRM_MS, ringColor: "var(--ok)", hint: "Maintenir pour rappeler « " + name + " ».",
+        confirm: () => { send("preset", "/Regie/Preset/Load " + name, "Préréglage " + name); toast("Rappel : " + name); } });
+      const del = document.createElement("button");
+      del.className = "chip del";
+      del.innerHTML = '<span class="lbl">Supprimer</span>';
+      pressable(del, { holdMs: () => UNLOCK_MS, hint: "Maintenir 1,5 s pour supprimer « " + name + " ».",
+        confirm: () => { send("presetDel", "/Regie/Preset/Delete " + name, "Suppression " + name); toast("Supprimé : " + name); } });
+      line.appendChild(load); line.appendChild(del);
+      box.appendChild(line);
+    }
+  }
+}
+function cam(word, label) { send("cam", "/Regie/Camera " + word, label); toast(label); }
+pressable($("#camDescent"), { tap: () => cam("descente", "Caméra : descente") });
+pressable($("#camArrival"), { tap: () => cam("arrivee", "Caméra : arrivée") });
+pressable($("#camStop"), { tap: () => cam("stop", "Caméra : stop") });
+pressable($("#camTop"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour remonter en haut du rail.", confirm: () => cam("depart", "Caméra : haut du rail") });
+pressable($("#camFrame"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour aller à la vue d'ensemble.", confirm: () => cam("ensemble", "Caméra : vue d'ensemble") });
+pressable($("#presetSave"), { tap: () => {
+  const name = $("#presetName").value.trim();
+  if (!name) { toast("Donner un nom au préréglage."); return; }
+  send("presetSave", "/Regie/Preset/Save " + name, "Enregistrement " + name);
+  toast("Enregistré : " + name);
+  $("#presetName").value = "";
+} });
 
 // ------------------------------------------------- Press, hold, ring, toast
 // Every control goes through here: a tap fires on release; a control that
