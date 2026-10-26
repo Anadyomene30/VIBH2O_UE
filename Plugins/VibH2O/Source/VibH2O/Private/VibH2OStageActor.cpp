@@ -1074,14 +1074,16 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		BubbleMood.Brightness = BubbleBrightness;
 		Bubble->SetMood(BubbleMood, DeltaSeconds);
 
-		// One number per spectator: on the mother only.
+		Bubble->UpdateFromState(State, Mask, Tint, CollectiveSynchrony, Blend, StriationSpeedScale, DeltaSeconds);
+
+		// One number per spectator: on the mother only. Placed after the
+		// update, on the bubble as it will be drawn this frame.
 		Bubble->SetSeatLabelVisible(bShowSeatNumbers && Body.Member == 0);
 		if (bShowSeatNumbers)
 		{
-			Bubble->OrientSeatLabel(ViewLocation);
+			Bubble->SetSeatLabelStyle(SeatNumberSource, SeatNumberSize, SeatNumberColor);
+			Bubble->PlaceSeatLabel(ViewLocation);
 		}
-
-		Bubble->UpdateFromState(State, Mask, Tint, CollectiveSynchrony, Blend, StriationSpeedScale, DeltaSeconds);
 	}
 
 	EndSteering();

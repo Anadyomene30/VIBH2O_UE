@@ -7,6 +7,16 @@
 
 #include "VibH2OTypes.generated.h"
 
+/** Which number a bubble shows when the seat numbers are on. */
+UENUM(BlueprintType)
+enum class EVibH2OSeatNumber : uint8
+{
+	/** The individual's identifier, as Max sends it in the room plan. */
+	Individual UMETA(DisplayName = "Identifiant du spectateur"),
+	/** The seat's index in the room plan, 1-based, empty seats counted. */
+	Seat UMETA(DisplayName = "Numéro de siège dans le plan"),
+};
+
 /**
  * Order in which the OSC seat index walks the room.
  *

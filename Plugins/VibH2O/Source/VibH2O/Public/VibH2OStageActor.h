@@ -663,13 +663,23 @@ public:
 	bool bPreviewShowOrientation = true;
 
 	/**
-	 * Writes each individual's number over their bubble.
+	 * Writes each spectator's number over the middle of their bubble.
 	 *
-	 * How a seating plan is checked against the real room, and how a wrong seat
-	 * order is caught in one look rather than on opening night.
+	 * For the audience, so each spectator finds themselves in the room; for
+	 * the setup, so a wrong seat order is caught in one look rather than on
+	 * opening night. Interp: a cue in a Level Sequence can show and hide them.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Bulles", meta = (DisplayName = "Afficher les numéros de siège", ToolTip = "Un numéro sur chaque bulle, pour la mise en place. À décocher pour le spectacle."))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Numéros", meta = (DisplayName = "Afficher les numéros", ToolTip = "Le numéro de chaque spectateur au centre de sa bulle, pour qu'il s'y retrouve. Animable dans Sequencer."))
 	bool bShowSeatNumbers = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Numéros", meta = (DisplayName = "Numéro affiché", ToolTip = "L'identifiant du spectateur envoyé par Max, ou le numéro du siège dans le plan de salle."))
+	EVibH2OSeatNumber SeatNumberSource = EVibH2OSeatNumber::Individual;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Numéros", meta = (DisplayName = "Taille des numéros", ClampMin = "0.1", ClampMax = "1.5", UIMin = "0.2", UIMax = "1.0", ToolTip = "Hauteur des chiffres, en part du diamètre de la bulle. 0,55 : lisible sans déborder pour deux ou trois chiffres."))
+	float SeatNumberSize = 0.55f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Numéros", meta = (DisplayName = "Couleur des numéros"))
+	FLinearColor SeatNumberColor = FLinearColor::White;
 
 	/**
 	 * Animate the preview: the float, and a fake heartbeat pulsing the markers.

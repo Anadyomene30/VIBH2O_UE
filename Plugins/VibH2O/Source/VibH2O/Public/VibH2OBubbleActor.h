@@ -313,17 +313,27 @@ public:
 	/** Called by the stage actor on a daughter: her seat is her mother's. */
 	void AssignDaughter(const FVibH2OSeat& Seat, int32 InFamilyMember);
 
-	/** Shows or hides the number floating over this bubble. */
+	/** Shows or hides the number written on this bubble. */
 	void SetSeatLabelVisible(bool bVisible);
 
+	/** What the number says, how tall it is (share of the diameter), its colour. */
+	void SetSeatLabelStyle(EVibH2OSeatNumber Source, float HeightFraction, const FLinearColor& Color);
+
 	/**
-	 * Turns the number toward the viewer.
+	 * Writes the number over the middle of the bubble, as seen from the viewer.
 	 *
-	 * A text component renders on a fixed plane, so without this it is edge-on
-	 * and invisible from most angles. The stage actor passes the view position
-	 * once per frame rather than every bubble asking for it.
+	 * The bubble is opaque, so the text cannot sit at its true centre: it sits
+	 * on the surface facing the viewer, which reads as the centre from there.
+	 * A text component renders on a fixed plane, so it also turns to face the
+	 * viewer. The stage actor passes the view position once per frame rather
+	 * than every bubble asking for it.
 	 */
-	void OrientSeatLabel(const FVector& ViewLocation);
+	void PlaceSeatLabel(const FVector& ViewLocation);
+
+	UTextRenderComponent* GetSeatLabel() const { return SeatLabel; }
+
+	/** Centre and radius of the bubble as drawn this frame, in world space. */
+	void GetDrawnSphere(FVector& OutCentre, float& OutRadius) const;
 
 	/**
 	 * Called by the stage actor every frame, once the bubble has been placed.
@@ -350,13 +360,19 @@ private:
 	TObjectPtr<UStaticMeshComponent> DemoMesh;
 
 	/**
-	 * The individual's number, floating over the bubble.
+	 * The spectator's number, over the middle of the bubble.
 	 *
-	 * Not decoration: it is how a seating plan is checked against the real
-	 * room, and how a wrong seat order is spotted in one look.
+	 * Lets each spectator find themselves in the room - and is how a seating
+	 * plan is checked against the real room, a wrong seat order spotted in
+	 * one look.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VibH2O|Bulle", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UTextRenderComponent> SeatLabel;
+
+	EVibH2OSeatNumber SeatLabelSource = EVibH2OSeatNumber::Individual;
+	float SeatLabelHeightFraction = 0.55f;
+	/** -1 until a text has been written: forces the first write. */
+	int32 SeatLabelShownNumber = -1;
 
 	/** Local position last frame, used to measure speed. */
 	FVector PreviousLocalLocation = FVector::ZeroVector;

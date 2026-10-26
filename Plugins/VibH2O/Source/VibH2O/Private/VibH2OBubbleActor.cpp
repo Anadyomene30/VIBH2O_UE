@@ -10,6 +10,12 @@
 #include "UObject/ConstructorHelpers.h"
 #include "VibH2OModule.h"
 
+namespace VibH2OBubbleInternal
+{
+	/** Text height the seat number is built at, before its transform scales it. */
+	constexpr float SeatLabelBaseSize = 100.0f;
+}
+
 AVibH2OBubbleActor::AVibH2OBubbleActor()
 {
 	// The bubble does not tick on its own: the stage actor places and updates
@@ -30,13 +36,17 @@ AVibH2OBubbleActor::AVibH2OBubbleActor()
 	SeatLabel->SetupAttachment(BubbleRoot);
 	SeatLabel->SetHorizontalAlignment(EHTA_Center);
 	SeatLabel->SetVerticalAlignment(EVRTA_TextCenter);
-	SeatLabel->SetWorldSize(26.0f);
+	// A fixed size, scaled by the transform: changing the world size would
+	// rebuild the text of two hundred bubbles every frame as they breathe.
+	SeatLabel->SetWorldSize(VibH2OBubbleInternal::SeatLabelBaseSize);
 	SeatLabel->SetTextRenderColor(FColor(255, 255, 255));
-	SeatLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 46.0f));
+	// Sized in world centimetres from the bubble's measured radius, so it must
+	// not inherit the stage's scale on top of that.
+	SeatLabel->SetUsingAbsoluteScale(true);
 	SeatLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SeatLabel->SetGenerateOverlapEvents(false);
 	SeatLabel->SetCastShadow(false);
-	// Off by default: the numbers are a checking aid, not part of the piece.
+	// Off by default: the stage turns them on, for the setup or for the audience.
 	SeatLabel->SetVisibility(false);
 
 	// Demonstration sphere, taken from engine content. It proves the data
@@ -138,9 +148,11 @@ void AVibH2OBubbleActor::AssignSeat(const FVibH2OSeat& Seat)
 	// WITH_EDITOR, and not a build-configuration macro: SetActorLabel only
 	// exists when the editor is compiled in. A Development Game build - the one
 	// used in rehearsal - has no editor and would not link.
+	// A reassigned bubble may keep its number source but not its number.
+	SeatLabelShownNumber = -1;
 	if (SeatLabel != nullptr)
 	{
-		SeatLabel->SetText(FText::AsNumber(IndividualId));
+		SetSeatLabelStyle(SeatLabelSource, SeatLabelHeightFraction, FLinearColor(SeatLabel->TextRenderColor));
 	}
 
 #if WITH_EDITOR
@@ -175,20 +187,69 @@ void AVibH2OBubbleActor::SetSeatLabelVisible(bool bVisible)
 	}
 }
 
-void AVibH2OBubbleActor::OrientSeatLabel(const FVector& ViewLocation)
+void AVibH2OBubbleActor::SetSeatLabelStyle(EVibH2OSeatNumber Source, float HeightFraction, const FLinearColor& Color)
+{
+	SeatLabelSource = Source;
+	SeatLabelHeightFraction = FMath::Max(HeightFraction, 0.0f);
+	if (SeatLabel == nullptr)
+	{
+		return;
+	}
+
+	const int32 Number = Source == EVibH2OSeatNumber::Seat ? SeatIndex : IndividualId;
+	if (Number != SeatLabelShownNumber)
+	{
+		SeatLabelShownNumber = Number;
+		SeatLabel->SetText(FText::AsNumber(Number, &FNumberFormattingOptions::DefaultNoGrouping()));
+	}
+
+	const FColor Wanted = Color.ToFColor(true);
+	if (SeatLabel->TextRenderColor != Wanted)
+	{
+		SeatLabel->SetTextRenderColor(Wanted);
+	}
+}
+
+void AVibH2OBubbleActor::GetDrawnSphere(FVector& OutCentre, float& OutRadius) const
+{
+	// Measured on the mesh actually drawn, every frame: the artist's mesh, the
+	// stage's scale and the bubble's breathing all change the size.
+	OutCentre = GetActorLocation();
+	OutRadius = 17.5f * GetActorScale3D().GetMin();
+	const UMeshComponent* Mesh = TargetMeshComponent != nullptr ? TargetMeshComponent.Get() : static_cast<const UMeshComponent*>(DemoMesh.Get());
+	if (Mesh != nullptr)
+	{
+		OutCentre = Mesh->Bounds.Origin;
+		// The smallest half-extent of the box: the radius of a sphere, and
+		// the safe side for anything rounder or flatter.
+		OutRadius = Mesh->Bounds.BoxExtent.GetMin();
+	}
+}
+
+void AVibH2OBubbleActor::PlaceSeatLabel(const FVector& ViewLocation)
 {
 	if (SeatLabel == nullptr || !SeatLabel->IsVisible())
 	{
 		return;
 	}
+
+	FVector Centre;
+	float Radius = 0.0f;
+	GetDrawnSphere(Centre, Radius);
+
 	// Toward the viewer, not away from them: pointing the text's forward axis
 	// away renders its back face, and the digits come out mirrored. Measured on
 	// a capture - "17" read as its own reflection.
-	const FVector Toward = ViewLocation - SeatLabel->GetComponentLocation();
-	if (Toward.SizeSquared() > KINDA_SMALL_NUMBER)
+	const FVector Toward = (ViewLocation - Centre).GetSafeNormal();
+	if (Toward.IsNearlyZero())
 	{
-		SeatLabel->SetWorldRotation(Toward.Rotation());
+		return;
 	}
+
+	// Just off the surface, so the opaque bubble does not swallow it.
+	const float Height = FMath::Max(2.0f * Radius * SeatLabelHeightFraction, 1.0f);
+	SeatLabel->SetWorldLocationAndRotation(Centre + Toward * Radius * 1.04f, Toward.Rotation());
+	SeatLabel->SetWorldScale3D(FVector(Height / VibH2OBubbleInternal::SeatLabelBaseSize));
 }
 
 void AVibH2OBubbleActor::UpdateFromState(const FVibH2OIndividualState& NewState, float InFocusMask, const FLinearColor& Tint,
