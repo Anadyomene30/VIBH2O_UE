@@ -12,6 +12,7 @@
 #include "CineCameraComponent.h"
 #include "Components/SplineComponent.h"
 #include "Dom/JsonObject.h"
+#include "Engine/PostProcessVolume.h"
 #include "Engine/World.h"
 #include "Misc/ScopeExit.h"
 #include "Osc/VibH2OOscTypes.h"
@@ -247,6 +248,28 @@ bool FVibH2ORegieCommandsTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Toutes les commandes sont publiees"), (*Regie)->GetArrayField(TEXT("controls")).Num(), AVibH2ORegie::GetControls().Num());
 		TestEqual(TEXT("La couleur est publiee en hexadecimal"), (*Regie)->GetObjectField(TEXT("values"))->GetStringField(TEXT("ExcitedColorHigh")), FString(TEXT("#FF0000")));
 	}
+
+	// The image: starts from what the scene shows, moves from there, and
+	// comes back to it in one press.
+	APostProcessVolume* Volume = World->SpawnActor<APostProcessVolume>();
+	Volume->bUnbound = true;
+	Volume->Priority = 5.0f;
+	Volume->Settings.bOverride_ColorSaturation = true;
+	Volume->Settings.ColorSaturation = FVector4(1.0, 0.8, 1.2, 0.9);
+	Desk->ExposureVolume = Volume;
+	// The scene changed after the desk was placed: "read the scene" takes it in.
+	Desk->CaptureFromScene();
+	Desk->ResetImage();
+	TestEqual(TEXT("L'image d'origine reprend la saturation de la scene"), Volume->Settings.ColorSaturation.W, 0.9);
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("ImageSaturation"), TEXT("0.5") }));
+	TestEqual(TEXT("Le curseur agit sur la saturation globale"), Volume->Settings.ColorSaturation.W, 0.45, 1e-4);
+	TestEqual(TEXT("La teinte par canal de l'artiste reste"), Volume->Settings.ColorSaturation.Y, 0.8, 1e-4);
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("ImageWarmth"), TEXT("1") }));
+	const float Warm = Volume->Settings.WhiteTemp;
+	FVibH2OOscMessage Reset(TEXT("/Regie/Image/Reset"));
+	Desk->HandleRegieMessage(Reset);
+	TestEqual(TEXT("Retour a l'image d'origine : saturation"), Volume->Settings.ColorSaturation.W, 0.9, 1e-4);
+	TestTrue(TEXT("Retour a l'image d'origine : chaud / froid"), Volume->Settings.WhiteTemp < Warm - 1000.0f);
 
 	// A preset gives back exactly what was saved, and only that.
 	const FString Name = TEXT("_test_automatique");

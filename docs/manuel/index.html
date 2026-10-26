@@ -204,7 +204,8 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
   <div class="tablewrap"><table>
     <thead><tr><th>Onglet de la tablette</th><th>Ce qu'on y règle</th></tr></thead>
     <tbody>
-      <tr><td><b>Spectacle</b></td><td>Caméra ; <span class="k">Luminosité générale (EV)</span> (+1 = deux fois plus clair) ; numéros des spectateurs ; marge de cadrage ; durées de la descente et de l'arrivée ; apparition des particules.</td></tr>
+      <tr><td><b>Spectacle</b></td><td>Caméra ; numéros des spectateurs ; marge de cadrage ; durées de la descente et de l'arrivée ; apparition des particules.</td></tr>
+      <tr><td><b>Image</b></td><td>Les réglages de l'image, sans connaître Unreal : <span class="k">Luminosité générale</span>, <span class="k">Contraste</span>, <span class="k">Saturation</span> (0 = noir et blanc), <span class="k">Froid ← → chaud</span>, <span class="k">Halo lumineux</span>, <span class="k">Bords assombris</span>, <span class="k">Grain</span>. Le bouton <span class="k">Revenir à l'image d'origine</span> (appui maintenu) remet l'image telle qu'elle était quand la Régie a été posée.</td></tr>
       <tr><td><b>Ambiance</b></td><td>Les deux couleurs de chaque ambiance (pour les spectateurs les plus calmes et les plus agités de la salle) ; lumière des bulles ; couleur, lumière et trouble de l'eau ; durée de bascule entre ambiances.</td></tr>
       <tr><td><b>Bulles · Réaction</b></td><td>Taille, flottement, gonflement au battement, déformation ; et ce que font les capteurs : grossissement et dérive avec l'excitation, contraste entre spectateurs, seuils calme / excité, effet de la synchronie.</td></tr>
       <tr><td><b>Préréglages</b></td><td>Enregistrer l'aspect actuel sous un nom ; le rappeler (appui maintenu) ; le supprimer (appui maintenu 1,5 s). Les préréglages sont des fichiers dans <code>Saved/VibH2O/Regie</code> du projet : ils restent d'une session à l'autre.</td></tr>
@@ -430,7 +431,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
   </div>
   <div class="duo">
     <figure><img src="img/arbre.jpg" alt="L'arbre en point cloud." width="1521" height="762"><figcaption><b>MAPS/TESTS/GS_TREESolo</b> — ton arbre, fonctionne.</figcaption></figure>
-    <div class="box warn" style="align-self:start"><strong>À éviter</strong><span><b>MAPS/OLD/rainmine</b> fait planter Unreal 5.8 (EasyRain) — elle est dans <code>_ARCHIVE</code>. <b>MAPS/TESTS/TREE_Number</b> n'affiche rien (mesh corrompu). <b>/Game/KatjaDissolveFORVIDEO</b> (à la racine) a perdu ses systèmes Niagara. Ne jamais enregistrer d'asset dans un dossier de plugin : il disparaît à la réinstallation.</span></div>
+    <div class="box warn" style="align-self:start"><strong>À éviter</strong><span>Les cartes cassées (<b>rainmine</b>, qui faisait planter Unreal 5.8 ; <b>TREE_Number</b>, au mesh corrompu ; l'ancienne <b>KatjaDissolveFORVIDEO</b> sans ses Niagara) sont sorties du projet, dans l'archive. Ne jamais enregistrer d'asset dans un dossier de plugin : il disparaît à la réinstallation.</span></div>
   </div>
   <p>La pluie dans Sequencer : ouvre <b>SEQ_Pluie_Demo</b>, sur l'acteur Pluie ajoute une piste de paramètre (<code>Densite</code>, <code>Lueur</code>…) et anime-la.</p>
 </section>
@@ -457,21 +458,33 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
 
 <section class="ch" id="fichiers">
   <h2>Où sont les fichiers</h2>
+  <p>Le projet a été rangé le 26 octobre : il ne contient plus que ce qui sert au spectacle (1 Go au lieu de 9,7). Tout le reste est conservé hors du projet, intact.</p>
   <div class="tablewrap"><table>
-    <thead><tr><th>Quoi</th><th>Où</th></tr></thead>
+    <thead><tr><th>Dans le Content Browser</th><th>Ce qu'on y trouve</th></tr></thead>
     <tbody>
-      <tr><td>Projet du spectacle</td><td class="path">D:\VIBH2O\09-2026\VIBH2O_LUX\VIBH2O</td></tr>
-      <tr><td>Assets rangés (rien de supprimé)</td><td class="path">Content/_ARCHIVE — même arborescence qu'avant</td></tr>
-      <tr><td>Sauvegardes du projet</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_LUX_2026-10-24_avant_archivage, …_2026-10-25_avant_reprise_archivage</td></tr>
-      <tr><td>Anciens plugins</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_PLUGINS_2026-10-24</td></tr>
-      <tr><td>Code du plugin VibH2O</td><td class="path">Documents\GitHub\VIBH2O_UE (branche main) — docs/ : TUTORIEL, CUES, ATTRACTEURS_ET_IPAD, DECISIONS_NUIT</td></tr>
-      <tr><td>Rapports de la nuit</td><td class="path">VIBH2O_LUX\VIBH2O\_RAPPORT_CLAUDE</td></tr>
-      <tr><td>Page de la télécommande</td><td class="path">Plugins/VibH2O/Resources/Remote/index.html</td></tr>
+      <tr><td class="path">MAPS</td><td>Les 7 cartes gardées : <b>VIBH2o_PPCM_Fond</b> (le spectacle), VIBH2o_PPCM (d'origine), les trois Katja, OLD/corinnedissolve, TESTS/GS_TREESolo.</td></tr>
+      <tr><td class="path">VIBH2O</td><td>Tout ce qui est propre au projet, rangé par sorte : <b>Blueprints</b> (BP_UnderWater…), <b>Environnement</b> (eau, caustiques), <b>FX</b> (Dirt, pluie), <b>Heritage</b> (l'ancienne scène : Camera_Controller, Matrix_Controller, matériaux et Niagara des anciennes bulles, séquences Katja), <b>Importes</b> (modules Niagara importés), <b>Materiaux</b>, <b>Meshes</b>, <b>Sequences</b>, <b>Textures</b>.</td></tr>
+      <tr><td class="path">Chameleon, FluidNinjaLive, GaussianSplat, Scans</td><td>Les packs encore utilisés par les cartes gardées, à leur place d'origine.</td></tr>
+      <tr><td class="path">Plugins → VibH2O Content</td><td>Le plugin : presets d'ambiance, bulle de démonstration.</td></tr>
     </tbody>
   </table></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Sur le disque</th><th>Où</th></tr></thead>
+    <tbody>
+      <tr><td>Projet du spectacle</td><td class="path">D:\VIBH2O\09-2026\VIBH2O_LUX\VIBH2O\VIBH2O.uproject</td></tr>
+      <tr><td>Ce qui a été sorti du projet (8,5 Go : packs inutilisés, anciennes cartes, anciens assets)</td><td class="path">D:\VIBH2O\09-2026\_ARCHIVE_LUX_2026-10-26 — la liste est dans LISTE.txt</td></tr>
+      <tr><td>Le projet complet tel qu'il était avant le rangement</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_LUX_2026-10-26_avant_rangement</td></tr>
+      <tr><td>Sauvegardes plus anciennes</td><td class="path">D:\VIBH2O\09-2026\_SAUVEGARDE_LUX_… (par date)</td></tr>
+      <tr><td>Préréglages de la Régie</td><td class="path">VIBH2O_LUX\VIBH2O\Saved\VibH2O\Regie</td></tr>
+      <tr><td>Code du plugin VibH2O</td><td class="path">Documents\GitHub\VIBH2O_UE (branche main)</td></tr>
+      <tr><td>Rapports et ce manuel</td><td class="path">VIBH2O_LUX\VIBH2O\_RAPPORT_CLAUDE</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box info"><strong>Récupérer quelque chose d'archivé</strong><span>Un pack ou une ancienne carte : Unreal fermé, recopie son dossier depuis <code>_ARCHIVE_LUX_2026-10-26\Content</code> à la même place dans <code>VIBH2O_LUX\VIBH2O\Content</code>. Pour rouvrir une très vieille carte telle qu'elle était, ouvre plutôt le projet de la sauvegarde d'avant rangement (copie-le d'abord ailleurs avec son dossier Plugins).</span></div>
+  <div class="box info"><strong>L'Outliner de la carte du spectacle</strong><span><b>VibH2O</b> (scène, simulateur, lumières, Régie, exposition), <b>Fond</b> (eau, soleil, particules, fond), <b>Caméra et sortie</b> (rail, caméra, Camera_Controller, Spout), <b>DIRT</b> (nuages de particules), <b>Environnement d'origine (ne pas supprimer)</b> (l'eau d'origine, le ciel, les anciennes lumières).</span></div>
 </section>
 
-<footer>VIBH2O — manuel de l'opérateur. Plugin VibH2O vérifié le 26 octobre 2026 : 32 tests au vert, Unreal 5.5 et 5.8, Editor, Game et Shipping.</footer>
+<footer>VIBH2O — manuel de l'opérateur. Plugin VibH2O vérifié le 26 octobre 2026 : 36 tests au vert, Unreal 5.5 et 5.8, Editor, Game et Shipping.</footer>
 </main>
 </div>
 
