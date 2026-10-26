@@ -325,10 +325,10 @@ public:
 	 * The bubble is opaque, so the text cannot sit at its true centre: it sits
 	 * on the surface facing the viewer, which reads as the centre from there.
 	 * A text component renders on a fixed plane, so it also turns to face the
-	 * viewer. The stage actor passes the view position once per frame rather
-	 * than every bubble asking for it.
+	 * viewer, upright in its picture: ViewUp is the camera's up. The stage
+	 * actor passes the view once per frame rather than every bubble asking.
 	 */
-	void PlaceSeatLabel(const FVector& ViewLocation);
+	void PlaceSeatLabel(const FVector& ViewLocation, const FVector& ViewUp = FVector::UpVector);
 
 	UTextRenderComponent* GetSeatLabel() const { return SeatLabel; }
 

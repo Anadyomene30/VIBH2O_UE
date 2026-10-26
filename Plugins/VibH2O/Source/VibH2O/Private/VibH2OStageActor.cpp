@@ -833,15 +833,18 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 	// The hand-steered layers step their fades once, before any bubble.
 	BeginSteering(DeltaSeconds);
 
-	// One view position for the whole room: every seat number turns toward it,
-	// and asking the player controller once beats asking it two hundred times.
+	// One view for the whole room: every seat number turns toward it, upright
+	// in the picture, and asking the player controller once beats asking it
+	// two hundred times.
 	FVector ViewLocation = GetActorLocation();
+	FVector ViewUp = FVector::UpVector;
 	if (bShowSeatNumbers)
 	{
 		if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
 			FRotator ViewRotation = FRotator::ZeroRotator;
 			PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+			ViewUp = ViewRotation.Quaternion().GetUpVector();
 		}
 		else if (GetWorld()->ViewLocationsRenderedLastFrame.Num() > 0)
 		{
@@ -1082,7 +1085,7 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 		if (bShowSeatNumbers)
 		{
 			Bubble->SetSeatLabelStyle(SeatNumberSource, SeatNumberSize, SeatNumberColor);
-			Bubble->PlaceSeatLabel(ViewLocation);
+			Bubble->PlaceSeatLabel(ViewLocation, ViewUp);
 		}
 	}
 

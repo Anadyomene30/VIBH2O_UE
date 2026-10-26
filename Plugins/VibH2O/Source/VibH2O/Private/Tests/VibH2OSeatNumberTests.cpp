@@ -122,7 +122,9 @@ bool FVibH2OSeatNumberTest::RunTest(const FString& Parameters)
 	Bubble->GetDrawnSphere(Centre, Radius);
 	TestTrue(FString::Printf(TEXT("Rayon mesure a l'echelle du spectacle (%.1f cm)"), Radius), Radius > 50.0f);
 	const FVector View = Centre + FVector(0.0f, 0.0f, 30000.0f);
-	Bubble->PlaceSeatLabel(View);
+	// The rail camera's up in the picture: world -Y.
+	const FVector CameraUp(0.0f, -1.0f, 0.0f);
+	Bubble->PlaceSeatLabel(View, CameraUp);
 
 	const FVector Offset = Label->GetComponentLocation() - Centre;
 	TestTrue(FString::Printf(TEXT("Devant la bulle, cote spectateur (%.1f cm pour un rayon de %.1f)"), Offset.Z, Radius),
@@ -130,6 +132,13 @@ bool FVibH2OSeatNumberTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Au milieu de la bulle vue d'en haut"), Offset.Size2D() < 1.0f);
 	TestTrue(TEXT("Tourne vers la camera, pas vers le fond (chiffres a l'endroit)"),
 		FVector::DotProduct(Label->GetForwardVector(), FVector::UpVector) > 0.99f);
+	TestTrue(TEXT("Chiffres droits dans l'image de la camera, pas tournes"),
+		FVector::DotProduct(Label->GetUpVector(), CameraUp) > 0.99f);
+	// A bubble off the axis must not tilt its digits either.
+	AVibH2OBubbleActor* Side = Mothers.Last();
+	Side->PlaceSeatLabel(View, CameraUp);
+	TestTrue(TEXT("Une bulle hors de l'axe garde ses chiffres droits"),
+		FVector::DotProduct(Side->GetSeatLabel()->GetUpVector().GetSafeNormal2D(), CameraUp) > 0.99f);
 	const float Height = Label->GetComponentScale().X * Label->WorldSize;
 	TestTrue(FString::Printf(TEXT("Hauteur des chiffres = 0,55 x diametre (%.1f cm pour %.1f)"), Height, 2.0f * Radius),
 		FMath::IsNearlyEqual(Height, 2.0f * Radius * Stage->SeatNumberSize, 0.5f));

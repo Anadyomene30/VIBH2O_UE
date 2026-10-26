@@ -226,7 +226,7 @@ void AVibH2OBubbleActor::GetDrawnSphere(FVector& OutCentre, float& OutRadius) co
 	}
 }
 
-void AVibH2OBubbleActor::PlaceSeatLabel(const FVector& ViewLocation)
+void AVibH2OBubbleActor::PlaceSeatLabel(const FVector& ViewLocation, const FVector& ViewUp)
 {
 	if (SeatLabel == nullptr || !SeatLabel->IsVisible())
 	{
@@ -246,9 +246,19 @@ void AVibH2OBubbleActor::PlaceSeatLabel(const FVector& ViewLocation)
 		return;
 	}
 
+	// Upright for the camera, not for the world: seen from straight above, a
+	// rotation built from the direction alone spins each number by its own
+	// small offset from the axis - measured in Play, every digit at an angle.
+	FVector Up = ViewUp;
+	if (FMath::Abs(FVector::DotProduct(Toward, Up.GetSafeNormal())) > 0.999f)
+	{
+		Up = FVector::ForwardVector;
+	}
+	const FRotator Facing = FRotationMatrix::MakeFromXZ(Toward, Up).Rotator();
+
 	// Just off the surface, so the opaque bubble does not swallow it.
 	const float Height = FMath::Max(2.0f * Radius * SeatLabelHeightFraction, 1.0f);
-	SeatLabel->SetWorldLocationAndRotation(Centre + Toward * Radius * 1.04f, Toward.Rotation());
+	SeatLabel->SetWorldLocationAndRotation(Centre + Toward * Radius * 1.04f, Facing);
 	SeatLabel->SetWorldScale3D(FVector(Height / VibH2OBubbleInternal::SeatLabelBaseSize));
 }
 
