@@ -15,6 +15,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "InputCoreTypes.h"
+#include "Interfaces/IPluginManager.h"
 #include "Interfaces/Interface_PostProcessVolume.h"
 #include "JsonObjectConverter.h"
 #include "LevelSequence.h"
@@ -339,6 +340,7 @@ void AVibH2ORegie::Tick(float DeltaSeconds)
 	// notices by comparing, and pushes only what changed.
 	ApplyChanged(false);
 	TickCameraPath();
+	TickTableauPath();
 
 	const UWorld* World = GetWorld();
 	if (World == nullptr || !World->IsGameWorld())
@@ -1376,6 +1378,23 @@ void AVibH2ORegie::TickCameraPath()
 	SetRailPosition(Path <= 1.0f ? FMath::Lerp(0.0f, Approach, Path) : FMath::Lerp(Approach, Framed, Path - 1.0f));
 }
 
+void AVibH2ORegie::TickTableauPath()
+{
+	if (!AppliedTableauPath.IsSet())
+	{
+		AppliedTableauPath = TableauPath;
+		return;
+	}
+	const bool bChanged = !FMath::IsNearlyEqual(TableauPath, AppliedTableauPath.GetValue(), 1e-5f);
+	AppliedTableauPath = TableauPath;
+	if (!bChanged || TableauPath < 0.0f || Stage == nullptr)
+	{
+		return;
+	}
+	// A zero-length glide: sets the value and cancels a glide under way.
+	Stage->GlideBlendTo(FMath::Clamp(TableauPath, 0.0f, 1.0f), 0.0f);
+}
+
 void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 {
 	if (Stage == nullptr || Rail == nullptr)
@@ -1806,6 +1825,28 @@ FString AVibH2ORegie::GetPresetFolder()
 
 void AVibH2ORegie::RefreshPresetNames()
 {
+	// The plugin ships ready-made presets (lights, room shapes). They are
+	// copied into the project once - a deleted one does not come back.
+	const FString Folder = GetPresetFolder();
+	const FString Marker = FPaths::Combine(Folder, TEXT(".starter_presets_v1"));
+	if (!FPaths::FileExists(Marker))
+	{
+		if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("VibH2O")))
+		{
+			const FString Source = FPaths::Combine(Plugin->GetBaseDir(), TEXT("Resources"), TEXT("RegiePresets"));
+			TArray<FString> Files;
+			IFileManager::Get().FindFiles(Files, *FPaths::Combine(Source, TEXT("*.json")), true, false);
+			for (const FString& File : Files)
+			{
+				const FString Target = FPaths::Combine(Folder, File);
+				if (!FPaths::FileExists(Target))
+				{
+					IFileManager::Get().Copy(*Target, *FPaths::Combine(Source, File));
+				}
+			}
+			FFileHelper::SaveStringToFile(TEXT("Préréglages fournis par le plugin déjà copiés."), *Marker);
+		}
+	}
 	PresetNames = ListPresets();
 }
 

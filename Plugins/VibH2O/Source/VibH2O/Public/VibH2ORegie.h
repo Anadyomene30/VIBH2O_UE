@@ -418,6 +418,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Conduite", meta = (DisplayName = "Caméra : parcours (séquence)", UIMin = "-1.0", UIMax = "2.0", ToolTip = "Pour piloter la descente depuis une séquence : 0 = haut du rail, 1 = approche, 2 = vue d'ensemble de la salle (qui suit le nombre de spectateurs). -1 = non utilisé. N'agit que quand la valeur change."))
 	float CameraPath = -1.0f;
 
+	/**
+	 * The tableau as one animatable value for a Level Sequence: 0 the room,
+	 * 1 the school. Negative: unused. Like the camera path it acts only when
+	 * it changes, so a sequence stopped on a step leaves the tablet, the cues
+	 * and Max free to move the tableau.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Conduite", meta = (DisplayName = "Tableau (séquence)", UIMin = "-1.0", UIMax = "1.0", ToolTip = "Pour passer d'un tableau à l'autre depuis une séquence : 0 = salle, 1 = banc. -1 = non utilisé. N'agit que quand la valeur change : une séquence arrêtée laisse la main à la tablette."))
+	float TableauPath = -1.0f;
+
 	/** Plays from where the show stands to the next step, and stops there. */
 	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
 	void ConduiteGo();
@@ -591,6 +600,7 @@ private:
 	float ApplyFramingCloser(float Position) const;
 	void TickFollowSchool(float DeltaSeconds);
 	void TickCameraPath();
+	void TickTableauPath();
 
 	struct FConduiteStep
 	{
@@ -672,6 +682,7 @@ private:
 	double LastSchoolFramingTime = 0.0;
 	/** CameraPath as last written to the rail; unset until the first tick, which only records it. */
 	TOptional<float> AppliedCameraPath;
+	TOptional<float> AppliedTableauPath;
 	/**
 	 * Sideways offset of the rail camera, along its right and up axes: in
 	 * tableau 2 it keeps the wandering school in the middle of the picture.

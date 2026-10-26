@@ -132,10 +132,10 @@ body.locked #shield { display: block; }
 .banner.show { display: block; }
 #nack { border-left: 8px solid var(--bad); }
 
-nav { flex: none; display: flex; gap: 8px; padding: 10px 12px 0; overflow-x: auto; scrollbar-width: none; }
+nav { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 0; }
 nav::-webkit-scrollbar { display: none; }
 nav button {
-  flex: 1 0 auto; white-space: nowrap; min-height: 52px; padding: 6px 16px; border-radius: var(--radius); color: var(--dim);
+  flex: 1 0 auto; white-space: nowrap; min-height: 46px; padding: 6px 14px; border-radius: var(--radius); color: var(--dim);
   border: 1px solid var(--line); background: transparent; font-weight: 600;
 }
 nav button.sel { color: var(--blue); border-color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--panel)); }
@@ -577,15 +577,23 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 
 <div id="help"><div>
   <h3>Télécommande VibH2O</h3>
-  <p><b>Installer :</b> dans Safari, bouton Partager → <i>Sur l'écran d'accueil</i>. L'icône ouvre ensuite la télécommande en plein écran.</p>
-  <p><b>Adresse :</b> <code id="host"></code> — c'est le PC Unreal. Elle est écrite dans le log Unreal au lancement (<i>telecommande iPad — ouvrir…</i>).</p>
-  <p><b>En-tête :</b> <b>MAX</b> (vert) = les capteurs arrivent de Max. <b>SIMULATION</b> (orange clignotant) = de fausses données remplacent Max. <b>AUCUNE DONNÉE</b> (rouge) = rien n'arrive. Puis l'ambiance, le fond, et les zones éteintes.</p>
-  <p><b>Attracteurs :</b> un appui appelle les bulles, un second les renvoie à leur place. <b>TOUT RELÂCHER</b> renvoie tout le monde. Double appui sur <i>Durée des fondus</i> : retour à ×1.</p>
-  <p><b>Zones :</b> faire glisser une zone sur le tulle pour suivre une circassienne. Pour <b>éteindre</b> une zone, <b>maintenir</b> sa pastille jusqu'au bout de l'anneau ; un simple appui la rallume. Pareil pour passer le fond au noir et couper un effet.</p>
-  <p><b>Tableaux :</b> « → Salle » et « → Banc » font glisser la salle d'un tableau à l'autre. Le curseur fin est caché derrière <i>Déverrouiller le curseur</i>.</p>
+  <p><b>Par où commencer :</b> l'onglet <b>Conduite</b> déroule le spectacle — <b>GO</b> joue jusqu'à l'étape suivante. Tout le reste sert à régler l'image ; sous chaque réglage, une ligne dit ce qu'il change.</p>
+  <p><b>Les onglets :</b>
+    <b>Spectacle</b> la caméra et le cadrage ·
+    <b>Tableaux · Fond · Focus</b> salle ou banc, fond noir, mettre un groupe en avant ·
+    <b>Tableau 2</b> le banc et sa forme ·
+    <b>Image</b> luminosité, couleurs ·
+    <b>Ambiance</b> couleurs des états calme / normal / excité ·
+    <b>Salle · Bulles</b> forme de la salle, public simulé, bulles ·
+    <b>Lumières</b> les trois lumières des bulles ·
+    <b>Préréglages</b> garder un aspect et le rappeler ·
+    <b>Attracteurs · Zones</b> appeler des bulles, protéger un artiste.</p>
+  <p><b>Toucher ou maintenir :</b> un appui simple allume ou lance. Ce qui éteint, efface ou déplace beaucoup demande de <b>maintenir</b> jusqu'au bout de l'anneau ; relâcher avant n'envoie rien.</p>
+  <p><b>En-tête :</b> <b>MAX</b> = les vrais capteurs arrivent. <b>SIMULATION</b> (orange) = public simulé, pour répéter. <b>AUCUNE DONNÉE</b> (rouge) = rien n'arrive. Puis l'ambiance, le fond, les zones éteintes.</p>
+  <p><b>Préréglages :</b> ils gardent tous les réglages, les groupes de focus et la forme du banc. Un nom qui existe déjà demande un second appui pour être remplacé.</p>
   <p><b>Dans le noir :</b> ☾ passe en thème de nuit. 🔒 bloque tout ; pour déverrouiller, <b>maintenir 🔒 1,5 s</b>.</p>
-  <p><b>Commande non reçue</b> (bandeau rouge) : Unreal n'a pas eu l'ordre ; le bouton revient à l'état réel. Recommencer.</p>
-  <p>Point vert : Unreal répond. Point rouge : plus de réponse — vérifier le Wi-Fi et que le jeu tourne.</p>
+  <p><b>Si rien ne répond :</b> point rouge en haut à gauche = Unreal ne répond plus (Wi-Fi, ou le jeu est arrêté). Bandeau rouge « commande non reçue » = recommencer.</p>
+  <p><b>Adresse :</b> <code id="host"></code> — le PC Unreal. Sur iPad : Partager → <i>Sur l'écran d'accueil</i> pour l'avoir en plein écran.</p>
   <button class="hbtn" id="helpClose">Fermer</button>
 </div></div>
 
@@ -1230,6 +1238,7 @@ let regieSig = null, presetsSig = null, noticeSerial = -1;
 // A preset name travels as one token: "~" then percent-encoded, so spaces,
 // dashes and leading zeros reach Unreal untouched.
 const encName = (name) => "~" + encodeURIComponent(name);
+const frNum = (v, d) => Number(v).toFixed(d).replace(".", ",");
 const decimals = (step) => (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3);
 function regieRow(c) {
   const key = "rg:" + c.id;
@@ -1255,16 +1264,16 @@ function regieRow(c) {
     const push = () => {
       const v = parseFloat(input.value);
       hold(key, v);
-      out.textContent = v.toFixed(decimals(c.step));
-      send(key, "/Regie/Set " + c.id + " " + v, c.label + " : " + v.toFixed(decimals(c.step)), [key]);
+      out.textContent = frNum(v, decimals(c.step));
+      send(key, "/Regie/Set " + c.id + " " + v, c.label + " : " + frNum(v, decimals(c.step)), [key]);
     };
     input.addEventListener("input", () => {
-      if (heavy) { out.textContent = parseFloat(input.value).toFixed(decimals(c.step)); return; }
+      if (heavy) { out.textContent = frNum(parseFloat(input.value), decimals(c.step)); return; }
       push();
     });
     input.addEventListener("change", () => { release(); push(); });
     row.appendChild(input); row.appendChild(out);
-    row.update = (v) => { if (!active) input.value = v; out.textContent = Number(v).toFixed(decimals(c.step)); };
+    row.update = (v) => { if (!active) input.value = v; out.textContent = frNum(v, decimals(c.step)); };
   } else if (c.kind === "color") {
     const input = document.createElement("input");
     input.type = "color";
@@ -1358,13 +1367,25 @@ function renderRegie() {
     presetsSig = psig;
     const box = $("#presets");
     box.innerHTML = names.length ? "" : "<p class=\"ends\"><span>Aucun préréglage pour l'instant.</span></p>";
-    for (const name of names) {
+    // Grouped by their prefix: "Lumière · …" and "Salle · …" only touch the
+    // lights or the room; the rest are whole looks.
+    const familyOf = (n) => n.includes(" · ") ? n.split(" · ")[0] : "Mes préréglages";
+    const sorted = [...names].sort((a, b) => (familyOf(a) === "Mes préréglages" ? 0 : 1) - (familyOf(b) === "Mes préréglages" ? 0 : 1) || familyOf(a).localeCompare(familyOf(b), "fr") || a.localeCompare(b, "fr"));
+    let lastFamily = null;
+    for (const name of sorted) {
+      if (familyOf(name) !== lastFamily) {
+        lastFamily = familyOf(name);
+        const head = document.createElement("h2");
+        head.textContent = lastFamily === "Mes préréglages" ? "Mes préréglages — tout l'aspect" : lastFamily + " — seulement " + (lastFamily === "Lumière" ? "les lumières" : lastFamily === "Salle" ? "la forme de la salle" : lastFamily.toLowerCase());
+        head.style.marginTop = "10px";
+        box.appendChild(head);
+      }
       const line = document.createElement("div");
       line.className = "preset";
       const load = document.createElement("button");
       load.className = "chip";
       load.innerHTML = '<span class="lbl"></span>';
-      load.querySelector(".lbl").textContent = name;
+      load.querySelector(".lbl").textContent = name.includes(" · ") ? name.split(" · ").slice(1).join(" · ") : name;
       pressable(load, { holdMs: () => CONFIRM_MS, ringColor: "var(--ok)", hint: "Maintenir pour rappeler « " + name + " ».",
         confirm: () => { send("preset", "/Regie/Preset/Load " + encName(name), "Préréglage " + name); toast("Rappel : " + name); } });
       const del = document.createElement("button");

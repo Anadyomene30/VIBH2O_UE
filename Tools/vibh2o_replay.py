@@ -5,14 +5,14 @@ Pour repeter sans Max ni public : les BPM enregistres sont renvoyes a leur
 rythme (ou plus vite), chaque capteur a sa place dans la salle.
 
     python vibh2o_replay.py SESSION_ALES.txt --plan ALES_FINAL.json
-    python vibh2o_replay.py SESSION_ALES.txt --plan ALES_FINAL.json --speed 4 --start 600
+    python vibh2o_replay.py SESSION_ALES.txt --plan ALES_FINAL.json --speed 3 --start 1380   # le passage le plus agite d'Ales
 
 Ce qu'il faut savoir :
   * L'enregistrement donne, par ligne : "n, /<capteur>/ <bpm> <horodatage ms>.;"
   * Le plan (RoomMapping_Presets du depot VibH2o) donne "colonne rangee" -> capteur.
   * L'excitation et la synchronie sont normalement calculees par Max. Ici elles
     sont APPROCHEES pour la repetition : excitation = ecart du BPM lisse au BPM
-    de repos de la personne (mediane des premieres minutes), rapporte a
+    de repos de la personne (mediane de la seance, ou des premieres minutes avec --baseline), rapporte a
     --excitation-range ; synchronie = proximite de la tendance de la personne a
     celle de la salle. L'analyse de Max reste la reference.
   * Les enregistrements sont des donnees personnelles : ne jamais les copier
@@ -73,8 +73,8 @@ def main() -> int:
     parser.add_argument("--speed", type=float, default=1.0, help="Vitesse de lecture (2 = deux fois plus vite).")
     parser.add_argument("--start", type=float, default=0.0, help="Commencer a cette seconde de l'enregistrement.")
     parser.add_argument("--duration", type=float, default=0.0, help="Duree a rejouer, en secondes d'enregistrement. 0 = tout.")
-    parser.add_argument("--baseline", type=float, default=120.0, help="Secondes du debut qui donnent le BPM de repos.")
-    parser.add_argument("--excitation-range", type=float, default=20.0, help="Ecart de BPM qui vaut une excitation de 1.")
+    parser.add_argument("--baseline", type=float, default=0.0, help="Secondes du debut qui donnent le BPM de repos. 0 = la mediane de toute la seance (conseille : le debut est souvent l'arrivee du public, agitee).")
+    parser.add_argument("--excitation-range", type=float, default=12.0, help="Ecart de BPM au-dessus du repos qui vaut une excitation de 1.")
     parser.add_argument("--rate", type=float, default=10.0, help="Envois par seconde et par personne.")
     parser.add_argument("--order", choices=("column", "row"), default="column")
     parser.add_argument("--bpm-prefix", default="/BPM")
@@ -95,7 +95,7 @@ def main() -> int:
     # Resting BPM: the median of each sensor over the first minutes.
     early = defaultdict(list)
     for t, sensor, bpm in events:
-        if t > args.baseline:
+        if args.baseline > 0 and t > args.baseline:
             break
         if 35.0 < bpm < 200.0:
             early[sensor].append(bpm)

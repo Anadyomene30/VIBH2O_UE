@@ -39,6 +39,7 @@ public class VibH2O : ModuleRules
 		// not inside the pak: it can then be edited on site, in a text editor,
 		// and reloaded with VibH2O.Restart - no repackaging.
 		RuntimeDependencies.Add("$(PluginDir)/Resources/Remote/...", StagedFileType.NonUFS);
+		RuntimeDependencies.Add("$(PluginDir)/Resources/RegiePresets/...", StagedFileType.NonUFS);
 
 		// Editor builds only: the cue director's learn step records an undo
 		// transaction, and the background guard lifts the editor's throttle

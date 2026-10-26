@@ -225,6 +225,15 @@ bool FVibH2ORegieFramingRailTest::RunTest(const FString& Parameters)
 	Rail->CurrentPositionOnRail = 0.5f;
 	Desk->Tick(0.0f);
 	TestEqual(TEXT("Parcours immobile : la camera reste libre"), Rail->CurrentPositionOnRail, 0.5f, 1e-4f);
+
+	// The tableau from a sequence: acts on change only, so a stopped
+	// sequence leaves the tablet free.
+	Desk->TableauPath = 1.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Tableau 1 depuis la sequence : le banc"), Stage->BlendAlpha, 1.0f, 1e-4f);
+	Stage->BlendAlpha = 0.3f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Sequence arretee : la tablette garde la main"), Stage->BlendAlpha, 0.3f, 1e-4f);
 	return true;
 }
 
