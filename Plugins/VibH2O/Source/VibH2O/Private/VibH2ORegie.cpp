@@ -21,6 +21,7 @@
 #include "VibH2OSettings.h"
 #include "VibH2OStageActor.h"
 #include "VibH2OSubsystem.h"
+#include "VibH2OTulleRig.h"
 
 namespace VibH2ORegieInternal
 {
@@ -529,6 +530,11 @@ void AVibH2ORegie::ApplyToOutput()
 	}
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
+		// The tulles in depth send their own pictures, at their own sizes.
+		if (It->IsA<AVibH2OTulleRig>())
+		{
+			continue;
+		}
 		TInlineComponentArray<UActorComponent*> Components(*It);
 		for (UActorComponent* Component : Components)
 		{

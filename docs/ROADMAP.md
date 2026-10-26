@@ -135,6 +135,12 @@ Et un problème hors périmètre : dans ce worktree, `make_demo_material.py` pla
 Demandés pour piloter la salle à la main pendant le spectacle. Mode d'emploi complet :
 [`ATTRACTEURS_ET_IPAD.md`](ATTRACTEURS_ET_IPAD.md).
 
+### Tulles en profondeur — **26 octobre 2026, en réserve, compilé et testé, jamais vu en salle**
+
+Une image par tulle (face, cour, jardin, bac), dans les proportions réelles de la salle, chacune
+avec son émetteur Spout. Éteint par défaut. Mode d'emploi et points à juger :
+[`TULLES_EN_PROFONDEUR.md`](TULLES_EN_PROFONDEUR.md).
+
 ### Tableau 2 enrichi — division et vortex — **24 octobre 2026, compilé, testé, mesuré**
 
 Choix artistiques de Dimitri, posés avant d'écrire le code :
