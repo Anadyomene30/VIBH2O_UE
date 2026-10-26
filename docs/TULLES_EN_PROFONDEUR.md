@@ -81,4 +81,13 @@ Le **Diagnostic** donne trois choses :
 - SpoutUE est facultatif : l'émetteur est créé par son nom. Sans le plugin, les images restent
   disponibles en Blueprint par `GetTulleTarget`.
 - La régie laisse ces émetteurs tranquilles : elle ne règle que le flux principal.
-- Tests : `VibH2O.Tulles.Geometrie`, `VibH2O.Tulles.Repartition`, `VibH2O.Tulles.SceneEtCamera`.
+- Tests :
+  - `VibH2O.Tulles.Geometrie`, `VibH2O.Tulles.Repartition`, `VibH2O.Tulles.SceneEtCamera`,
+    `VibH2O.Tulles.SortiesEnJeu` ;
+  - `VibH2O.Tulles.RenduReel` passe par le vrai moteur de rendu : une bulle posée au coin bas
+    gauche d'un tulle sort en bas à gauche de son image, ni en miroir ni à l'envers. Il ne tourne
+    qu'avec la carte graphique : lancer l'automation avec `-RenderOffscreen` au lieu de
+    `-nullrhi`.
+
+Pas encore vu en vrai : l'envoi Spout (SpoutUE n'est pas dans ce projet), et le retrait des bulles
+de l'image principale, qui demande une partie lancée avec un joueur.
