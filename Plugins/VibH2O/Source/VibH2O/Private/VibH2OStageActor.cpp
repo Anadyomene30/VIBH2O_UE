@@ -1569,6 +1569,44 @@ FBox AVibH2OStageActor::GetRoomBounds() const
 	return ComputeBubbleBounds(nullptr);
 }
 
+FBox AVibH2OStageActor::GetSeatPlanBounds() const
+{
+	const UVibH2OSubsystem* Subsystem = GetSubsystem();
+	if (Subsystem == nullptr || GridDriver == nullptr)
+	{
+		return GetRoomBounds();
+	}
+	static const FVibH2OIndividualState RestState;
+	const FTransform StageTransform = GetActorTransform();
+	FBox Bounds(ForceInit);
+	for (const FVibH2OSeat& Seat : Room.Seats)
+	{
+		if (!Seat.bOccupied)
+		{
+			continue;
+		}
+		// The tableau 1 driver alone, at time zero: the seat's own place.
+		FVibH2OLayoutContext Context;
+		Context.Stage = const_cast<AVibH2OStageActor*>(this);
+		Context.Seat = Seat;
+		Context.Columns = Room.Columns;
+		Context.Rows = Room.Rows;
+		Context.OccupiedOrdinal = Subsystem->GetOccupiedOrdinal(Seat.SeatIndex);
+		Context.OccupiedCount = Subsystem->GetOccupiedCount();
+		Context.Individual = RestState;
+		Context.TimeSeconds = 0.0f;
+		Context.Seed = FVibH2OSchoolMath::MakeMemberSeed(Seat.SeatIndex, 0);
+		Bounds += StageTransform.TransformPosition(GridDriver->EvaluateSeat(Context).GetLocation());
+	}
+	if (!Bounds.IsValid)
+	{
+		return GetRoomBounds();
+	}
+	// Room for the bubble itself and its breathing.
+	const float Radius = ColumnSpacing * 0.5f * GetActorScale3D().GetMax();
+	return Bounds.ExpandBy(FVector(Radius));
+}
+
 FBox AVibH2OStageActor::ComputeBubbleBounds(const FVibH2OFocusGroup* Group) const
 {
 	FBox Bounds(ForceInit);

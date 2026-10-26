@@ -207,11 +207,18 @@ void AVibH2OCueDirector::ExecuteCue(int32 CueIndex, float InputValue)
 
 	case EVibH2OCueAction::SetBlendAlpha:
 	case EVibH2OCueAction::SendOsc:
+	case EVibH2OCueAction::ConduiteGo:
+	case EVibH2OCueAction::ConduitePrevious:
+	case EVibH2OCueAction::ConduiteNext:
 	{
 		// Through the subsystem's own routes: the stage follows /Blend, the
-		// attractors follow /Attractor - the cue adds no second path.
-		const FString Address = Cue.Action == EVibH2OCueAction::SetBlendAlpha
-			? UVibH2OSettings::Get()->BlendPrefix
+		// attractors follow /Attractor, the desk follows /Regie - the cue
+		// adds no second path.
+		const FString Regie = UVibH2OSettings::Get()->RegiePrefix;
+		const FString Address = Cue.Action == EVibH2OCueAction::SetBlendAlpha ? UVibH2OSettings::Get()->BlendPrefix
+			: Cue.Action == EVibH2OCueAction::ConduiteGo ? Regie + TEXT("/Conduite/Go")
+			: Cue.Action == EVibH2OCueAction::ConduitePrevious ? Regie + TEXT("/Conduite/Precedent")
+			: Cue.Action == EVibH2OCueAction::ConduiteNext ? Regie + TEXT("/Conduite/Suivant")
 			: Cue.OutOscAddress;
 		UVibH2OSubsystem* Subsystem = BoundSubsystem.IsValid() ? BoundSubsystem.Get() : UVibH2OSubsystem::Get(this);
 		if (Subsystem == nullptr || Address.IsEmpty())

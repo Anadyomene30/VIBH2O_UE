@@ -14,6 +14,12 @@
 #include "Dom/JsonObject.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/World.h"
+#include "LevelSequence.h"
+#include "LevelSequenceActor.h"
+#include "LevelSequencePlayer.h"
+#include "MovieScene.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Misc/ScopeExit.h"
 #include "Osc/VibH2OOscTypes.h"
 #include "VibH2ORegie.h"
@@ -257,8 +263,10 @@ bool FVibH2ORegieCommandsTest::RunTest(const FString& Parameters)
 	Volume->Settings.bOverride_ColorSaturation = true;
 	Volume->Settings.ColorSaturation = FVector4(1.0, 0.8, 1.2, 0.9);
 	Desk->ExposureVolume = Volume;
-	// The scene changed after the desk was placed: "read the scene" takes it in.
-	Desk->CaptureFromScene();
+	// The scene changed after the desk was placed: the explicit button takes
+	// it in. Reading the scene again must not: it would make the desk's own
+	// sliders part of the "original image".
+	Desk->RecaptureImage();
 	Desk->ResetImage();
 	TestEqual(TEXT("L'image d'origine reprend la saturation de la scene"), Volume->Settings.ColorSaturation.W, 0.9);
 	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("ImageSaturation"), TEXT("0.5") }));
@@ -270,6 +278,16 @@ bool FVibH2ORegieCommandsTest::RunTest(const FString& Parameters)
 	Desk->HandleRegieMessage(Reset);
 	TestEqual(TEXT("Retour a l'image d'origine : saturation"), Volume->Settings.ColorSaturation.W, 0.9, 1e-4);
 	TestTrue(TEXT("Retour a l'image d'origine : chaud / froid"), Volume->Settings.WhiteTemp < Warm - 1000.0f);
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("ImageSaturation"), TEXT("0.5") }));
+	Desk->CaptureFromScene();
+	Desk->HandleRegieMessage(Reset);
+	TestEqual(TEXT("Relire la scene ne change pas l'image d'origine"), Volume->Settings.ColorSaturation.W, 0.9, 1e-4);
+
+	// One slider touches one value: a value tuned by hand on the stage stays.
+	Stage->FloatSpeed = 3.3f;
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("BubbleBrightness"), TEXT("2") }));
+	TestEqual(TEXT("Un reglage fait a la main sur la scene n'est pas ecrase"), Stage->FloatSpeed, 3.3f);
+	TestEqual(TEXT("Le curseur bouge agit"), Stage->BubbleBrightness, 2.0f);
 
 	// A preset gives back exactly what was saved, and only that.
 	const FString Name = TEXT("_test_automatique");
@@ -284,6 +302,88 @@ bool FVibH2ORegieCommandsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Le preset rend la couleur de l'eau"), Desk->Reglages.WaterColor.Equals(FLinearColor(0.2f, 0.4f, 0.6f, 1.0f), 1e-4f));
 	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Preset/Delete"), { Name }));
 	TestFalse(TEXT("Preset supprime"), Desk->ListPresets().Contains(Name));
+
+	// The tablet's encoded name keeps its spaces, dash and leading zero.
+	const FString Spaced = TEXT("_test Bleu - 07");
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Preset/Save"), { TEXT("~_test%20Bleu%20-%2007") }));
+	TestTrue(TEXT("Un nom avec espaces et tiret arrive intact"), Desk->ListPresets().Contains(Spaced));
+	Desk->DeletePreset(Spaced);
+
+	// A hand-edited preset cannot push a value off its slider.
+	const FString File = FPaths::Combine(AVibH2ORegie::GetPresetFolder(), Name + TEXT(".json"));
+	TestTrue(TEXT("Preset ecrit a la main"), FFileHelper::SaveStringToFile(TEXT("{ \"Exposure\": 900 }"), *File));
+	TestTrue(TEXT("Preset ecrit a la main relu"), Desk->LoadPreset(Name));
+	TestEqual(TEXT("Une valeur folle dans un preset est ramenee dans les bornes"), Desk->Reglages.Exposure, 16.0f);
+	Desk->DeletePreset(Name);
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// The show's running order: the markers of one Level Sequence.
+// ---------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVibH2ORegieConduiteTest,
+	"VibH2O.Regie.Conduite",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVibH2ORegieConduiteTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("VibH2O_TestConduite"));
+	if (World == nullptr)
+	{
+		AddError(TEXT("Impossible de creer un monde editeur de test."));
+		return false;
+	}
+	ON_SCOPE_EXIT
+	{
+		World->DestroyWorld(false);
+	};
+
+	ULevelSequence* Sequence = NewObject<ULevelSequence>(GetTransientPackage());
+	Sequence->Initialize();
+	UMovieScene* MovieScene = Sequence->GetMovieScene();
+	MovieScene->SetDisplayRate(FFrameRate(25, 1));
+	const FFrameRate Tick = MovieScene->GetTickResolution();
+	auto At = [&Tick](double Seconds) { return (Seconds * Tick).RoundToFrame(); };
+	MovieScene->SetPlaybackRange(TRange<FFrameNumber>(At(0.0), At(20.0)));
+	// Placed out of order on purpose: the running order is the time order.
+	FMovieSceneMarkedFrame Arrival(At(10.0));
+	Arrival.Label = TEXT("Arrivee");
+	MovieScene->AddMarkedFrame(Arrival);
+	FMovieSceneMarkedFrame Vortex(At(5.0));
+	Vortex.Label = TEXT("Vortex");
+	MovieScene->AddMarkedFrame(Vortex);
+
+	ALevelSequenceActor* SequenceActor = World->SpawnActor<ALevelSequenceActor>();
+	AVibH2ORegie* Desk = World->SpawnActor<AVibH2ORegie>();
+	if (!TestNotNull(TEXT("Sequence"), SequenceActor) || !TestNotNull(TEXT("Regie"), Desk))
+	{
+		return false;
+	}
+	SequenceActor->SetSequence(Sequence);
+	SequenceActor->GetSequencePlayer()->Initialize(Sequence, World->PersistentLevel, FLevelSequenceCameraSettings());
+	Desk->ShowSequence = SequenceActor;
+
+	const TArray<FString> Steps = Desk->GetConduiteSteps();
+	if (!TestEqual(TEXT("Debut, puis un pas par marqueur"), Steps.Num(), 3))
+	{
+		return false;
+	}
+	TestEqual(TEXT("Les pas suivent l'ordre du temps (1)"), Steps[1], FString(TEXT("Vortex")));
+	TestEqual(TEXT("Les pas suivent l'ordre du temps (2)"), Steps[2], FString(TEXT("Arrivee")));
+
+	Desk->ConduiteGoTo(2);
+	TestEqual(TEXT("Aller a un pas"), Desk->GetConduiteStep(), 2);
+	Desk->ConduitePrevious();
+	TestEqual(TEXT("Precedent depuis le debut d'un pas : le pas d'avant"), Desk->GetConduiteStep(), 1);
+	Desk->ConduiteNext();
+	TestEqual(TEXT("Suivant"), Desk->GetConduiteStep(), 2);
+	Desk->ConduiteNext();
+	TestEqual(TEXT("Suivant au dernier pas : on y reste"), Desk->GetConduiteStep(), 2);
+	Desk->ConduiteGoTo(0);
+	Desk->ConduitePrevious();
+	TestEqual(TEXT("Precedent au premier pas : on y reste"), Desk->GetConduiteStep(), 0);
 	return true;
 }
 
