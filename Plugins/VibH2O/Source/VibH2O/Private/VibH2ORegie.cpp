@@ -1109,7 +1109,7 @@ bool AVibH2ORegie::IsFramed(TConstArrayView<FVector> Corners, const FVector& Cam
 	return true;
 }
 
-bool AVibH2ORegie::ComputeFramedRailPosition(float& OutPosition, bool bForSchool) const
+bool AVibH2ORegie::ComputeFramedRailPosition(float& OutPosition, bool bForSchool, FVector2D Shift) const
 {
 	if (Stage == nullptr || Rail == nullptr || Stage->GetBubbles().Num() == 0)
 	{
@@ -1144,11 +1144,13 @@ bool AVibH2ORegie::ComputeFramedRailPosition(float& OutPosition, bool bForSchool
 
 	const float Length = Spline->GetSplineLength();
 	const float Current = Rail->CurrentPositionOnRail;
-	const FVector Offset = Camera->GetComponentLocation() - Spline->GetLocationAtDistanceAlongSpline(Current * Length, ESplineCoordinateSpace::World);
 	const FQuat View = Camera->GetComponentQuat();
 	const FVector Forward = View.GetForwardVector();
 	const FVector Right = View.GetRightVector();
 	const FVector Up = View.GetUpVector();
+	// The camera as placed, then moved sideways by the shift asked for.
+	const FVector Offset = Camera->GetComponentLocation() - Spline->GetLocationAtDistanceAlongSpline(Current * Length, ESplineCoordinateSpace::World)
+		- Right * CameraShift.X - Up * CameraShift.Y + Right * Shift.X + Up * Shift.Y;
 	// A cine camera's own ratio is only refreshed on its tick: read the sensor.
 	float AspectRatio = Camera->AspectRatio > 0.0f ? Camera->AspectRatio : 16.0f / 9.0f;
 	if (const UCineCameraComponent* Cine = Cast<UCineCameraComponent>(Camera))
@@ -1262,16 +1264,37 @@ void AVibH2ORegie::TickCameraPath()
 
 void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 {
-	if (Stage == nullptr || Rail == nullptr || CameraMove != EVibH2ORegieCameraMove::None)
+	if (Stage == nullptr || Rail == nullptr)
 	{
 		return;
 	}
 	const double Now = FPlatformTime::Seconds();
 	const bool bInSchool = Stage->BlendAlpha > 0.05f;
+	const bool bFollow = bInSchool && Reglages.bFollowSchool;
 
-	if (!bInSchool || !Reglages.bFollowSchool)
+	// The sideways shift eases toward its target - the school's centre, or
+	// back to nothing in tableau 1 - whatever moves the rail.
+	const FVector2D ShiftGoal = bFollow ? SchoolShiftTarget : FVector2D::ZeroVector;
+	if (!CameraShift.Equals(ShiftGoal, 0.5f))
+	{
+		const float ShiftAlpha = 1.0f - FMath::Exp(-FMath::Max(DeltaSeconds, 0.0f) / (bFollow ? 3.0f : 1.5f));
+		CameraShift = FMath::Lerp(CameraShift, ShiftGoal, ShiftAlpha);
+		ApplyCameraShift();
+	}
+	else if (CameraShift != ShiftGoal)
+	{
+		CameraShift = ShiftGoal;
+		ApplyCameraShift();
+	}
+
+	if (CameraMove != EVibH2ORegieCameraMove::None)
+	{
+		return;
+	}
+	if (!bFollow)
 	{
 		// Back in the room: return to the room's overall view, once.
+		SchoolShiftTarget = FVector2D::ZeroVector;
 		if (bFollowingSchool)
 		{
 			bFollowingSchool = false;
@@ -1292,10 +1315,22 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 	if (Now - LastSchoolFramingTime > 0.25)
 	{
 		LastSchoolFramingTime = Now;
-		float Target = 0.0f;
-		if (ComputeFramedRailPosition(Target, true))
+		// The school's middle on the camera's axis: sideways, parallel to the
+		// picture, so the view itself does not turn.
+		if (const UCameraComponent* Camera = FindRailCamera())
 		{
-			SchoolTarget = Target;
+			const FQuat View = Camera->GetComponentQuat();
+			const FVector Right = View.GetRightVector();
+			const FVector Up = View.GetUpVector();
+			const FVector Placed = Camera->GetComponentLocation() - Right * CameraShift.X - Up * CameraShift.Y;
+			const FVector Toward = Stage->GetRoomBounds().GetCenter() - Placed;
+			const FVector2D Shift(FVector::DotProduct(Toward, Right), FVector::DotProduct(Toward, Up));
+			float Target = 0.0f;
+			if (ComputeFramedRailPosition(Target, true, Shift))
+			{
+				SchoolTarget = Target;
+				SchoolShiftTarget = Shift;
+			}
 		}
 	}
 	if (SchoolTarget < 0.0f)
@@ -1311,6 +1346,27 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 	// About three seconds to settle: no pumping when the school breathes.
 	const float Alpha = 1.0f - FMath::Exp(-FMath::Max(DeltaSeconds, 0.0f) / 3.0f);
 	SetRailPosition(FMath::Lerp(Current, SchoolTarget, Alpha));
+}
+
+void AVibH2ORegie::ApplyCameraShift()
+{
+	UCameraComponent* Camera = ShiftedCamera.IsValid() ? ShiftedCamera.Get() : FindRailCamera();
+	if (Camera == nullptr)
+	{
+		return;
+	}
+	if (!ShiftedCamera.IsValid())
+	{
+		// Where it was placed: the shift is always taken from there, so it
+		// returns exactly to it.
+		ShiftedCamera = Camera;
+		ShiftBaseLocation = Camera->GetRelativeLocation();
+	}
+	const FQuat View = Camera->GetComponentQuat();
+	const FVector World = View.GetRightVector() * CameraShift.X + View.GetUpVector() * CameraShift.Y;
+	const USceneComponent* Parent = Camera->GetAttachParent();
+	const FVector Local = Parent != nullptr ? Parent->GetComponentTransform().InverseTransformVectorNoScale(World) : World;
+	Camera->SetRelativeLocation(ShiftBaseLocation + Local);
 }
 
 void AVibH2ORegie::StartDescent()

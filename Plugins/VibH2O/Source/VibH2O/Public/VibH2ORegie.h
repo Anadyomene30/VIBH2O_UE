@@ -490,7 +490,13 @@ private:
 	void GatherParticles();
 	float GetRailPosition() const;
 	void SetRailPosition(float Position);
-	bool ComputeFramedRailPosition(float& OutPosition, bool bForSchool = false) const;
+	/**
+	 * Shift is the camera's sideways offset (along its right and up axes)
+	 * to frame with, in place of the one it has now.
+	 */
+	bool ComputeFramedRailPosition(float& OutPosition, bool bForSchool = false, FVector2D Shift = FVector2D::ZeroVector) const;
+	/** Moves the rail camera sideways, parallel to the picture, by CameraShift. */
+	void ApplyCameraShift();
 	void TickFollowSchool(float DeltaSeconds);
 	void TickCameraPath();
 
@@ -574,6 +580,15 @@ private:
 	double LastSchoolFramingTime = 0.0;
 	/** CameraPath as last written to the rail; unset until the first tick, which only records it. */
 	TOptional<float> AppliedCameraPath;
+	/**
+	 * Sideways offset of the rail camera, along its right and up axes: in
+	 * tableau 2 it keeps the wandering school in the middle of the picture.
+	 * Zero in tableau 1, where the camera sits exactly as placed.
+	 */
+	FVector2D CameraShift = FVector2D::ZeroVector;
+	FVector2D SchoolShiftTarget = FVector2D::ZeroVector;
+	TWeakObjectPtr<class UCameraComponent> ShiftedCamera;
+	FVector ShiftBaseLocation = FVector::ZeroVector;
 	double LastFramingTime = 0.0;
 
 	// Particles.
