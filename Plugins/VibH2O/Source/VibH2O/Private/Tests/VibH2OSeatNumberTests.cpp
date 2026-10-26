@@ -83,6 +83,7 @@ bool FVibH2OSeatNumberTest::RunTest(const FString& Parameters)
 
 	const float Dt = 1.0f / 60.0f;
 	Stage->bShowSeatNumbers = true;
+	Stage->SeatNumberFadeSeconds = 0.0f;
 	Stage->Tick(Dt);
 	Stage->Tick(Dt);
 
@@ -143,9 +144,14 @@ bool FVibH2OSeatNumberTest::RunTest(const FString& Parameters)
 	TestTrue(FString::Printf(TEXT("Hauteur des chiffres = 0,55 x diametre (%.1f cm pour %.1f)"), Height, 2.0f * Radius),
 		FMath::IsNearlyEqual(Height, 2.0f * Radius * Stage->SeatNumberSize, 0.5f));
 
+	// Hidden with a fade: half way after half the time, gone at the end.
+	Stage->SeatNumberFadeSeconds = 0.5f;
 	Stage->bShowSeatNumbers = false;
-	Stage->Tick(Dt);
-	TestFalse(TEXT("Decoche : les numeros disparaissent"), Bubble->GetSeatLabel()->IsVisible());
+	Stage->Tick(0.25f);
+	const uint8 HalfAlpha = Bubble->GetSeatLabel()->TextRenderColor.A;
+	TestTrue(FString::Printf(TEXT("A mi-fondu, le numero est a moitie visible (alpha %d)"), HalfAlpha), Bubble->GetSeatLabel()->IsVisible() && HalfAlpha > 100 && HalfAlpha < 155);
+	Stage->Tick(0.3f);
+	TestFalse(TEXT("Decoche : les numeros disparaissent au bout du fondu"), Bubble->GetSeatLabel()->IsVisible());
 
 	return true;
 }

@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VibH2O">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#061a2c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>VibH2O</title>
@@ -24,37 +24,49 @@
 /* Two themes, both dark. Night mode only swaps variables: no global filter,
    so secondary text never drops below #8fa0ab. */
 :root {
-  --bg: #000;
-  --panel: #0b0f12;
-  --panel2: #05080a;
-  --line: #26323a;
-  --track: #1a232a;
-  --text: #b9c7d0;
-  --dim: #8fa0ab;
-  --strong: #e3ecf1;
-  --ok: #2fbf71;
-  --bad: #e0483e;
-  --warn: #e0a63a;
-  --blue: #3fa7d6;
+  /* VIB.e-motion, direction "Table d'eau": the cyanotype held like an
+     instrument. Ink background, glacier for calm and for what is lit, rust
+     for stress, pure white kept for synchrony - so white means something. */
+  --bg: #061a2c;
+  --panel: #0a2438;
+  --panel2: #071c2f;
+  --line: #1d3c53;
+  --track: #0f2f47;
+  --text: #c9dbe6;
+  --dim: #9db8c9;
+  --faint: #6d8a9c;
+  --strong: #e8f2f8;
+  --ok: #9fd6ee;
+  --bad: #d0574a;
+  --warn: #d9a05b;
+  --blue: #9fd6ee;
+  --rust: #c87a55;
   --accent: 100%;   /* how much of a server colour shows */
   --onmix: 20%;     /* tint of a lit tile */
-  --bannerbg: #2a0c0a;
-  --bannertext: #ffb0a8;
-  --radius: 16px;
+  --bannerbg: #2a1410;
+  --bannertext: #f0c0a8;
+  --radius: 4px;
+  --sans: "Hanken Grotesk", "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", "SF Mono", Consolas, Menlo, monospace;
+  --serif: Fraunces, "Iowan Old Style", Georgia, serif;
   color-scheme: dark;
 }
+/* Night: direction "Tulle", for the dark of the hall - almost black, one
+   light only. Secondary text never drops below #8fa0ab. */
 body.night {
-  --panel: #030506;
-  --panel2: #020304;
-  --line: #182127;
-  --track: #11181d;
-  --text: #a6b4bd;
-  --dim: #8fa0ab;
-  --strong: #c7d2d9;
-  --ok: #259a5b;
-  --bad: #c23d34;
+  --bg: #03101c;
+  --panel: #061522;
+  --panel2: #040e18;
+  --line: #14293a;
+  --track: #0b1d2c;
+  --text: #b5c8d4;
+  --dim: #90aabc;
+  --faint: #6a8597;
+  --strong: #d9e7f0;
+  --ok: #7fb6d8;
+  --bad: #b04a3f;
   --warn: #b8862f;
-  --blue: #2f7fa3;
+  --blue: #7fb6d8;
   --accent: 62%;
   --onmix: 12%;
   --bannerbg: #1a0706;
@@ -65,7 +77,7 @@ body.night {
 html, body { margin: 0; height: 100%; background: var(--bg); }
 body {
   color: var(--text);
-  font: 17px/1.3 -apple-system, system-ui, "Segoe UI", sans-serif;
+  font: 17px/1.35 var(--sans);
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
   touch-action: manipulation;
@@ -83,10 +95,10 @@ header {
 }
 #dot { width: 16px; height: 16px; border-radius: 50%; background: var(--bad); flex: none; transition: background .2s; }
 #dot.ok { background: var(--ok); }
-#title { font-weight: 700; letter-spacing: .08em; color: var(--strong); flex: none; }
+#title { font: 300 26px/1 var(--serif); letter-spacing: -.01em; color: var(--strong); flex: none; }
 #pills { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pill {
-  display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 17px;
+  display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: var(--radius);
   border: 2px solid var(--line); font-size: 15px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
   color: var(--text);
 }
@@ -100,7 +112,7 @@ header {
 @keyframes blink { 50% { background: transparent; color: var(--warn); } }
 #status { color: var(--dim); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 120px; }
 .hbtn {
-  flex: none; height: 48px; min-width: 52px; padding: 0 14px; border-radius: 12px;
+  flex: none; height: 48px; min-width: 52px; padding: 0 14px; border-radius: var(--radius);
   border: 1px solid var(--line); background: var(--panel); font-size: 20px; color: var(--strong);
 }
 .hbtn.on { border-color: var(--warn); color: var(--warn); }
@@ -123,10 +135,10 @@ body.locked #shield { display: block; }
 nav { flex: none; display: flex; gap: 8px; padding: 10px 12px 0; overflow-x: auto; scrollbar-width: none; }
 nav::-webkit-scrollbar { display: none; }
 nav button {
-  flex: 1 0 auto; white-space: nowrap; min-height: 52px; padding: 6px 16px; border-radius: 12px; color: var(--dim);
+  flex: 1 0 auto; white-space: nowrap; min-height: 52px; padding: 6px 16px; border-radius: var(--radius); color: var(--dim);
   border: 1px solid var(--line); background: transparent; font-weight: 600;
 }
-nav button.sel { color: var(--strong); border-color: var(--dim); background: var(--panel); }
+nav button.sel { color: var(--blue); border-color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--panel)); }
 
 main { flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .page { display: none; height: 100%; padding: 14px; gap: 14px; }
@@ -139,7 +151,12 @@ body.nostate #noconn { display: flex; }
 #noconn.bad h3 { color: var(--bad); }
 
 section { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
-h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+h2 { margin: 0; font: 500 12px/1.4 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--blue); }
+/* Panels sit on a 28 px water table; a short glacier mark tops each one. */
+.page.sel.grid, .page.sel#page2 { background-image: linear-gradient(#9fd6ee08 1px, transparent 1px), linear-gradient(90deg, #9fd6ee08 1px, transparent 1px); background-size: 28px 28px; }
+.page.grid > section, #page2 > section { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.page.grid > section::before, #page2 > section::before { content: ""; position: absolute; top: -1px; left: -1px; width: 34px; height: 2px; background: var(--blue); opacity: .6; }
+output, .rg output { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .empty { color: var(--dim); padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); line-height: 1.45; }
 .note { color: var(--dim); font-size: 15px; }
 
@@ -235,6 +252,12 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
   border: 2px solid var(--line); background: var(--panel); color: var(--text);
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15;
 }
+#seatMap { display: grid; gap: 4px; margin: 8px 0 10px; overflow-x: auto; }
+#seatMap button { aspect-ratio: 1; min-width: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); font: 11px/1 var(--mono); }
+#seatMap button.sel { background: var(--blue); color: var(--bg); border-color: var(--blue); font-weight: 700; }
+#seatMap span { min-width: 26px; }
+#groupName { flex: 1; min-width: 160px; font: inherit; color: var(--strong); background: var(--panel2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; -webkit-user-select: text; user-select: text; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
 .chip small { font-size: 13px; font-weight: 600; color: var(--dim); }
 .chip.on { border-color: var(--cc); color: var(--strong); background: color-mix(in srgb, var(--cc) var(--onmix), var(--panel)); }
 .chip.pressing { transform: scale(.97); }
@@ -266,7 +289,7 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 .condNow { font-size: 30px; font-weight: 700; color: var(--strong); }
 .preset .chip.cur { border-color: var(--ok); color: var(--strong); }
 .saveRow .big { flex: none; min-width: 0; padding: 0 20px; font-size: 18px; }
-.saveRow input { flex: 1; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--strong); font: inherit; padding: 0 14px; }
+.saveRow input { flex: 1; min-height: 52px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--strong); font: inherit; padding: 0 14px; }
 .page.sel#page2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
 #page2 section { min-height: auto; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); }
 .ends { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 15px; }
@@ -281,7 +304,7 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
 .meter .fill { height: 100%; width: 0; border-radius: 6px; background: var(--blue); transition: width .2s linear; }
 .meter .mark { position: absolute; top: -6px; width: 4px; height: 24px; margin-left: -2px; background: var(--strong); border-radius: 2px; }
 #blendText, #moodNow { color: var(--strong); }
-.wide { min-height: 52px; border-radius: 12px; border: 1px dashed var(--line); color: var(--dim); padding: 0 16px; align-self: flex-start; }
+.wide { min-height: 52px; border-radius: var(--radius); border: 1px dashed var(--line); color: var(--dim); padding: 0 16px; align-self: flex-start; }
 .wide.on { border-style: solid; border-color: var(--warn); color: var(--warn); }
 #moods .chip { --c: #b48cf0; min-width: 120px; }
 #excRow .fill { background: #e07a5f; }
@@ -354,6 +377,7 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
     <button data-page="pageI">Image</button>
     <button data-page="pageA">Ambiance</button>
     <button data-page="pageB">Salle · Bulles</button>
+    <button data-page="pageL">Lumières</button>
     <button data-page="pageP">Préréglages</button>
     <button data-page="page1">Attracteurs · Zones</button>
   </nav>
@@ -394,6 +418,16 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
       <section><h2>Image et descente</h2><div data-regie="Spectacle"></div></section>
     </div>
     <div class="page grid" id="pageT">
+      <section><h2>Forme quand la salle est synchrone</h2>
+        <div class="chips" id="bancShapes">
+          <button class="chip" data-banc="Vortex"><span class="lbl">Vortex</span></button>
+          <button class="chip" data-banc="Colonne"><span class="lbl">Colonne</span></button>
+          <button class="chip" data-banc="Sphere"><span class="lbl">Sphère</span></button>
+          <button class="chip" data-banc="Sablier"><span class="lbl">Sablier</span></button>
+          <button class="chip" data-banc="Anneau"><span class="lbl">Anneau</span></button>
+        </div>
+        <p class="note">Le changement se fait en douceur. Les rayons et la hauteur du vortex dimensionnent toutes les formes.</p>
+      </section>
       <section><h2>Tableau 2 : division et vortex</h2><div data-regie="Tableau 2"></div>
         <p class="ends"><span>Le passage salle → banc se commande dans l'onglet Tableaux. Ces réglages disent comment il se fait.</span></p></section>
     </div>
@@ -409,7 +443,28 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
       <section><h2>Couleurs des ambiances</h2><div data-regie="Ambiance" data-kind="color"></div></section>
       <section><h2>Lumière et eau</h2><div data-regie="Ambiance" data-kind="other"></div></section>
     </div>
+    <div class="page grid" id="pageL">
+      <section><h2>Couleurs des lumières</h2><div data-regie="Lumières" data-kind="color"></div></section>
+      <section><h2>Intensités et direction</h2><div data-regie="Lumières" data-kind="other"></div></section>
+    </div>
     <div class="page grid" id="pageB">
+      <section><h2>Formes toutes faites</h2>
+        <div class="chips">
+          <button class="chip" data-forme="droite"><span class="lbl">Droite</span></button>
+          <button class="chip" data-forme="incurvee"><span class="lbl">Incurvée</span></button>
+          <button class="chip" data-forme="theatre"><span class="lbl">Théâtre (gradins)</span></button>
+        </div>
+        <h2>Public simulé</h2>
+        <div class="chips">
+          <button class="chip" data-sim="petite"><span class="lbl">Petite 6×4</span></button>
+          <button class="chip" data-sim="moyenne"><span class="lbl">Moyenne 12×8</span></button>
+          <button class="chip" data-sim="grande"><span class="lbl">Grande 20×10</span></button>
+          <button class="chip" data-sim="rectangulaire"><span class="lbl">Allongée 24×3</span></button>
+          <button class="chip" data-sim="theatre"><span class="lbl">Théâtre 16×10</span></button>
+          <button class="chip" data-sim="ales"><span class="lbl">Alès 23×4</span></button>
+        </div>
+        <p class="ends"><span>Le public simulé ne sert qu'en répétition, sans Max.</span></p>
+      </section>
       <section><h2>Forme de la salle</h2><div data-regie="Salle"></div></section>
       <section><h2>Bulles</h2><div data-regie="Bulles"></div></section>
       <section><h2>Réaction aux capteurs</h2><div data-regie="Réaction"></div></section>
@@ -484,7 +539,23 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
       </section>
       <section>
         <h2>Focus</h2>
+        <p class="note">Mettre en avant un groupe de spectateurs : les autres bulles s'assombrissent.</p>
         <div id="groups"></div>
+        <button class="chip" id="pickOpen"><span class="lbl">Composer un groupe…</span></button>
+        <div id="picker" hidden>
+          <p class="note">Toucher les sièges à mettre en avant. Le numéro est celui affiché sur la bulle.</p>
+          <div id="seatMap"></div>
+          <div class="chips">
+            <input id="groupName" type="text" maxlength="40" placeholder="Nom du groupe" autocomplete="off">
+            <button class="chip" id="pickFromActive"><span class="lbl">Partir du groupe actif</span></button>
+            <button class="chip" id="pickClear"><span class="lbl">Tout effacer</span></button>
+          </div>
+          <div class="chips">
+            <button class="chip on" id="pickSave"><span class="lbl">Enregistrer et mettre en avant</span></button>
+            <button class="chip del" id="pickDelete"><span class="lbl">Supprimer ce groupe</span></button>
+            <button class="chip" id="pickClose"><span class="lbl">Fermer</span></button>
+          </div>
+        </div>
         <div class="slider">
           <label for="focus">Intensité</label>
           <input type="range" id="focus" min="0" max="1" step="0.001" value="0">
@@ -763,6 +834,21 @@ function renderAttractors() {
     tilesSig = ts;
     tiles.innerHTML = attractors.length ? "" :
       '<div class="empty">Aucun attracteur dans le niveau. Placer un acteur <b>VibH2O — Attracteur</b> dans Unreal.</div>';
+    if (attractors.length && !$("#shareChips")) {
+      const row = document.createElement("div");
+      row.className = "chips";
+      row.id = "shareChips";
+      row.innerHTML = '<span class="note">Part de la salle appelée :</span>'
+        + '<button class="chip" data-share="30"><span class="lbl">30 %</span></button>'
+        + '<button class="chip" data-share="60"><span class="lbl">60 %</span></button>'
+        + '<button class="chip" data-share="100"><span class="lbl">Toute la salle</span></button>';
+      tiles.after(row);
+      row.querySelectorAll("[data-share]").forEach((b) => pressable(b, { tap: () => {
+        const v = Number(b.dataset.share) / 100;
+        for (const a of list(state.attractors)) send("share:" + a.id, "/Attractor/" + a.id + "/Share/ " + v, "Attracteurs : part " + b.textContent.trim());
+        toast("Attracteurs : " + b.textContent.trim());
+      } }));
+    }
     for (const a of attractors) {
       const el = document.createElement("button");
       el.className = "tile";
@@ -787,6 +873,9 @@ function renderAttractors() {
       + (on ? (pct >= 99 ? "arrivé" : "en route · " + pct + " %") : (pct <= 1 ? "au repos" : "retour · " + pct + " %"))
       + " · part " + Math.round(num(a.share, 0) * 100) + " %";
   }
+
+  const shares = attractors.map((a) => Math.round(num(a.share, 0) * 100));
+  document.querySelectorAll("[data-share]").forEach((b) => b.classList.toggle("on", shares.length > 0 && shares.every((v) => v === Number(b.dataset.share))));
 
   const fadeScale = shown("fade", num(state.fadeScale, 1)) || 1;
   if (!fadeDragging) $("#fade").value = Math.log2(fadeScale);
@@ -1222,8 +1311,8 @@ function regieRow(c) {
 }
 function renderRegie() {
   const r = state.regie;
-  document.querySelectorAll("#nav button[data-page=pageC], #nav button[data-page=pageS], #nav button[data-page=pageT], #nav button[data-page=pageI], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
-  if (!r && ["pageC", "pageS", "pageT", "pageI", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
+  document.querySelectorAll("#nav button[data-page=pageC], #nav button[data-page=pageS], #nav button[data-page=pageT], #nav button[data-page=pageI], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageL], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
+  if (!r && ["pageC", "pageS", "pageT", "pageI", "pageA", "pageB", "pageL", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
   if (!r || !Array.isArray(r.controls)) return;
   const sig = r.controls.map((c) => c.id + c.label + c.kind).join(",");
   if (sig !== regieSig) {
@@ -1253,6 +1342,8 @@ function renderRegie() {
   $("#railFrame").textContent = framed >= 0 ? "vue d'ensemble à " + framed.toFixed(3) : "vue d'ensemble : pas de salle";
 
   renderConduite(r.conduite);
+  renderPicker();
+  document.querySelectorAll("[data-banc]").forEach((b) => b.classList.toggle("on", b.dataset.banc === r.syncShape));
 
   // What Unreal says about the last command: saved, recalled, refused...
   const n = r.notice;
@@ -1316,6 +1407,57 @@ function renderConduite(c) {
     box.appendChild(line);
   });
 }
+document.querySelectorAll("[data-forme]").forEach((b) => pressable(b, { tap: () => { send("forme", "/Regie/Forme " + b.dataset.forme, "Forme : " + b.textContent.trim()); } }));
+document.querySelectorAll("[data-sim]").forEach((b) => pressable(b, { holdMs: () => CONFIRM_MS, hint: "Maintenir pour changer le public simulé.", confirm: () => { send("sim", "/Regie/Simulation/Salle " + b.dataset.sim, "Public simulé : " + b.textContent.trim()); } }));
+// --- Focus groups picked seat by seat
+let pickSel = new Set(), pickSig = null;
+function renderPicker() {
+  const r = state && state.regie, room = r && r.room;
+  if (!room || $("#picker").hidden) return;
+  const sig = room.columns + "x" + room.rows + ":" + (room.seats || []).map((s) => s.join(".")).join(",");
+  const map = $("#seatMap");
+  if (sig !== pickSig) {
+    pickSig = sig;
+    map.innerHTML = "";
+    map.style.gridTemplateColumns = "repeat(" + Math.max(1, num(room.columns, 1)) + ", minmax(26px, 1fr))";
+    const cells = new Map((room.seats || []).map((s) => [s[1] + "," + s[2], s]));
+    for (let row = 0; row < num(room.rows, 0); row++) {
+      for (let col = 0; col < num(room.columns, 0); col++) {
+        const s = cells.get(col + "," + row);
+        if (!s || !s[4]) { map.appendChild(document.createElement("span")); continue; }
+        const b = document.createElement("button");
+        b.dataset.seat = s[0];
+        b.textContent = s[3];
+        b.title = "Siège " + s[0] + " · spectateur " + s[3];
+        b.addEventListener("click", () => { const k = Number(b.dataset.seat); pickSel.has(k) ? pickSel.delete(k) : pickSel.add(k); paintPicker(); });
+        map.appendChild(b);
+      }
+    }
+  }
+  paintPicker();
+}
+function paintPicker() { $("#seatMap").querySelectorAll("button").forEach((b) => b.classList.toggle("sel", pickSel.has(Number(b.dataset.seat)))); $("#pickSave .lbl").textContent = "Enregistrer et mettre en avant (" + pickSel.size + ")"; }
+function activeGroupSeats() {
+  const r = state && state.regie, room = r && r.room, active = state && state.focus && state.focus.active;
+  const g = room && (room.groups || []).find((x) => x.name === active);
+  return g ? g.seats : [];
+}
+pressable($("#pickOpen"), { tap: () => { $("#picker").hidden = false; $("#pickOpen").hidden = true; pickSel = new Set(activeGroupSeats()); const a = state && state.focus && state.focus.active; if (a) $("#groupName").value = a; pickSig = null; renderPicker(); } });
+pressable($("#pickClose"), { tap: () => { $("#picker").hidden = true; $("#pickOpen").hidden = false; } });
+pressable($("#pickClear"), { tap: () => { pickSel.clear(); paintPicker(); } });
+pressable($("#pickFromActive"), { tap: () => { pickSel = new Set(activeGroupSeats()); const a = state && state.focus && state.focus.active; if (a) $("#groupName").value = a; paintPicker(); } });
+pressable($("#pickSave"), { tap: () => {
+  const name = $("#groupName").value.trim();
+  if (!name) { toast("Donner un nom au groupe."); return; }
+  if (!pickSel.size) { toast("Toucher au moins un siège."); return; }
+  send("focusSet", "/Regie/Focus/Groupe " + encName(name) + " " + [...pickSel].join(" "), "Groupe " + name);
+} });
+pressable($("#pickDelete"), { holdMs: () => UNLOCK_MS, hint: "Maintenir 1,5 s pour supprimer le groupe.", confirm: () => {
+  const name = $("#groupName").value.trim();
+  if (name) send("focusDel", "/Regie/Focus/Supprimer " + encName(name), "Suppression du groupe " + name);
+} });
+// --- Shapes of the school
+document.querySelectorAll("[data-banc]").forEach((b) => pressable(b, { tap: () => { send("banc", "/Regie/Banc " + b.dataset.banc.toLowerCase(), "Forme du banc : " + b.textContent.trim()); } }));
 pressable($("#condGo"), { tap: () => { send("condGo", "/Regie/Conduite/Go", "GO"); toast("GO"); } });
 pressable($("#condPrev"), { tap: () => { send("condPrev", "/Regie/Conduite/Precedent", "Précédent"); } });
 pressable($("#condNextBtn"), { tap: () => { send("condNext", "/Regie/Conduite/Suivant", "Suivant"); } });

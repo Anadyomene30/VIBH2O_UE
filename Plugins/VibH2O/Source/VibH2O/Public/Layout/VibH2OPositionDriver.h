@@ -219,6 +219,9 @@ struct VIBH2O_API FVibH2OSchoolFrame
 
 	/** +1 or -1: which way the vortex turns. */
 	float SpinDirection = 1.0f;
+
+	/** EVibH2OSyncShape: the wall the school holds when in order. */
+	uint8 Shape = 0;
 };
 
 /**

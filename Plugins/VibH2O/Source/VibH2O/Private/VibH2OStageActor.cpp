@@ -756,7 +756,39 @@ FVibH2OGridParams AVibH2OStageActor::MakeGridParams(int32 Columns, int32 Rows) c
 	Params.ElevationCurve = ElevationCurve ? &ElevationCurve->FloatCurve : nullptr;
 	Params.DepthAmplitude = DepthAmplitude;
 	Params.DepthNoiseScale = DepthNoiseScale;
+	Params.ColumnSteps = GetColumnSteps(Columns);
 	return Params;
+}
+
+const TArray<float>* AVibH2OStageActor::GetColumnSteps(int32 Columns) const
+{
+	if (Columns != Room.Columns || Columns <= 0)
+	{
+		return nullptr;
+	}
+	const int32 Occupied = Room.GetOccupiedCount();
+	if (ColumnStepsFrame != GFrameCounter || ColumnStepsColumns != Columns || ColumnStepsOccupied != Occupied
+		|| ColumnStepsGeneration != Room.Generation || ColumnStepsAisle != AisleWidth)
+	{
+		ColumnStepsFrame = GFrameCounter;
+		ColumnStepsColumns = Columns;
+		ColumnStepsOccupied = Occupied;
+		ColumnStepsGeneration = Room.Generation;
+		ColumnStepsAisle = AisleWidth;
+		// An aisle is a column the plan leaves entirely empty - in an empty
+		// room there is none.
+		TArray<bool> Aisles;
+		Aisles.Init(Occupied > 0, Columns);
+		for (const FVibH2OSeat& Seat : Room.Seats)
+		{
+			if (Seat.bOccupied && Aisles.IsValidIndex(Seat.Column))
+			{
+				Aisles[Seat.Column] = false;
+			}
+		}
+		FVibH2OLayoutMath::ComputeColumnSteps(Aisles, AisleWidth, CachedColumnSteps);
+	}
+	return &CachedColumnSteps;
 }
 
 void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
@@ -839,7 +871,11 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 	// two hundred times.
 	FVector ViewLocation = GetActorLocation();
 	FVector ViewUp = FVector::UpVector;
-	if (bShowSeatNumbers)
+	const float NumbersTarget = bShowSeatNumbers ? 1.0f : 0.0f;
+	SeatNumberOpacity = SeatNumberFadeSeconds <= 0.0f ? NumbersTarget
+		: FMath::FInterpConstantTo(SeatNumberOpacity, NumbersTarget, DeltaSeconds, 1.0f / SeatNumberFadeSeconds);
+	const bool bNumbersShow = SeatNumberOpacity > 0.0f;
+	if (bNumbersShow)
 	{
 		if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
@@ -1035,6 +1071,16 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 				Scale * (1.0f + Amount * FMath::Sin(W * 1.23f + P2)));
 		}
 
+		// A shape of its own, fixed, at constant volume.
+		if (ShapeIrregularity > 0.0f)
+		{
+			const FVector Shape(
+				1.0f + ShapeIrregularity * FVibH2ONoise::SignedFloat(Context.Seed * 37 + 1),
+				1.0f + ShapeIrregularity * FVibH2ONoise::SignedFloat(Context.Seed * 37 + 2),
+				1.0f + ShapeIrregularity * FVibH2ONoise::SignedFloat(Context.Seed * 37 + 3));
+			ScaleVector *= Shape / FMath::Pow(FMath::Max(Shape.X * Shape.Y * Shape.Z, KINDA_SMALL_NUMBER), 1.0f / 3.0f);
+		}
+
 		Bubble->SetActorRelativeLocation(Location);
 		Bubble->SetActorRelativeRotation(Rotation);
 		Bubble->SetActorRelativeScale3D(ScaleVector);
@@ -1082,8 +1128,8 @@ void AVibH2OStageActor::UpdateBubbles(float DeltaSeconds)
 
 		// One number per spectator: on the mother only. Placed after the
 		// update, on the bubble as it will be drawn this frame.
-		Bubble->SetSeatLabelVisible(bShowSeatNumbers && Body.Member == 0);
-		if (bShowSeatNumbers)
+		Bubble->SetSeatLabelOpacity(Body.Member == 0 ? SeatNumberOpacity : 0.0f);
+		if (bNumbersShow && Body.Member == 0)
 		{
 			Bubble->SetSeatLabelStyle(SeatNumberSource, SeatNumberSize, SeatNumberColor);
 			Bubble->PlaceSeatLabel(ViewLocation, ViewUp);
@@ -1602,8 +1648,20 @@ FBox AVibH2OStageActor::GetSeatPlanBounds() const
 	{
 		return GetRoomBounds();
 	}
-	// Room for the bubble itself and its breathing.
-	const float Radius = ColumnSpacing * 0.5f * GetActorScale3D().GetMax();
+	// Room for the bubble itself and its breathing: half a seat, or the
+	// largest bubble as drawn when they are bigger than that.
+	float Radius = ColumnSpacing * 0.5f * GetActorScale3D().GetMax();
+	for (const TPair<int32, TObjectPtr<AVibH2OBubbleActor>>& Pair : Bubbles)
+	{
+		const AVibH2OBubbleActor* Bubble = Pair.Value;
+		if (Bubble != nullptr && !Bubble->IsHidden())
+		{
+			FVector Centre;
+			float Drawn = 0.0f;
+			Bubble->GetDrawnSphere(Centre, Drawn);
+			Radius = FMath::Max(Radius, Drawn * 1.1f);
+		}
+	}
 	return Bounds.ExpandBy(FVector(Radius));
 }
 

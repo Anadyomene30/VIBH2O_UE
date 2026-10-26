@@ -48,6 +48,13 @@ AVibH2OBubbleActor::AVibH2OBubbleActor()
 	SeatLabel->SetCastShadow(false);
 	// Off by default: the stage turns them on, for the setup or for the audience.
 	SeatLabel->SetVisibility(false);
+	// The engine's translucent text material reads the colour's alpha: the
+	// number can fade in and out instead of popping.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TranslucentText(TEXT("/Engine/EngineMaterials/DefaultTextMaterialTranslucent.DefaultTextMaterialTranslucent"));
+	if (TranslucentText.Succeeded())
+	{
+		SeatLabel->SetTextMaterial(TranslucentText.Object);
+	}
 
 	// Demonstration sphere, taken from engine content. It proves the data
 	// flows, nothing more.
@@ -187,6 +194,12 @@ void AVibH2OBubbleActor::SetSeatLabelVisible(bool bVisible)
 	}
 }
 
+void AVibH2OBubbleActor::SetSeatLabelOpacity(float Opacity)
+{
+	SeatLabelOpacity = FMath::Clamp(Opacity, 0.0f, 1.0f);
+	SetSeatLabelVisible(SeatLabelOpacity > 0.001f);
+}
+
 void AVibH2OBubbleActor::SetSeatLabelStyle(EVibH2OSeatNumber Source, float HeightFraction, const FLinearColor& Color)
 {
 	SeatLabelSource = Source;
@@ -203,7 +216,9 @@ void AVibH2OBubbleActor::SetSeatLabelStyle(EVibH2OSeatNumber Source, float Heigh
 		SeatLabel->SetText(FText::AsNumber(Number, &FNumberFormattingOptions::DefaultNoGrouping()));
 	}
 
-	const FColor Wanted = Color.ToFColor(true);
+	FLinearColor Faded = Color;
+	Faded.A *= SeatLabelOpacity;
+	const FColor Wanted = Faded.ToFColor(true);
 	if (SeatLabel->TextRenderColor != Wanted)
 	{
 		SeatLabel->SetTextRenderColor(Wanted);

@@ -217,6 +217,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.6", DisplayName = "Déformation organique", UIMax = "0.15", ToolTip = "Les bulles respirent et ne sont jamais des sphères parfaites. Réaliste sous 0,1 ; au-delà, effet caoutchouc."))
 	float OrganicDeform = 0.035f;
 
+	/**
+	 * Each bubble keeps a shape of its own: a little flattened or stretched
+	 * along its own axes, at constant volume. Fixed, unlike the breathing
+	 * above, so no two bubbles are the same and none is a perfect sphere.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", ClampMax = "0.4", DisplayName = "Forme irrégulière", UIMax = "0.3", ToolTip = "Chaque bulle a sa propre forme, un peu aplatie ou allongée, sans changer de volume. 0 = sphères parfaites ; 0,08 = discret ; 0,2 = très marqué."))
+	float ShapeIrregularity = 0.08f;
+
 	/** How fast that deformation breathes, in cycles per second. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Bulles", meta = (ClampMin = "0.0", DisplayName = "Vitesse de la déformation", UIMax = "2.0", ToolTip = "Respirations par seconde."))
 	float OrganicSpeed = 0.42f;
@@ -234,6 +242,13 @@ public:
 	/** Depth gap between two rows, in cm. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Geometrie", meta = (ClampMin = "1.0", ForceUnits = "cm", DisplayName = "Écart entre rangées", UIMin = "40", UIMax = "400", ToolTip = "Distance entre deux rangées."))
 	float RowSpacing = 140.0f;
+
+	/**
+	 * Width of an aisle - a column the plan leaves entirely empty - in seats.
+	 * 1: as wide as a seat; 2: twice; 0: the aisle closes up.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Geometrie", meta = (ClampMin = "0.0", UIMax = "6.0", DisplayName = "Allées : largeur (× un siège)", ToolTip = "Largeur d'une allée - une colonne que le plan laisse entièrement vide - en nombre de sièges. 1 = comme un siège, 2 = deux fois plus large, 0 = l'allée se referme."))
+	float AisleWidth = 1.0f;
 
 	/**
 	 * SIGNED angle per column step, in degrees. Zero gives an exactly straight
@@ -375,6 +390,14 @@ public:
 	/** Larger than the base radius for a cone that opens upward. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Vortex", meta = (ClampMin = "0.0", ForceUnits = "cm", DisplayName = "Vortex : rayon en haut", UIMax = "2000", ToolTip = "Rayon du haut du cône (il s'évase vers le haut)."))
 	float VortexTopRadius = 900.0f;
+
+	/**
+	 * The shape the school takes when the room is in step. The vortex
+	 * settings size it: radii, height, offset, direction. Changing it on the
+	 * fly is smooth - the fish swim to the new wall.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Tableaux|Vortex", meta = (DisplayName = "Forme en synchronie", ToolTip = "La forme que prend le banc quand la salle est synchrone. Les réglages du vortex (rayons, hauteur) la dimensionnent. Le changement se fait en douceur."))
+	EVibH2OSyncShape SyncShape = EVibH2OSyncShape::Vortex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, AdvancedDisplay, Category = "VibH2O|Tableaux|Vortex", meta = (ClampMin = "0", UIMax = "10", ToolTip = "Pilote « Vortex simple » seulement — sans effet avec le banc de poissons."))
 	float VortexTurns = 3.0f;
@@ -554,6 +577,12 @@ public:
 	FBox GetSeatPlanBounds() const;
 
 	/**
+	 * Each column's centre in seat steps, aisles at their width; null when
+	 * Columns is not the plan's. Worked out once per frame.
+	 */
+	const TArray<float>* GetColumnSteps(int32 Columns) const;
+
+	/**
 	 * Distance at which a camera of the given horizontal field of view frames
 	 * the whole group.
 	 *
@@ -679,7 +708,11 @@ public:
 	 * opening night. Interp: a cue in a Level Sequence can show and hide them.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Numéros", meta = (DisplayName = "Afficher les numéros", ToolTip = "Le numéro de chaque spectateur au centre de sa bulle, pour qu'il s'y retrouve. Animable dans Sequencer."))
-	bool bShowSeatNumbers = false;
+	bool bShowSeatNumbers = true;
+
+	/** Showing or hiding the numbers fades them over this time. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Numéros", meta = (DisplayName = "Numéros : durée du fondu", ClampMin = "0.0", UIMax = "5.0", ForceUnits = "s", ToolTip = "Les numéros apparaissent et disparaissent en fondu sur cette durée. 0 = d'un coup."))
+	float SeatNumberFadeSeconds = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Numéros", meta = (DisplayName = "Numéro affiché", ToolTip = "L'identifiant du spectateur envoyé par Max, ou le numéro du siège dans le plan de salle."))
 	EVibH2OSeatNumber SeatNumberSource = EVibH2OSeatNumber::Individual;
@@ -802,6 +835,16 @@ private:
 	void DrawEditorPreview() const;
 
 	FVibH2OGridParams MakeGridParams(int32 Columns, int32 Rows) const;
+
+	/** How much the seat numbers show, fading toward bShowSeatNumbers. */
+	float SeatNumberOpacity = 0.0f;
+
+	mutable TArray<float> CachedColumnSteps;
+	mutable uint64 ColumnStepsFrame = MAX_uint64;
+	mutable int32 ColumnStepsColumns = -1;
+	mutable int32 ColumnStepsOccupied = -1;
+	mutable int32 ColumnStepsGeneration = -1;
+	mutable float ColumnStepsAisle = -1.0f;
 	const FVibH2OFocusGroup* FindFocusGroup(FName GroupName) const;
 	float ComputeFocusMask(const FVibH2OSeat& Seat) const;
 	/**

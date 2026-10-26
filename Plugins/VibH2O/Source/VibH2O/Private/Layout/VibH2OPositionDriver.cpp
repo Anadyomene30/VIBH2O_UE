@@ -44,6 +44,7 @@ FTransform UVibH2OGridDriver::EvaluateSeat_Implementation(const FVibH2OLayoutCon
 	Params.ElevationCurve = Stage->ElevationCurve ? &Stage->ElevationCurve->FloatCurve : nullptr;
 	Params.DepthAmplitude = Stage->DepthAmplitude;
 	Params.DepthNoiseScale = Stage->DepthNoiseScale;
+	Params.ColumnSteps = Stage->GetColumnSteps(Context.Columns);
 
 	const FVibH2OSeatLayout Layout = FVibH2OLayoutMath::EvaluateGrid(Params, Context.Seat.Column, Context.Seat.Row);
 	return FTransform(Layout.Rotation, Layout.Location);
@@ -114,6 +115,51 @@ namespace
 	 * fish cover the wall evenly: the top ring is longer than the bottom one,
 	 * so it needs more fish. Inverse of the cumulative area of the frustum.
 	 */
+	float ConeHeightForUniform(float U, float BaseRadius, float TopRadius);
+
+	/** Radius of the wall at height H (0 bottom, 1 top), for each sync shape. */
+	float ShapeRadius(uint8 Shape, float H, float BaseRadius, float TopRadius)
+	{
+		const float Wide = FMath::Max(BaseRadius, TopRadius);
+		switch (static_cast<EVibH2OSyncShape>(Shape))
+		{
+		case EVibH2OSyncShape::Colonne:
+			return 0.5f * (BaseRadius + TopRadius);
+		case EVibH2OSyncShape::Sphere:
+			// Half of the height as radius at most, so the sphere stays round.
+			return Wide * FMath::Sqrt(FMath::Max(1.0f - FMath::Square(2.0f * H - 1.0f), 0.0f));
+		case EVibH2OSyncShape::Sablier:
+			return FMath::Lerp(Wide * 0.25f, Wide, FMath::Abs(2.0f * H - 1.0f));
+		case EVibH2OSyncShape::Anneau:
+			return Wide;
+		case EVibH2OSyncShape::Vortex:
+		default:
+			return FMath::Lerp(BaseRadius, TopRadius, H);
+		}
+	}
+
+	/** Each fish's own height on the wall, from a uniform U, covering it evenly. */
+	float ShapeHeight(uint8 Shape, float U, float BaseRadius, float TopRadius)
+	{
+		switch (static_cast<EVibH2OSyncShape>(Shape))
+		{
+		case EVibH2OSyncShape::Colonne:
+		case EVibH2OSyncShape::Sphere:
+			// A sphere's area is even in height (Archimedes): a uniform height
+			// covers it evenly too.
+			return U;
+		case EVibH2OSyncShape::Sablier:
+			// More fish at the wide ends than at the waist.
+			return 0.5f + 0.5f * FMath::Sign(U - 0.5f) * FMath::Sqrt(FMath::Abs(2.0f * U - 1.0f));
+		case EVibH2OSyncShape::Anneau:
+			// A band around the middle of the height.
+			return 0.5f + (U - 0.5f) * 0.18f;
+		case EVibH2OSyncShape::Vortex:
+		default:
+			return ConeHeightForUniform(U, BaseRadius, TopRadius);
+		}
+	}
+
 	float ConeHeightForUniform(float U, float BaseRadius, float TopRadius)
 	{
 		const float A = (TopRadius - BaseRadius) * 0.5f;
@@ -222,6 +268,7 @@ void UVibH2OFlockDriver::PrepareFrame_Implementation(const FVibH2OFrameContext& 
 		School.ConeHeight = Stage->VortexHeight;
 		School.ConeZOffset = Stage->VortexZOffset;
 		School.SpinDirection = Stage->VortexSpinSpeed < 0.0f ? -1.0f : 1.0f;
+		School.Shape = static_cast<uint8>(Stage->SyncShape);
 	}
 	StepSchool(School);
 }
@@ -422,7 +469,7 @@ void UVibH2OFlockDriver::StepSchool(const FVibH2OSchoolFrame& School)
 			const FVector Tangent = FVector(-Radial.Y, Radial.X, 0.0f) * School.SpinDirection;
 
 			const float H01 = FMath::Clamp(static_cast<float>(Pos.Z - ConeZ0) / ConeH, 0.0f, 1.0f);
-			const float ConeR = FMath::Lerp(ConeRb, ConeRt, H01);
+			const float ConeR = ShapeRadius(School.Shape, H01, ConeRb, ConeRt);
 			const float HalfShell = FMath::Max(ConeR * ShellThickness * 0.5f, SepRadius);
 			// A spring onto the wall, softer for a thicker shell, plus the exact
 			// centripetal pull a circle at this speed needs. Without the latter
@@ -438,7 +485,7 @@ void UVibH2OFlockDriver::StepSchool(const FVibH2OSchoolFrame& School)
 
 			// Every fish has its own height on the cone, chosen so the wall is
 			// evenly covered, and drifts slowly up and down around it.
-			const float Base = ConeHeightForUniform(FVibH2ONoise::UnitFloat(i * 17 + 1), ConeRb, ConeRt);
+			const float Base = ShapeHeight(School.Shape, FVibH2ONoise::UnitFloat(i * 17 + 1), ConeRb, ConeRt);
 			const float Cycle = 2.0f * PI * VerticalCycleSpeed * (0.7f + 0.6f * FVibH2ONoise::UnitFloat(i * 17 + 2));
 			const float Wave = 0.1f * FMath::Sin(Time * Cycle + FVibH2ONoise::UnitFloat(i * 17 + 3) * 2.0f * PI);
 			const float TargetZ = ConeZ0 + ConeH * FMath::Clamp(Base + Wave, 0.0f, 1.0f);

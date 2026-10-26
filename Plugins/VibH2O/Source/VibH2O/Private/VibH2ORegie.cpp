@@ -7,6 +7,7 @@
 #include "Components/InputComponent.h"
 #include "Components/SplineComponent.h"
 #include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/World.h"
@@ -26,6 +27,8 @@
 #include "Osc/VibH2OOscTypes.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "VibH2OBackdrop.h"
+#include "VibH2OLightRig.h"
+#include "VibH2OSimulatorActor.h"
 #include "Layout/VibH2OPositionDriver.h"
 #include "VibH2OModule.h"
 #include "VibH2OSettings.h"
@@ -46,6 +49,7 @@ namespace VibH2ORegieInternal
 		{ TEXT("ImageVignette"), TEXT("Bords assombris"), TEXT("Image"), 0.0f, 1.0f, 0.01f, TEXT("Assombrit les bords et les coins de l'image.") },
 		{ TEXT("ImageGrain"), TEXT("Grain"), TEXT("Image"), 0.0f, 1.0f, 0.01f, TEXT("Grain de pellicule. 0 = image lisse.") },
 		{ TEXT("bShowSeatNumbers"), TEXT("Numéros des spectateurs"), TEXT("Spectacle"), 0.0f, 1.0f, 1.0f, TEXT("Le num\u00e9ro de chaque spectateur au centre de sa bulle.") },
+		{ TEXT("SeatNumberFade"), TEXT("Num\u00e9ros : dur\u00e9e du fondu (s)"), TEXT("Spectacle"), 0.0f, 5.0f, 0.1f, TEXT("Les num\u00e9ros apparaissent et disparaissent en fondu sur cette dur\u00e9e. 0 = d'un coup.") },
 		{ TEXT("FramingMargin"), TEXT("Cadrage : marge autour de la salle"), TEXT("Spectacle"), 0.0f, 0.8f, 0.01f, TEXT("Espace autour de la salle \u00e0 l'arriv\u00e9e de la cam\u00e9ra. 0 = bord \u00e0 bord.") },
 		{ TEXT("DescentSeconds"), TEXT("Descente : durée (s)"), TEXT("Spectacle"), 1.0f, 300.0f, 1.0f, TEXT("Temps de la descente lointaine (bouton Descente, touche 0).") },
 		{ TEXT("ApproachPosition"), TEXT("Descente : s'arrête à (rail)"), TEXT("Spectacle"), 0.0f, 1.0f, 0.005f, TEXT("O\u00f9 s'arr\u00eate la descente lointaine : 0 = haut du rail, 1 = bas.") },
@@ -87,12 +91,30 @@ namespace VibH2ORegieInternal
 		{ TEXT("RoomTiers"), TEXT("Gradins : hauteur par rangée (cm)"), TEXT("Salle"), 0.0f, 150.0f, 1.0f, TEXT("Chaque rangée monte d'autant. 0 = salle à plat.") },
 		{ TEXT("RoomRelief"), TEXT("Relief (cm)"), TEXT("Salle"), 0.0f, 100.0f, 1.0f, TEXT("Petites variations de hauteur, pour une salle moins parfaite. 0 = plat.") },
 
+		{ TEXT("LightLevel"), TEXT("Niveau g\u00e9n\u00e9ral"), TEXT("Lumi\u00e8res"), 0.0f, 4.0f, 0.01f, TEXT("Multiplie les trois lumi\u00e8res des bulles. 0 = \u00e9teint.") },
+		{ TEXT("KeyLight"), TEXT("Face : intensit\u00e9 (lux)"), TEXT("Lumi\u00e8res"), 0.0f, 20.0f, 0.1f, TEXT("La lumi\u00e8re principale, qui dessine les bulles.") },
+		{ TEXT("KeyColor"), TEXT("Face : couleur"), TEXT("Lumi\u00e8res"), 0.0f, 1.0f, 0.0f, TEXT("") },
+		{ TEXT("KeyAzimuth"), TEXT("Face : direction (\u00b0)"), TEXT("Lumi\u00e8res"), -180.0f, 180.0f, 1.0f, TEXT("D'o\u00f9 vient la lumi\u00e8re de face, en tournant autour de la salle.") },
+		{ TEXT("KeyHeight"), TEXT("Face : hauteur (\u00b0)"), TEXT("Lumi\u00e8res"), -30.0f, 89.0f, 1.0f, TEXT("90 = au z\u00e9nith, 0 = rasante.") },
+		{ TEXT("BackLight"), TEXT("Contre-jour : intensit\u00e9 (lux)"), TEXT("Lumi\u00e8res"), 0.0f, 20.0f, 0.1f, TEXT("La lumi\u00e8re de derri\u00e8re, qui fait briller le bord des bulles.") },
+		{ TEXT("BackColor"), TEXT("Contre-jour : couleur"), TEXT("Lumi\u00e8res"), 0.0f, 1.0f, 0.0f, TEXT("") },
+		{ TEXT("FillLight"), TEXT("D\u00e9bouchage : intensit\u00e9 (lux)"), TEXT("Lumi\u00e8res"), 0.0f, 20.0f, 0.05f, TEXT("La lumi\u00e8re douce qui \u00e9claircit les ombres.") },
+		{ TEXT("FillColor"), TEXT("D\u00e9bouchage : couleur"), TEXT("Lumi\u00e8res"), 0.0f, 1.0f, 0.0f, TEXT("") },
+		{ TEXT("LightBeams"), TEXT("Faisceaux dans l'eau"), TEXT("Lumi\u00e8res"), 0.0f, 4.0f, 0.05f, TEXT("Combien on voit les faisceaux des lumi\u00e8res dans l'eau.") },
+
+		{ TEXT("SeatSpacing"), TEXT("\u00c9cart entre si\u00e8ges (cm)"), TEXT("Salle"), 20.0f, 500.0f, 1.0f, TEXT("La largeur de la salle : distance entre deux si\u00e8ges voisins. La cam\u00e9ra recadre seule.") },
+		{ TEXT("RowSpacing"), TEXT("\u00c9cart entre rang\u00e9es (cm)"), TEXT("Salle"), 20.0f, 500.0f, 1.0f, TEXT("La profondeur de la salle : distance entre deux rang\u00e9es. La cam\u00e9ra recadre seule.") },
+		{ TEXT("AisleWidth"), TEXT("All\u00e9es : largeur (\u00d7 un si\u00e8ge)"), TEXT("Salle"), 0.0f, 6.0f, 0.1f, TEXT("Une all\u00e9e est une colonne que le plan laisse vide. 1 = comme un si\u00e8ge, 2 = deux fois plus large, 0 = elle se referme.") },
+
+		{ TEXT("ShapeIrregularity"), TEXT("Forme irr\u00e9guli\u00e8re"), TEXT("Bulles"), 0.0f, 0.4f, 0.005f, TEXT("Chaque bulle a sa propre forme, un peu aplatie ou allong\u00e9e. 0 = sph\u00e8res parfaites ; 0,08 = discret ; 0,2 = tr\u00e8s marqu\u00e9.") },
 		{ TEXT("BubbleSize"), TEXT("Taille des bulles"), TEXT("Bulles"), 0.1f, 4.0f, 0.05f, TEXT("Taille de toutes les bulles.") },
 		{ TEXT("FloatAmplitude"), TEXT("Flottement : ampleur (cm)"), TEXT("Bulles"), 0.0f, 200.0f, 1.0f, TEXT("De combien les bulles bougent autour de leur place.") },
 		{ TEXT("FloatSpeed"), TEXT("Flottement : vitesse"), TEXT("Bulles"), 0.0f, 5.0f, 0.01f, TEXT("Vitesse de ce mouvement.") },
 		{ TEXT("BeatPop"), TEXT("Battement : gonflement"), TEXT("Bulles"), 0.0f, 1.0f, 0.01f, TEXT("Combien la bulle gonfle \u00e0 chaque battement de c\u0153ur.") },
 		{ TEXT("OrganicDeform"), TEXT("Déformation organique"), TEXT("Bulles"), 0.0f, 1.0f, 0.005f, TEXT("La bulle se d\u00e9forme doucement, comme vivante.") },
 
+		{ TEXT("DriftThreshold"), TEXT("D\u00e9rive : \u00e0 partir de l'excitation"), TEXT("R\u00e9action"), 0.0f, 0.99f, 0.01f, TEXT("Sous ce niveau d'excitation de la personne, sa bulle reste \u00e0 sa place ; au-dessus, elle s'\u00e9carte de plus en plus.") },
+		{ TEXT("DriftLimit"), TEXT("D\u00e9rive : limite (part de l'\u00e9cart)"), TEXT("R\u00e9action"), 0.0f, 0.5f, 0.01f, TEXT("La d\u00e9rive ne d\u00e9passe jamais cette part de l'\u00e9cart entre si\u00e8ges, quelle que soit l'amplitude.") },
 		{ TEXT("ScalePerExcitation"), TEXT("Excitation : grossissement"), TEXT("Réaction"), 0.0f, 3.0f, 0.01f, TEXT("Combien une bulle grossit quand son spectateur s'excite.") },
 		{ TEXT("DriftIntensity"), TEXT("Excitation : dérive (cm)"), TEXT("Réaction"), 0.0f, 500.0f, 5.0f, TEXT("Combien une bulle tr\u00e8s excit\u00e9e quitte sa place.") },
 		{ TEXT("IndividualContrast"), TEXT("Contraste entre spectateurs"), TEXT("Réaction"), 0.0f, 6.0f, 0.1f, TEXT("0 = toutes les bulles pareilles. Plus haut : chacun prend sa couleur.") },
@@ -344,12 +366,20 @@ void AVibH2ORegie::Tick(float DeltaSeconds)
 	}
 	TickCamera(DeltaSeconds);
 	TickFollowSchool(DeltaSeconds);
+
+	// A paused sequence keeps imposing its values every frame. Once a step
+	// is reached the show's sequence is stopped where it stands - the values
+	// stay - so the tablet, the cues and Max get the stage back.
+	if (ULevelSequencePlayer* Player = GetShowPlayer(); Player != nullptr && Player->IsPaused())
+	{
+		Player->StopAtCurrentTime();
+	}
 	TickParticles();
 }
 
 void AVibH2ORegie::ResolveMissingConnections()
 {
-	const bool bMissing = Stage == nullptr || ExposureVolume == nullptr || Water == nullptr || Rail == nullptr
+	const bool bMissing = Stage == nullptr || ExposureVolume == nullptr || Water == nullptr || Rail == nullptr || Lights == nullptr
 		|| (CameraController == nullptr && !CameraControllerClassName.IsEmpty());
 	const double Now = FPlatformTime::Seconds();
 	if (bMissing && Now - LastResolveTime > 5.0)
@@ -378,6 +408,14 @@ void AVibH2ORegie::ResolveConnections()
 		return;
 	}
 
+	if (Lights == nullptr)
+	{
+		for (TActorIterator<AVibH2OLightRig> It(World); It; ++It)
+		{
+			Lights = *It;
+			break;
+		}
+	}
 	if (Stage == nullptr)
 	{
 		for (TActorIterator<AVibH2OStageActor> It(World); It; ++It)
@@ -514,6 +552,7 @@ void AVibH2ORegie::ApplyChanged(bool bForce)
 	ApplyToExposure();
 	ApplyToImage();
 	ApplyToTableau2();
+	ApplyToLights();
 	if (bForce || bWaterPending || Changed(TEXT("WaterColor")) || Changed(TEXT("WaterLight")) || Changed(TEXT("WaterDensity")))
 	{
 		ApplyToWater();
@@ -524,7 +563,9 @@ void AVibH2ORegie::ApplyChanged(bool bForce)
 	}
 	// The room's shape moves its edges: the overall view follows.
 	if (Changed(TEXT("FramingMargin")) || Changed(TEXT("OutputFormat")) || Changed(TEXT("RoomCurvature"))
-		|| Changed(TEXT("bRoomFanOut")) || Changed(TEXT("RoomTiers")) || Changed(TEXT("RoomRelief")))
+		|| Changed(TEXT("bRoomFanOut")) || Changed(TEXT("RoomTiers")) || Changed(TEXT("RoomRelief"))
+		|| Changed(TEXT("SeatSpacing")) || Changed(TEXT("RowSpacing")) || Changed(TEXT("AisleWidth")) || Changed(TEXT("BubbleSize"))
+		|| Changed(TEXT("FramingCloser")) || Changed(TEXT("FramingRight")) || Changed(TEXT("FramingUp")))
 	{
 		RefreshFraming();
 	}
@@ -555,6 +596,13 @@ void AVibH2ORegie::ApplyToStage()
 	VIBH2O_PUSH(bShowSeatNumbers, Stage->bShowSeatNumbers);
 	VIBH2O_PUSH(BubbleBrightness, Stage->BubbleBrightness);
 	VIBH2O_PUSH(RoomCurvature, Stage->CurvatureAngle);
+	VIBH2O_PUSH(ShapeIrregularity, Stage->ShapeIrregularity);
+	VIBH2O_PUSH(SeatNumberFade, Stage->SeatNumberFadeSeconds);
+	VIBH2O_PUSH(SeatSpacing, Stage->ColumnSpacing);
+	VIBH2O_PUSH(RowSpacing, Stage->RowSpacing);
+	VIBH2O_PUSH(AisleWidth, Stage->AisleWidth);
+	VIBH2O_PUSH(DriftThreshold, Stage->DriftThreshold);
+	VIBH2O_PUSH(DriftLimit, Stage->DriftMaxRatio);
 	VIBH2O_PUSH(bRoomFanOut, Stage->bFanOut);
 	VIBH2O_PUSH(RoomTiers, Stage->ElevationPerRow);
 	VIBH2O_PUSH(RoomRelief, Stage->DepthAmplitude);
@@ -583,6 +631,32 @@ void AVibH2ORegie::ApplyToStage()
 	VIBH2O_PUSH(SyncHueTightening, Palette.SyncHueTightening);
 	VIBH2O_PUSH(SyncHalo, Palette.SyncHalo);
 #undef VIBH2O_PUSH
+}
+
+void AVibH2ORegie::ApplyToLights()
+{
+	if (Lights == nullptr)
+	{
+		return;
+	}
+	const FVibH2ORegieSettings& R = Reglages;
+#define VIBH2O_PUSH(Setting, Target) if (Changed(TEXT(#Setting))) { Target = R.Setting; }
+	VIBH2O_PUSH(LightLevel, Lights->MasterIntensity);
+	VIBH2O_PUSH(KeyLight, Lights->Key.Illuminance);
+	VIBH2O_PUSH(KeyColor, Lights->Key.Color);
+	VIBH2O_PUSH(KeyAzimuth, Lights->Key.Azimuth);
+	VIBH2O_PUSH(KeyHeight, Lights->Key.Elevation);
+	VIBH2O_PUSH(BackLight, Lights->Back.Illuminance);
+	VIBH2O_PUSH(BackColor, Lights->Back.Color);
+	VIBH2O_PUSH(FillLight, Lights->Fill.Illuminance);
+	VIBH2O_PUSH(FillColor, Lights->Fill.Color);
+#undef VIBH2O_PUSH
+	if (Changed(TEXT("LightBeams")))
+	{
+		Lights->Key.VolumetricScattering = R.LightBeams;
+		Lights->Back.VolumetricScattering = R.LightBeams;
+		Lights->Fill.VolumetricScattering = R.LightBeams;
+	}
 }
 
 void AVibH2ORegie::ApplyToExposure()
@@ -963,6 +1037,13 @@ void AVibH2ORegie::ReadScene()
 		R.bShowSeatNumbers = Stage->bShowSeatNumbers;
 		R.BubbleBrightness = Stage->BubbleBrightness;
 		R.RoomCurvature = Stage->CurvatureAngle;
+		R.ShapeIrregularity = Stage->ShapeIrregularity;
+		R.SeatNumberFade = Stage->SeatNumberFadeSeconds;
+		R.SeatSpacing = Stage->ColumnSpacing;
+		R.RowSpacing = Stage->RowSpacing;
+		R.AisleWidth = Stage->AisleWidth;
+		R.DriftThreshold = Stage->DriftThreshold;
+		R.DriftLimit = Stage->DriftMaxRatio;
 		R.bRoomFanOut = Stage->bFanOut;
 		R.RoomTiers = Stage->ElevationPerRow;
 		R.RoomRelief = Stage->DepthAmplitude;
@@ -990,6 +1071,20 @@ void AVibH2ORegie::ReadScene()
 		{
 			CaptureTableau2();
 		}
+	}
+
+	if (Lights != nullptr)
+	{
+		R.LightLevel = Lights->MasterIntensity;
+		R.KeyLight = Lights->Key.Illuminance;
+		R.KeyColor = Lights->Key.Color;
+		R.KeyAzimuth = Lights->Key.Azimuth;
+		R.KeyHeight = Lights->Key.Elevation;
+		R.BackLight = Lights->Back.Illuminance;
+		R.BackColor = Lights->Back.Color;
+		R.FillLight = Lights->Fill.Illuminance;
+		R.FillColor = Lights->Fill.Color;
+		R.LightBeams = Lights->Key.VolumetricScattering;
 	}
 
 	// The exposure the camera actually gets: the most important volume that
@@ -1222,10 +1317,14 @@ void AVibH2ORegie::RefreshFraming()
 {
 	ResolveMissingConnections();
 	float Position = 0.0f;
-	if (ComputeFramedRailPosition(Position) && !FMath::IsNearlyEqual(Position, FramedRailPosition, 1e-4f))
+	if (ComputeFramedRailPosition(Position, false, GetManualShift()))
 	{
-		FramedRailPosition = Position;
-		ApplyToCameraController();
+		Position = ApplyFramingCloser(Position);
+		if (!FMath::IsNearlyEqual(Position, FramedRailPosition, 1e-4f))
+		{
+			FramedRailPosition = Position;
+			ApplyToCameraController();
+		}
 	}
 }
 
@@ -1289,7 +1388,7 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 
 	// The sideways shift eases toward its target - the school's centre, or
 	// back to nothing in tableau 1 - whatever moves the rail.
-	const FVector2D ShiftGoal = bFollow ? SchoolShiftTarget : FVector2D::ZeroVector;
+	const FVector2D ShiftGoal = bFollow ? SchoolShiftTarget : GetManualShift();
 	if (!CameraShift.Equals(ShiftGoal, 0.5f))
 	{
 		const float ShiftAlpha = 1.0f - FMath::Exp(-FMath::Max(DeltaSeconds, 0.0f) / (bFollow ? 3.0f : 1.5f));
@@ -1309,7 +1408,7 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 	if (!bFollow)
 	{
 		// Back in the room: return to the room's overall view, once.
-		SchoolShiftTarget = FVector2D::ZeroVector;
+		SchoolShiftTarget = GetManualShift();
 		if (bFollowingSchool)
 		{
 			bFollowingSchool = false;
@@ -1339,11 +1438,11 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 			const FVector Up = View.GetUpVector();
 			const FVector Placed = Camera->GetComponentLocation() - Right * CameraShift.X - Up * CameraShift.Y;
 			const FVector Toward = Stage->GetRoomBounds().GetCenter() - Placed;
-			const FVector2D Shift(FVector::DotProduct(Toward, Right), FVector::DotProduct(Toward, Up));
+			const FVector2D Shift = FVector2D(FVector::DotProduct(Toward, Right), FVector::DotProduct(Toward, Up)) + GetManualShift();
 			float Target = 0.0f;
 			if (ComputeFramedRailPosition(Target, true, Shift))
 			{
-				SchoolTarget = Target;
+				SchoolTarget = ApplyFramingCloser(Target);
 				SchoolShiftTarget = Shift;
 			}
 		}
@@ -1361,6 +1460,23 @@ void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)
 	// About three seconds to settle: no pumping when the school breathes.
 	const float Alpha = 1.0f - FMath::Exp(-FMath::Max(DeltaSeconds, 0.0f) / 3.0f);
 	SetRailPosition(FMath::Lerp(Current, SchoolTarget, Alpha));
+}
+
+FVector2D AVibH2ORegie::GetManualShift() const
+{
+	return FVector2D(Reglages.FramingRight, Reglages.FramingUp) * 100.0f;
+}
+
+float AVibH2ORegie::ApplyFramingCloser(float Position) const
+{
+	const USplineComponent* Spline = Rail != nullptr ? Rail->GetRailSplineComponent() : nullptr;
+	const float Length = Spline != nullptr ? Spline->GetSplineLength() : 0.0f;
+	if (Length <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(Reglages.FramingCloser))
+	{
+		return Position;
+	}
+	// Down the rail is toward the room: closer is further along.
+	return FMath::Clamp(Position + Reglages.FramingCloser * 100.0f / Length, 0.0f, 1.0f);
 }
 
 void AVibH2ORegie::ApplyCameraShift()
@@ -1706,6 +1822,106 @@ TArray<FString> AVibH2ORegie::ListPresets() const
 	return Names;
 }
 
+void AVibH2ORegie::WritePresetExtras(TSharedRef<FJsonObject> Json) const
+{
+	if (Stage == nullptr)
+	{
+		return;
+	}
+	const TSharedRef<FJsonObject> Focus = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Groups;
+	for (const FVibH2OFocusGroup& Group : Stage->FocusGroups)
+	{
+		const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+		if (FJsonObjectConverter::UStructToJsonObject(FVibH2OFocusGroup::StaticStruct(), &Group, Entry))
+		{
+			Groups.Add(MakeShared<FJsonValueObject>(Entry));
+		}
+	}
+	Focus->SetArrayField(TEXT("groups"), Groups);
+	Focus->SetStringField(TEXT("active"), Stage->ActiveFocusGroup.IsNone() ? FString() : Stage->ActiveFocusGroup.ToString());
+	Focus->SetNumberField(TEXT("amount"), Stage->FocusAmount);
+	Focus->SetNumberField(TEXT("dim"), Stage->FocusDimmedValue);
+	Json->SetObjectField(TEXT("focus"), Focus);
+	Json->SetStringField(TEXT("syncShape"), StaticEnum<EVibH2OSyncShape>()->GetNameStringByValue(static_cast<int64>(Stage->SyncShape)));
+}
+
+void AVibH2ORegie::ReadPresetExtras(const TSharedRef<FJsonObject>& Json)
+{
+	if (Stage == nullptr)
+	{
+		return;
+	}
+	Stage->Modify();
+	const TSharedPtr<FJsonObject>* Focus = nullptr;
+	if (Json->TryGetObjectField(TEXT("focus"), Focus))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Groups = nullptr;
+		if ((*Focus)->TryGetArrayField(TEXT("groups"), Groups))
+		{
+			Stage->FocusGroups.Reset();
+			for (const TSharedPtr<FJsonValue>& Value : *Groups)
+			{
+				FVibH2OFocusGroup Group;
+				if (Value->AsObject().IsValid() && FJsonObjectConverter::JsonObjectToUStruct((Value->AsObject()).ToSharedRef(), &Group))
+				{
+					Stage->FocusGroups.Add(Group);
+				}
+			}
+		}
+		double Number = 0.0;
+		if ((*Focus)->TryGetNumberField(TEXT("amount"), Number))
+		{
+			Stage->FocusAmount = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f);
+		}
+		if ((*Focus)->TryGetNumberField(TEXT("dim"), Number))
+		{
+			Stage->FocusDimmedValue = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f);
+		}
+		FString Active;
+		if ((*Focus)->TryGetStringField(TEXT("active"), Active))
+		{
+			Stage->SetActiveFocusGroup(Active.IsEmpty() ? NAME_None : FName(*Active));
+		}
+	}
+	FString Shape;
+	if (Json->TryGetStringField(TEXT("syncShape"), Shape))
+	{
+		const int64 Value = StaticEnum<EVibH2OSyncShape>()->GetValueByNameString(Shape);
+		if (Value != INDEX_NONE)
+		{
+			Stage->SyncShape = static_cast<EVibH2OSyncShape>(Value);
+		}
+	}
+}
+
+void AVibH2ORegie::SetFocusGroupSeats(const FString& GroupName, const TArray<int32>& SeatIndices)
+{
+	const FString Clean = GroupName.TrimStartAndEnd();
+	if (Stage == nullptr || Clean.IsEmpty())
+	{
+		return;
+	}
+	Stage->Modify();
+	const FName Name(*Clean);
+	FVibH2OFocusGroup* Group = Stage->FocusGroups.FindByPredicate([&Name](const FVibH2OFocusGroup& Each) { return Each.GroupName == Name; });
+	if (Group == nullptr)
+	{
+		Group = &Stage->FocusGroups.AddDefaulted_GetRef();
+		Group->GroupName = Name;
+	}
+	// Picked seat by seat: no rectangle, just the seats chosen.
+	Group->bUseRect = false;
+	Group->ExtraSeatIndices = SeatIndices;
+	Group->ExtraIndividualIds.Reset();
+	Stage->SetActiveFocusGroup(Name);
+	if (Stage->FocusAmount <= 0.0f)
+	{
+		Stage->FocusAmount = 1.0f;
+	}
+	Notice(FString::Printf(TEXT("Groupe \"%s\" : %d si\u00e8ges, mis en avant."), *Clean, SeatIndices.Num()));
+}
+
 bool AVibH2ORegie::SavePreset(const FString& Name)
 {
 	const FString Clean = FPaths::MakeValidFileName(Name.TrimStartAndEnd());
@@ -1713,11 +1929,15 @@ bool AVibH2ORegie::SavePreset(const FString& Name)
 	{
 		return false;
 	}
-	FString Json;
-	if (!FJsonObjectConverter::UStructToJsonObjectString(Reglages, Json))
+	const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+	if (!FJsonObjectConverter::UStructToJsonObject(FVibH2ORegieSettings::StaticStruct(), &Reglages, Object))
 	{
 		return false;
 	}
+	WritePresetExtras(Object);
+	FString Json;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Json);
+	FJsonSerializer::Serialize(Object, Writer);
 	const bool bSaved = FFileHelper::SaveStringToFile(Json, *FPaths::Combine(GetPresetFolder(), Clean + TEXT(".json")), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	Notice(bSaved ? FString::Printf(TEXT("Préréglage \"%s\" enregistré."), *Clean)
 		: FString::Printf(TEXT("Préréglage \"%s\" NON enregistré (dossier Saved protégé ?)."), *Clean));
@@ -1753,6 +1973,11 @@ bool AVibH2ORegie::LoadPreset(const FString& Name)
 	}
 	Reglages = Loaded;
 	ApplyChanged(false);
+	TSharedPtr<FJsonObject> Extras;
+	if (FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Extras) && Extras.IsValid())
+	{
+		ReadPresetExtras(Extras.ToSharedRef());
+	}
 	Notice(FString::Printf(TEXT("Préréglage \"%s\" rappelé."), *Clean));
 	return true;
 }
@@ -1816,6 +2041,34 @@ bool AVibH2ORegie::SetValueFromText(const FString& Id, const FString& Value)
 	return true;
 }
 
+namespace VibH2ORegieInternal
+{
+	/** "~" then percent-encoded UTF-8, as the tablet sends names; anything else as is. */
+	static FString DecodeName(const FString& Token)
+	{
+		if (!Token.StartsWith(TEXT("~")))
+		{
+			return Token;
+		}
+		const FString Encoded = Token.Mid(1);
+		TArray<uint8> Bytes;
+		for (int32 Index = 0; Index < Encoded.Len(); ++Index)
+		{
+			if (Encoded[Index] == TEXT('%') && Index + 2 < Encoded.Len() && FChar::IsHexDigit(Encoded[Index + 1]) && FChar::IsHexDigit(Encoded[Index + 2]))
+			{
+				Bytes.Add(static_cast<uint8>(FParse::HexDigit(Encoded[Index + 1]) * 16 + FParse::HexDigit(Encoded[Index + 2])));
+				Index += 2;
+			}
+			else
+			{
+				Bytes.Add(static_cast<uint8>(Encoded[Index]));
+			}
+		}
+		Bytes.Add(0);
+		return UTF8_TO_TCHAR(reinterpret_cast<const char*>(Bytes.GetData()));
+	}
+}
+
 void AVibH2ORegie::HandleRegieMessage(const FVibH2OOscMessage& Message)
 {
 	const UVibH2OSettings* Settings = UVibH2OSettings::Get();
@@ -1837,22 +2090,7 @@ void AVibH2ORegie::HandleRegieMessage(const FVibH2OOscMessage& Message)
 	// dashes and leading zeros arrive untouched by the number parser.
 	if (Words.Num() == 1 && Words[0].StartsWith(TEXT("~")))
 	{
-		const FString Encoded = Words[0].Mid(1);
-		TArray<uint8> Bytes;
-		for (int32 Index = 0; Index < Encoded.Len(); ++Index)
-		{
-			if (Encoded[Index] == TEXT('%') && Index + 2 < Encoded.Len() && FChar::IsHexDigit(Encoded[Index + 1]) && FChar::IsHexDigit(Encoded[Index + 2]))
-			{
-				Bytes.Add(static_cast<uint8>(FParse::HexDigit(Encoded[Index + 1]) * 16 + FParse::HexDigit(Encoded[Index + 2])));
-				Index += 2;
-			}
-			else
-			{
-				Bytes.Add(static_cast<uint8>(Encoded[Index]));
-			}
-		}
-		Bytes.Add(0);
-		AllWords = UTF8_TO_TCHAR(reinterpret_cast<const char*>(Bytes.GetData()));
+		AllWords = VibH2ORegieInternal::DecodeName(Words[0]);
 	}
 
 	if (Segments.Num() == 0)
@@ -1917,6 +2155,103 @@ void AVibH2ORegie::HandleRegieMessage(const FVibH2OOscMessage& Message)
 	if (Head == TEXT("image"))
 	{
 		ResetImage();
+		return;
+	}
+
+	// Focus groups built on the tablet: a name, then the seats.
+	if (Head == TEXT("focus") && Stage != nullptr)
+	{
+		const FString Action = Segments.Num() > 1 ? Segments[1].ToLower() : FString();
+		if (Action == TEXT("groupe") && Words.Num() >= 1)
+		{
+			TArray<int32> Seats;
+			for (int32 Index = 1; Index < Words.Num(); ++Index)
+			{
+				Seats.AddUnique(FCString::Atoi(*Words[Index]));
+			}
+			SetFocusGroupSeats(VibH2ORegieInternal::DecodeName(Words[0]), Seats);
+		}
+		else if (Action == TEXT("supprimer") && Words.Num() >= 1)
+		{
+			const FName Group(*VibH2ORegieInternal::DecodeName(Words[0]));
+			Stage->Modify();
+			const int32 Removed = Stage->FocusGroups.RemoveAll([&Group](const FVibH2OFocusGroup& Each) { return Each.GroupName == Group; });
+			if (Stage->ActiveFocusGroup == Group)
+			{
+				Stage->SetActiveFocusGroup(NAME_None);
+			}
+			Notice(Removed > 0 ? FString::Printf(TEXT("Groupe \"%s\" supprim\u00e9."), *Group.ToString()) : FString::Printf(TEXT("Groupe \"%s\" introuvable."), *Group.ToString()));
+		}
+		return;
+	}
+
+	// The shape the school takes in step.
+	if (Head == TEXT("banc") && Stage != nullptr)
+	{
+		const FString Shape = (Segments.Num() > 1 ? Segments[1] : (Words.Num() > 0 ? Words[0] : FString())).ToLower();
+		static const TPair<const TCHAR*, EVibH2OSyncShape> Shapes[] = {
+			{ TEXT("vortex"), EVibH2OSyncShape::Vortex }, { TEXT("colonne"), EVibH2OSyncShape::Colonne },
+			{ TEXT("sphere"), EVibH2OSyncShape::Sphere }, { TEXT("sablier"), EVibH2OSyncShape::Sablier },
+			{ TEXT("anneau"), EVibH2OSyncShape::Anneau } };
+		for (const TPair<const TCHAR*, EVibH2OSyncShape>& Entry : Shapes)
+		{
+			if (Shape == Entry.Key)
+			{
+				Stage->SyncShape = Entry.Value;
+				Notice(FString::Printf(TEXT("Forme en synchronie : %s."), *Shape));
+				return;
+			}
+		}
+		return;
+	}
+
+	// Ready-made room shapes: one press sets the four shape settings.
+	if (Head == TEXT("forme"))
+	{
+		const FString Shape = (Segments.Num() > 1 ? Segments[1] : (Words.Num() > 0 ? Words[0] : FString())).ToLower();
+		if (Shape.StartsWith(TEXT("droit")))
+		{
+			Reglages.RoomCurvature = 0.0f; Reglages.RoomTiers = 0.0f; Reglages.RoomRelief = 0.0f;
+		}
+		else if (Shape.StartsWith(TEXT("incurv")))
+		{
+			Reglages.RoomCurvature = 4.0f; Reglages.bRoomFanOut = true; Reglages.RoomTiers = 0.0f; Reglages.RoomRelief = 10.0f;
+		}
+		else if (Shape.StartsWith(TEXT("theatre")))
+		{
+			Reglages.RoomCurvature = 6.0f; Reglages.bRoomFanOut = true; Reglages.RoomTiers = 40.0f; Reglages.RoomRelief = 15.0f;
+		}
+		else
+		{
+			return;
+		}
+		ApplyChanged(false);
+		Notice(FString::Printf(TEXT("Forme de la salle : %s."), *Shape));
+		return;
+	}
+
+	// The simulator's audience, for rehearsals without Max.
+	if (Head == TEXT("simulation"))
+	{
+		const FString Room = (Words.Num() > 0 ? Words[0] : (Segments.Num() > 2 ? Segments[2] : FString())).ToLower();
+		static const TPair<const TCHAR*, EVibH2OSimRoom> Rooms[] = {
+			{ TEXT("petite"), EVibH2OSimRoom::Petite }, { TEXT("moyenne"), EVibH2OSimRoom::Moyenne },
+			{ TEXT("grande"), EVibH2OSimRoom::Grande }, { TEXT("rectangulaire"), EVibH2OSimRoom::Rectangulaire },
+			{ TEXT("theatre"), EVibH2OSimRoom::Theatre }, { TEXT("ales"), EVibH2OSimRoom::Ales } };
+		for (const TPair<const TCHAR*, EVibH2OSimRoom>& Entry : Rooms)
+		{
+			if (Room == Entry.Key)
+			{
+				for (TActorIterator<AVibH2OSimulatorActor> It(GetWorld()); It; ++It)
+				{
+					It->ConfigureRoom(Entry.Value);
+					Notice(FString::Printf(TEXT("Salle simulée : %s."), *Room));
+					return;
+				}
+				Notice(TEXT("Pas de simulateur dans la carte."));
+				return;
+			}
+		}
 		return;
 	}
 
@@ -2028,6 +2363,49 @@ void AVibH2ORegie::WriteRemoteState(const TSharedRef<FJsonObject>& Root) const
 	Conduite->SetBoolField(TEXT("playing"), ShowPlayer != nullptr && ShowPlayer->IsPlaying());
 	Conduite->SetStringField(TEXT("sequence"), ShowSequence != nullptr && ShowSequence->GetSequence() != nullptr ? ShowSequence->GetSequence()->GetName() : FString());
 	Desk->SetObjectField(TEXT("conduite"), Conduite);
+
+	if (Stage != nullptr)
+	{
+		if (const UVibH2OSubsystem* Subsystem = UVibH2OSubsystem::Get(this))
+		{
+			const FVibH2ORoomSnapshot& Plan = Subsystem->GetRoomRef();
+			const TSharedRef<FJsonObject> Room = MakeShared<FJsonObject>();
+			Room->SetNumberField(TEXT("columns"), Plan.Columns);
+			Room->SetNumberField(TEXT("rows"), Plan.Rows);
+			TArray<TSharedPtr<FJsonValue>> Seats;
+			for (const FVibH2OSeat& Seat : Plan.Seats)
+			{
+				// [seat index, column, row, person id, occupied]
+				TArray<TSharedPtr<FJsonValue>> Cell;
+				Cell.Add(MakeShared<FJsonValueNumber>(Seat.SeatIndex));
+				Cell.Add(MakeShared<FJsonValueNumber>(Seat.Column));
+				Cell.Add(MakeShared<FJsonValueNumber>(Seat.Row));
+				Cell.Add(MakeShared<FJsonValueNumber>(Seat.IndividualId));
+				Cell.Add(MakeShared<FJsonValueNumber>(Seat.bOccupied ? 1 : 0));
+				Seats.Add(MakeShared<FJsonValueArray>(Cell));
+			}
+			Room->SetArrayField(TEXT("seats"), Seats);
+			TArray<TSharedPtr<FJsonValue>> Groups;
+			for (const FVibH2OFocusGroup& Group : Stage->FocusGroups)
+			{
+				const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+				Entry->SetStringField(TEXT("name"), Group.GroupName.ToString());
+				TArray<TSharedPtr<FJsonValue>> Members;
+				for (const FVibH2OSeat& Seat : Plan.Seats)
+				{
+					if (Group.Contains(Seat))
+					{
+						Members.Add(MakeShared<FJsonValueNumber>(Seat.SeatIndex));
+					}
+				}
+				Entry->SetArrayField(TEXT("seats"), Members);
+				Groups.Add(MakeShared<FJsonValueObject>(Entry));
+			}
+			Room->SetArrayField(TEXT("groups"), Groups);
+			Desk->SetObjectField(TEXT("room"), Room);
+		}
+		Desk->SetStringField(TEXT("syncShape"), StaticEnum<EVibH2OSyncShape>()->GetNameStringByValue(static_cast<int64>(Stage->SyncShape)));
+	}
 
 	const TSharedRef<FJsonObject> Last = MakeShared<FJsonObject>();
 	Last->SetNumberField(TEXT("serial"), NoticeSerial);

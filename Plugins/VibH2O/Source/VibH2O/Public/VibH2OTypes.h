@@ -8,6 +8,17 @@
 #include "VibH2OTypes.generated.h"
 
 /** Which number a bubble shows when the seat numbers are on. */
+/** The shape the school swims into when the room is in step. */
+UENUM(BlueprintType)
+enum class EVibH2OSyncShape : uint8
+{
+	Vortex UMETA(DisplayName = "Vortex (cône qui s'évase)"),
+	Colonne UMETA(DisplayName = "Colonne"),
+	Sphere UMETA(DisplayName = "Sphère"),
+	Sablier UMETA(DisplayName = "Sablier"),
+	Anneau UMETA(DisplayName = "Anneau"),
+};
+
 UENUM(BlueprintType)
 enum class EVibH2OSeatNumber : uint8
 {

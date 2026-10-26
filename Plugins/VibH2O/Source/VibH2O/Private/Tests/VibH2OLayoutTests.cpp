@@ -212,6 +212,40 @@ bool FVibH2OCurvatureTest::RunTest(const FString& Parameters)
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVibH2OAisleTest,
+	"VibH2O.Salle.Allees",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FVibH2OAisleTest::RunTest(const FString& Parameters)
+{
+	// Seven columns, an aisle in the middle (column 3).
+	TArray<bool> Aisles = { false, false, false, true, false, false, false };
+	FVibH2OGridParams Params;
+	Params.Columns = 7;
+	Params.Rows = 1;
+	Params.ColumnSpacing = 100.0f;
+	TArray<float> Steps;
+	Params.ColumnSteps = &Steps;
+	auto Gap = [&](int32 A, int32 B)
+	{
+		return static_cast<float>(FVector::Dist(FVibH2OLayoutMath::EvaluateGrid(Params, A, 0).Location, FVibH2OLayoutMath::EvaluateGrid(Params, B, 0).Location));
+	};
+
+	FVibH2OLayoutMath::ComputeColumnSteps(Aisles, 1.0f, Steps);
+	TestEqual(TEXT("Allee comme un siege : la grille d'origine"), Gap(2, 4), 200.0f, 0.01f);
+	TestEqual(TEXT("Allee comme un siege : voisins a un ecart"), Gap(0, 1), 100.0f, 0.01f);
+
+	FVibH2OLayoutMath::ComputeColumnSteps(Aisles, 3.0f, Steps);
+	TestEqual(TEXT("Allee de trois sieges : 1 + 3 ecarts de part et d'autre"), Gap(2, 4), 400.0f, 0.01f);
+	TestEqual(TEXT("Allee de trois sieges : les voisins ne bougent pas entre eux"), Gap(4, 5), 100.0f, 0.01f);
+	TestEqual(TEXT("La salle reste centree"), static_cast<float>(FVibH2OLayoutMath::EvaluateGrid(Params, 0, 0).Location.Y + FVibH2OLayoutMath::EvaluateGrid(Params, 6, 0).Location.Y), 0.0f, 0.01f);
+
+	FVibH2OLayoutMath::ComputeColumnSteps(Aisles, 0.0f, Steps);
+	TestEqual(TEXT("Allee refermee : les deux sieges se touchent a un ecart"), Gap(2, 4), 100.0f, 0.01f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVibH2ONoiseTest,
 	"VibH2O.Salle.BruitDeProfondeur",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)

@@ -98,6 +98,13 @@ struct VIBH2O_API FVibH2OGridParams
 	/** Noise scale. Small means broad swells, large means tight relief. */
 	float DepthNoiseScale = 0.25f;
 
+	/**
+	 * Optional: each column's centre, in seat steps from the middle of the
+	 * room. Lets an aisle be wider or narrower than a seat. Null, or of the
+	 * wrong size: evenly spaced columns.
+	 */
+	const TArray<float>* ColumnSteps = nullptr;
+
 	/** Common height of the whole room, in cm. */
 	float BaseHeight = 0.0f;
 };
@@ -196,6 +203,14 @@ struct VIBH2O_API FVibH2OLayoutMath
 	 * perfectly straight room.
 	 */
 	static FVibH2OSeatLayout EvaluateGrid(const FVibH2OGridParams& Params, int32 Column, int32 Row);
+
+	/**
+	 * Column centres in seat steps, centred on the room, for EvaluateGrid. An
+	 * aisle column takes AisleWidth seats instead of one: two seats across an
+	 * aisle sit 1 + AisleWidth steps apart (2 when AisleWidth is 1, as if the
+	 * aisle were a seat).
+	 */
+	static void ComputeColumnSteps(const TArray<bool>& AisleColumns, float AisleWidth, TArray<float>& OutSteps);
 
 	// -------------------------------------------------------- Tableau 2
 

@@ -111,11 +111,43 @@ void AVibH2OSimulatorActor::ConfigureAles()
 	// with two centre aisles. Non-square AND holed - the best test room there is.
 	// Also a Details-panel button: mark the map dirty so the change is saved.
 	Modify();
+	RoomPreset = EVibH2OSimRoom::Ales;
 	Columns = 23;
 	Rows = 4;
 	AisleColumns = { 6, 16 };
 	ExtraEmptySeatIndices.Reset();
 
+	if (bSimulating)
+	{
+		SendRoomNow();
+	}
+}
+
+void AVibH2OSimulatorActor::LoadRoomPreset()
+{
+	ConfigureRoom(RoomPreset);
+}
+
+void AVibH2OSimulatorActor::ConfigureRoom(EVibH2OSimRoom Room)
+{
+	if (Room == EVibH2OSimRoom::Ales)
+	{
+		ConfigureAles();
+		return;
+	}
+	Modify();
+	RoomPreset = Room;
+	AisleColumns.Reset();
+	ExtraEmptySeatIndices.Reset();
+	switch (Room)
+	{
+	case EVibH2OSimRoom::Petite: Columns = 6; Rows = 4; break;
+	case EVibH2OSimRoom::Grande: Columns = 20; Rows = 10; break;
+	case EVibH2OSimRoom::Rectangulaire: Columns = 24; Rows = 3; break;
+	case EVibH2OSimRoom::Theatre: Columns = 17; Rows = 10; AisleColumns = { 8 }; break;
+	case EVibH2OSimRoom::Moyenne:
+	default: Columns = 12; Rows = 8; break;
+	}
 	if (bSimulating)
 	{
 		SendRoomNow();

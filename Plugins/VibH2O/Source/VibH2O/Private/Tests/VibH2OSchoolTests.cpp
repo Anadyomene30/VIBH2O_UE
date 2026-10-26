@@ -341,6 +341,7 @@ bool FVibH2ODivisionStageTest::RunTest(const FString& Parameters)
 	Stage->FloatRotationAmount = 0.0f;
 	Stage->DriftIntensity = 0.0f;
 	Stage->OrganicDeform = 0.0f;
+	Stage->ShapeIrregularity = 0.0f;
 	Stage->ScalePerExcitation = 0.0f;
 	Stage->BeatPopAmount = 0.0f;
 	// The room's mood resizes every bubble, and with no arousal injected it

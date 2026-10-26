@@ -128,6 +128,33 @@ int32 FVibH2OLayoutMath::ColumnRowToSeatIndex(int32 Column, int32 Row, int32 Col
 
 // ----------------------------------------------------------- Tableau 1
 
+void FVibH2OLayoutMath::ComputeColumnSteps(const TArray<bool>& AisleColumns, float AisleWidth, TArray<float>& OutSteps)
+{
+	const int32 Columns = AisleColumns.Num();
+	OutSteps.SetNumUninitialized(Columns);
+	if (Columns == 0)
+	{
+		return;
+	}
+	const float Aisle = FMath::Max(AisleWidth, 0.0f);
+	// Centre to centre, two neighbours are half of each one's width apart.
+	float Position = 0.0f;
+	float Previous = AisleColumns[0] ? Aisle : 1.0f;
+	OutSteps[0] = 0.0f;
+	for (int32 Column = 1; Column < Columns; ++Column)
+	{
+		const float Width = AisleColumns[Column] ? Aisle : 1.0f;
+		Position += 0.5f * (Previous + Width);
+		OutSteps[Column] = Position;
+		Previous = Width;
+	}
+	const float Middle = 0.5f * (OutSteps[0] + OutSteps[Columns - 1]);
+	for (float& Step : OutSteps)
+	{
+		Step -= Middle;
+	}
+}
+
 FVibH2OSeatLayout FVibH2OLayoutMath::EvaluateGrid(const FVibH2OGridParams& Params, int32 Column, int32 Row)
 {
 	using namespace VibH2OLayoutInternal;
@@ -140,7 +167,9 @@ FVibH2OSeatLayout FVibH2OLayoutMath::EvaluateGrid(const FVibH2OGridParams& Param
 	// Offsets from the centre of the room, in seat steps. The room is thereby
 	// centred on the stage root, which makes moving and scaling it
 	// predictable.
-	const float ColumnOffset = static_cast<float>(Column) - 0.5f * static_cast<float>(Columns - 1);
+	const float ColumnOffset = Params.ColumnSteps != nullptr && Params.ColumnSteps->Num() == Columns && Params.ColumnSteps->IsValidIndex(Column)
+		? (*Params.ColumnSteps)[Column]
+		: static_cast<float>(Column) - 0.5f * static_cast<float>(Columns - 1);
 	const float RowOffset = static_cast<float>(Row) - 0.5f * static_cast<float>(Rows - 1);
 
 	// Depth: the row offset plus the noise-driven relief. The noise is injected

@@ -316,6 +316,9 @@ public:
 	/** Shows or hides the number written on this bubble. */
 	void SetSeatLabelVisible(bool bVisible);
 
+	/** How much the number shows, 0 to 1: it fades rather than pops. */
+	void SetSeatLabelOpacity(float Opacity);
+
 	/** What the number says, how tall it is (share of the diameter), its colour. */
 	void SetSeatLabelStyle(EVibH2OSeatNumber Source, float HeightFraction, const FLinearColor& Color);
 
@@ -373,6 +376,7 @@ private:
 	float SeatLabelHeightFraction = 0.55f;
 	/** -1 until a text has been written: forces the first write. */
 	int32 SeatLabelShownNumber = -1;
+	float SeatLabelOpacity = 1.0f;
 
 	/** Local position last frame, used to measure speed. */
 	FVector PreviousLocalLocation = FVector::ZeroVector;

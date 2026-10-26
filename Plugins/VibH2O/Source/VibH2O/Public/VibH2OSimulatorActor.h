@@ -54,6 +54,18 @@ enum class EVibH2OSimulatorScenario : uint8
  * downstream - burst settling, seat-order mapping, smoothing, staleness,
  * averages - therefore runs the real code, not a shortcut.
  */
+/** Ready-made audiences for the simulator. */
+UENUM(BlueprintType)
+enum class EVibH2OSimRoom : uint8
+{
+	Petite UMETA(DisplayName = "Petite (6 × 4)"),
+	Moyenne UMETA(DisplayName = "Moyenne (12 × 8)"),
+	Grande UMETA(DisplayName = "Grande (20 × 10, 200 places)"),
+	Rectangulaire UMETA(DisplayName = "Rectangulaire allongée (24 × 3)"),
+	Theatre UMETA(DisplayName = "Théâtre (16 × 10, allée centrale)"),
+	Ales UMETA(DisplayName = "Alès (23 × 4, deux allées)"),
+};
+
 UCLASS(Blueprintable, BlueprintType, HideCategories = (Actor, Rendering, Replication, Collision, HLOD, Physics, Networking, Input, LOD, Cooking, DataLayers, WorldPartition, LevelInstance), PrioritizeCategories = ("VibH2O"), AutoExpandCategories = ("VibH2O|Simulation"), meta = (DisplayName = "VibH2O — Simulateur"))
 class VIBH2O_API AVibH2OSimulatorActor : public AActor
 {
@@ -183,6 +195,18 @@ public:
 	/** Sends the full room plan immediately, as one burst. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Renvoyer le plan de salle"))
 	void SendRoomNow();
+
+	/** Ready-made audiences to rehearse with: sizes and shapes of room. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Simulation", meta = (DisplayName = "Salle prédéfinie", ToolTip = "Choisir puis cliquer « Charger la salle prédéfinie »."))
+	EVibH2OSimRoom RoomPreset = EVibH2OSimRoom::Moyenne;
+
+	/** Loads the room chosen in RoomPreset. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Charger la salle prédéfinie"))
+	void LoadRoomPreset();
+
+	/** Loads a ready-made room by its kind. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Simulation")
+	void ConfigureRoom(EVibH2OSimRoom Room);
 
 	/** Configures the real Ales room: 23 x 4, aisles at columns 6 and 16. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Charger la salle d'Alès (23 × 4)"))

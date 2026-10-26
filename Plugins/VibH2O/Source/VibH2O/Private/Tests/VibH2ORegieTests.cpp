@@ -194,6 +194,22 @@ bool FVibH2ORegieFramingRailTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A la fin calculee, toute la salle est dans l'image"), FramedAt(SmallRoom));
 	TestFalse(TEXT("Un peu plus bas, elle deborde"), FramedAt(SmallRoom + 0.01f));
 
+	// The director's offset: closer by 10 m moves the end point by exactly
+	// 10 m down the rail.
+	Desk->Reglages.FramingCloser = 10.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Cadrage plus pres de 10 m"), (Desk->FramedRailPosition - SmallRoom) * Spline->GetSplineLength(), 1000.0f, 1.0f);
+	Desk->Reglages.FramingCloser = 0.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Decalage remis a 0 : le calcul automatique"), Desk->FramedRailPosition, SmallRoom, 1e-4f);
+
+	// Wider seats: the room grows, the camera stops further away.
+	Desk->Reglages.SeatSpacing = Stage->ColumnSpacing * 2.0f;
+	Desk->Tick(0.0f);
+	TestTrue(TEXT("Sieges plus ecartes : la camera s'arrete plus loin"), Desk->FramedRailPosition < SmallRoom - 0.005f);
+	Desk->Reglages.SeatSpacing = Stage->ColumnSpacing * 0.5f;
+	Desk->Tick(0.0f);
+
 	// A sequence carries the descent through one value: 0 the top, 1 the
 	// approach, 2 the overall view - the one worked out for this room.
 	Desk->Tick(0.0f);
