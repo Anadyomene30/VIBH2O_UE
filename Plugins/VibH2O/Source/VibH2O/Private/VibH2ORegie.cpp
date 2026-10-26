@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/FileManager.h"
+#include "Interfaces/Interface_PostProcessVolume.h"
 #include "JsonObjectConverter.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -27,7 +28,13 @@ namespace VibH2ORegieInternal
 	// Labels are escaped rather than typed: the compiler must read them the
 	// same way whatever the source encoding it assumes.
 	static const FVibH2ORegieControl Controls[] = {
-		{ TEXT("Exposure"), TEXT("Luminosité générale (EV)"), TEXT("Spectacle"), 4.0f, 16.0f, 0.1f },
+		{ TEXT("Exposure"), TEXT("Luminosité générale (EV)"), TEXT("Image"), 4.0f, 16.0f, 0.1f },
+		{ TEXT("ImageContrast"), TEXT("Contraste"), TEXT("Image"), 0.3f, 2.0f, 0.01f },
+		{ TEXT("ImageSaturation"), TEXT("Saturation (couleurs vives)"), TEXT("Image"), 0.0f, 2.0f, 0.01f },
+		{ TEXT("ImageWarmth"), TEXT("Froid ← → chaud"), TEXT("Image"), -1.0f, 1.0f, 0.01f },
+		{ TEXT("ImageBloom"), TEXT("Halo lumineux"), TEXT("Image"), 0.0f, 8.0f, 0.05f },
+		{ TEXT("ImageVignette"), TEXT("Bords assombris"), TEXT("Image"), 0.0f, 1.0f, 0.01f },
+		{ TEXT("ImageGrain"), TEXT("Grain"), TEXT("Image"), 0.0f, 1.0f, 0.01f },
 		{ TEXT("bShowSeatNumbers"), TEXT("Numéros des spectateurs"), TEXT("Spectacle"), 0.0f, 1.0f, 1.0f },
 		{ TEXT("FramingMargin"), TEXT("Cadrage : marge autour de la salle"), TEXT("Spectacle"), 0.0f, 0.8f, 0.01f },
 		{ TEXT("DescentSeconds"), TEXT("Descente : durée (s)"), TEXT("Spectacle"), 1.0f, 300.0f, 1.0f },
@@ -199,6 +206,11 @@ void AVibH2ORegie::OnConstruction(const FTransform& Transform)
 		CaptureFromScene();
 		bCaptured = true;
 	}
+	else if (!bImageCaptured && ExposureVolume != nullptr)
+	{
+		// A desk placed before the image controls existed reads them now.
+		CaptureImage();
+	}
 	ApplyChanged(false);
 }
 
@@ -356,6 +368,7 @@ void AVibH2ORegie::ApplyChanged(bool bForce)
 	}
 	ApplyToStage();
 	ApplyToExposure();
+	ApplyToImage();
 	ApplyToWater();
 	ApplyToCameraController();
 
@@ -465,6 +478,97 @@ void AVibH2ORegie::ApplyToCameraController()
 	{
 		CameraController->MarkPackageDirty();
 	}
+}
+
+void AVibH2ORegie::CaptureImage()
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+
+	// What the camera sees is, setting by setting, the value of the most
+	// important volume that sets it. Read the same way, so the desk starts
+	// exactly from the scene's look.
+	TArray<FPostProcessVolumeProperties> Volumes;
+	for (IInterface_PostProcessVolume* Volume : World->PostProcessVolumes)
+	{
+		if (Volume != nullptr)
+		{
+			const FPostProcessVolumeProperties Properties = Volume->GetProperties();
+			if (Properties.bIsEnabled && Properties.Settings != nullptr && Properties.BlendWeight > 0.0f)
+			{
+				Volumes.Add(Properties);
+			}
+		}
+	}
+	Volumes.Sort([](const FPostProcessVolumeProperties& A, const FPostProcessVolumeProperties& B) { return A.Priority > B.Priority; });
+
+	const FPostProcessSettings Defaults;
+	auto Pick = [&Volumes, &Defaults](auto OverrideOf, auto ValueOf)
+	{
+		for (const FPostProcessVolumeProperties& Volume : Volumes)
+		{
+			if (OverrideOf(*Volume.Settings))
+			{
+				return ValueOf(*Volume.Settings);
+			}
+		}
+		return ValueOf(Defaults);
+	};
+	BaseContrast = Pick([](const FPostProcessSettings& S) { return S.bOverride_ColorContrast; }, [](const FPostProcessSettings& S) { return S.ColorContrast; });
+	BaseSaturation = Pick([](const FPostProcessSettings& S) { return S.bOverride_ColorSaturation; }, [](const FPostProcessSettings& S) { return S.ColorSaturation; });
+	BaseWhiteTemp = Pick([](const FPostProcessSettings& S) { return S.bOverride_WhiteTemp; }, [](const FPostProcessSettings& S) { return S.WhiteTemp; });
+	BaseBloom = Pick([](const FPostProcessSettings& S) { return S.bOverride_BloomIntensity; }, [](const FPostProcessSettings& S) { return S.BloomIntensity; });
+	BaseVignette = Pick([](const FPostProcessSettings& S) { return S.bOverride_VignetteIntensity; }, [](const FPostProcessSettings& S) { return S.VignetteIntensity; });
+	BaseGrain = Pick([](const FPostProcessSettings& S) { return S.bOverride_FilmGrainIntensity; }, [](const FPostProcessSettings& S) { return S.FilmGrainIntensity; });
+
+	Reglages.ImageContrast = 1.0f;
+	Reglages.ImageSaturation = 1.0f;
+	Reglages.ImageWarmth = 0.0f;
+	Reglages.ImageBloom = BaseBloom;
+	Reglages.ImageVignette = BaseVignette;
+	Reglages.ImageGrain = BaseGrain;
+	bImageCaptured = true;
+}
+
+void AVibH2ORegie::ResetImage()
+{
+	if (!bImageCaptured)
+	{
+		CaptureImage();
+	}
+	Reglages.ImageContrast = 1.0f;
+	Reglages.ImageSaturation = 1.0f;
+	Reglages.ImageWarmth = 0.0f;
+	Reglages.ImageBloom = BaseBloom;
+	Reglages.ImageVignette = BaseVignette;
+	Reglages.ImageGrain = BaseGrain;
+	ApplyChanged(false);
+}
+
+void AVibH2ORegie::ApplyToImage()
+{
+	if (ExposureVolume == nullptr || !bImageCaptured)
+	{
+		return;
+	}
+	// On the desk's own volume, which outranks the others: the channel
+	// balance the artist set stays, only the overall amount moves.
+	FPostProcessSettings& S = ExposureVolume->Settings;
+	S.bOverride_ColorContrast = true;
+	S.ColorContrast = FVector4(BaseContrast.X, BaseContrast.Y, BaseContrast.Z, BaseContrast.W * Reglages.ImageContrast);
+	S.bOverride_ColorSaturation = true;
+	S.ColorSaturation = FVector4(BaseSaturation.X, BaseSaturation.Y, BaseSaturation.Z, BaseSaturation.W * Reglages.ImageSaturation);
+	S.bOverride_WhiteTemp = true;
+	S.WhiteTemp = FMath::Clamp(BaseWhiteTemp + 2500.0f * Reglages.ImageWarmth, 1500.0f, 15000.0f);
+	S.bOverride_BloomIntensity = true;
+	S.BloomIntensity = Reglages.ImageBloom;
+	S.bOverride_VignetteIntensity = true;
+	S.VignetteIntensity = Reglages.ImageVignette;
+	S.bOverride_FilmGrainIntensity = true;
+	S.FilmGrainIntensity = Reglages.ImageGrain;
 }
 
 FIntPoint AVibH2ORegie::GetOutputSize(EVibH2OOutputFormat Format)
@@ -617,6 +721,8 @@ void AVibH2ORegie::CaptureFromScene()
 			}
 		}
 	}
+
+	CaptureImage();
 
 	// What was read is what is applied: nothing moves - except the output
 	// format, which the scene does not hold and the next apply sets.
@@ -1073,6 +1179,12 @@ void AVibH2ORegie::HandleRegieMessage(const FVibH2OOscMessage& Message)
 			RefreshFraming();
 			GlideCameraTo(FramedRailPosition >= 0.0f ? FramedRailPosition : GetRailPosition(), 0.0f);
 		}
+		return;
+	}
+
+	if (Head == TEXT("image"))
+	{
+		ResetImage();
 		return;
 	}
 

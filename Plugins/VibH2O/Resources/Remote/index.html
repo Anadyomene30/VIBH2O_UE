@@ -341,6 +341,7 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
   <nav id="nav">
     <button data-page="pageS" class="sel">Spectacle</button>
     <button data-page="page2" id="tab2">Tableaux · Fond · Focus</button>
+    <button data-page="pageI">Image</button>
     <button data-page="pageA">Ambiance</button>
     <button data-page="pageB">Bulles · Réaction</button>
     <button data-page="pageP">Préréglages</button>
@@ -366,6 +367,14 @@ input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 
         <div class="ends"><span id="railText">Rail —</span><span id="railFrame"></span></div>
       </section>
       <section><h2>Image et descente</h2><div data-regie="Spectacle"></div></section>
+    </div>
+    <div class="page grid" id="pageI">
+      <section>
+        <h2>Image</h2>
+        <div data-regie="Image"></div>
+        <button class="wide" id="imageReset">Revenir à l'image d'origine</button>
+        <p class="ends"><span>Ces réglages agissent sur toute l'image, de haut en bas du rail. L'image d'origine est celle de la scène au moment où la Régie a été posée.</span></p>
+      </section>
     </div>
     <div class="page grid" id="pageA">
       <section><h2>Couleurs des ambiances</h2><div data-regie="Ambiance" data-kind="color"></div></section>
@@ -1155,8 +1164,8 @@ function regieRow(c) {
 }
 function renderRegie() {
   const r = state.regie;
-  document.querySelectorAll("#nav button[data-page=pageS], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
-  if (!r && ["pageS", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
+  document.querySelectorAll("#nav button[data-page=pageS], #nav button[data-page=pageI], #nav button[data-page=pageA], #nav button[data-page=pageB], #nav button[data-page=pageP]").forEach((b) => { b.hidden = !r; });
+  if (!r && ["pageS", "pageI", "pageA", "pageB", "pageP"].some((id) => $("#" + id).classList.contains("sel"))) showPage("page2");
   if (!r || !Array.isArray(r.controls)) return;
   const sig = r.controls.map((c) => c.id + c.label + c.kind).join(",");
   if (sig !== regieSig) {
@@ -1216,6 +1225,8 @@ pressable($("#camArrival"), { tap: () => cam("arrivee", "Caméra : arrivée") })
 pressable($("#camStop"), { tap: () => cam("stop", "Caméra : stop") });
 pressable($("#camTop"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour remonter en haut du rail.", confirm: () => cam("depart", "Caméra : haut du rail") });
 pressable($("#camFrame"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour aller à la vue d'ensemble.", confirm: () => cam("ensemble", "Caméra : vue d'ensemble") });
+pressable($("#imageReset"), { holdMs: () => CONFIRM_MS, hint: "Maintenir pour revenir à l'image d'origine.",
+  confirm: () => { send("imageReset", "/Regie/Image/Reset", "Image d'origine"); toast("Image d'origine"); } });
 pressable($("#presetSave"), { tap: () => {
   const name = $("#presetName").value.trim();
   if (!name) { toast("Donner un nom au préréglage."); return; }

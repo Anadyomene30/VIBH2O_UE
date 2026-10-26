@@ -83,6 +83,26 @@ struct VIBH2O_API FVibH2ORegieSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Spectacle", meta = (DisplayName = "Particules : apparaissent à", ClampMin = "0.0", ClampMax = "1.0", ToolTip = "Position sur le rail où les particules commencent à naître."))
 	float ParticlesAppearAt = 0.04f;
 
+	// ------------------------------------------------------------------ Image
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Contraste", ClampMin = "0.3", ClampMax = "2.0", ToolTip = "1 = l'image d'origine. Plus haut : noirs plus noirs, blancs plus blancs."))
+	float ImageContrast = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Saturation (couleurs vives)", ClampMin = "0.0", ClampMax = "2.0", ToolTip = "0 = noir et blanc, 1 = l'image d'origine, 2 = couleurs très vives."))
+	float ImageSaturation = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Froid - chaud", ClampMin = "-1.0", ClampMax = "1.0", ToolTip = "0 = l'image d'origine. Négatif : plus bleu. Positif : plus orangé."))
+	float ImageWarmth = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Halo lumineux (bloom)", ClampMin = "0.0", ClampMax = "8.0", ToolTip = "Le halo autour de ce qui brille : les bulles, les particules."))
+	float ImageBloom = 0.675f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Bords assombris (vignettage)", ClampMin = "0.0", ClampMax = "1.0"))
+	float ImageVignette = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Image", meta = (DisplayName = "Grain", ClampMin = "0.0", ClampMax = "1.0", ToolTip = "Grain de pellicule. 0 = image lisse."))
+	float ImageGrain = 0.0f;
+
 	// --------------------------------------------------------------- Ambiance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Ambiance", meta = (DisplayName = "Calme : couleur des plus calmes", HideAlphaChannel))
@@ -255,6 +275,10 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Recalculer le cadrage"))
 	void RefreshFraming();
 
+	/** Puts contrast, saturation, warmth, bloom, vignette and grain back to how the scene looked when the desk was placed. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "VibH2O", meta = (DisplayName = "Revenir à l'image d'origine"))
+	void ResetImage();
+
 	UFUNCTION(BlueprintCallable, Category = "VibH2O|Caméra")
 	void StartDescent();
 
@@ -329,6 +353,8 @@ private:
 	void ApplyToWater();
 	void ApplyToCameraController();
 	void ApplyToOutput();
+	void ApplyToImage();
+	void CaptureImage();
 	class UCameraComponent* FindRailCamera() const;
 	void TickCamera(float DeltaSeconds);
 	void TickParticles();
@@ -343,6 +369,32 @@ private:
 	/** False until the desk has read the scene once: placing it must not change the look. */
 	UPROPERTY()
 	bool bCaptured = false;
+
+	/**
+	 * The look the scene had before the desk touched it, read through every
+	 * post-process volume in priority order: the desk's image sliders work
+	 * from it, and "back to the original image" returns to it.
+	 */
+	UPROPERTY()
+	bool bImageCaptured = false;
+
+	UPROPERTY()
+	FVector4 BaseContrast = FVector4(1.0, 1.0, 1.0, 1.0);
+
+	UPROPERTY()
+	FVector4 BaseSaturation = FVector4(1.0, 1.0, 1.0, 1.0);
+
+	UPROPERTY()
+	float BaseWhiteTemp = 6500.0f;
+
+	UPROPERTY()
+	float BaseBloom = 0.675f;
+
+	UPROPERTY()
+	float BaseVignette = 0.4f;
+
+	UPROPERTY()
+	float BaseGrain = 0.0f;
 
 	/** How much brighter the water glows toward the sun than elsewhere, read from the scene. */
 	UPROPERTY()
