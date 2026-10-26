@@ -311,6 +311,7 @@ void AVibH2ORegie::Tick(float DeltaSeconds)
 	// Sequencer and the Details panel write the struct directly: the desk
 	// notices by comparing, and pushes only what changed.
 	ApplyChanged(false);
+	TickCameraPath();
 
 	const UWorld* World = GetWorld();
 	if (World == nullptr || !World->IsGameWorld())
@@ -1226,6 +1227,37 @@ void AVibH2ORegie::SetRailPosition(float Position)
 	}
 	Rail->CurrentPositionOnRail = FMath::Clamp(Position, 0.0f, 1.0f);
 	LastWrittenRail = Rail->CurrentPositionOnRail;
+}
+
+void AVibH2ORegie::TickCameraPath()
+{
+	if (!AppliedCameraPath.IsSet())
+	{
+		// The value saved with the level is where things already stand:
+		// loading the map or starting Play moves nothing.
+		AppliedCameraPath = CameraPath;
+		return;
+	}
+	if (CameraPath < 0.0f || FMath::IsNearlyEqual(CameraPath, AppliedCameraPath.GetValue(), 1e-5f))
+	{
+		AppliedCameraPath = CameraPath;
+		return;
+	}
+	AppliedCameraPath = CameraPath;
+	ResolveMissingConnections();
+	if (FramedRailPosition < 0.0f)
+	{
+		RefreshFraming();
+	}
+	// The sequence has the camera: a move started from the tablet gives way.
+	if (CameraMove != EVibH2ORegieCameraMove::None)
+	{
+		StopCamera();
+	}
+	const float Approach = Reglages.ApproachPosition;
+	const float Framed = FramedRailPosition >= 0.0f ? FramedRailPosition : Approach;
+	const float Path = FMath::Clamp(CameraPath, 0.0f, 2.0f);
+	SetRailPosition(Path <= 1.0f ? FMath::Lerp(0.0f, Approach, Path) : FMath::Lerp(Approach, Framed, Path - 1.0f));
 }
 
 void AVibH2ORegie::TickFollowSchool(float DeltaSeconds)

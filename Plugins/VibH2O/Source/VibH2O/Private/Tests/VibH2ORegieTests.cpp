@@ -193,6 +193,22 @@ bool FVibH2ORegieFramingRailTest::RunTest(const FString& Parameters)
 	};
 	TestTrue(TEXT("A la fin calculee, toute la salle est dans l'image"), FramedAt(SmallRoom));
 	TestFalse(TEXT("Un peu plus bas, elle deborde"), FramedAt(SmallRoom + 0.01f));
+
+	// A sequence carries the descent through one value: 0 the top, 1 the
+	// approach, 2 the overall view - the one worked out for this room.
+	Desk->Tick(0.0f);
+	Desk->CameraPath = 0.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Parcours 0 : haut du rail"), Rail->CurrentPositionOnRail, 0.0f, 1e-4f);
+	Desk->CameraPath = 1.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Parcours 1 : approche"), Rail->CurrentPositionOnRail, Desk->Reglages.ApproachPosition, 1e-4f);
+	Desk->CameraPath = 2.0f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Parcours 2 : vue d'ensemble de cette salle"), Rail->CurrentPositionOnRail, SmallRoom, 1e-4f);
+	Rail->CurrentPositionOnRail = 0.5f;
+	Desk->Tick(0.0f);
+	TestEqual(TEXT("Parcours immobile : la camera reste libre"), Rail->CurrentPositionOnRail, 0.5f, 1e-4f);
 	return true;
 }
 

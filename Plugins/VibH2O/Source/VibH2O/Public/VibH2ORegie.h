@@ -326,6 +326,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Conduite", meta = (DisplayName = "Clavier : Espace = GO", ToolTip = "En Play : Espace ou Page suivante = GO, Page précédente = étape précédente. Une télécommande de présentation envoie justement ces touches."))
 	bool bConduiteKeys = true;
 
+	/**
+	 * The camera's way down the rail as one animatable value, so a Level
+	 * Sequence can carry the descent: 0 the top of the rail, 1 the approach,
+	 * 2 the overall view of the room - wherever the seat count puts it.
+	 * Negative: unused. Written to the rail only when it changes, so the
+	 * controller's keys and the desk keep working in between.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "VibH2O|Conduite", meta = (DisplayName = "Caméra : parcours (séquence)", UIMin = "-1.0", UIMax = "2.0", ToolTip = "Pour piloter la descente depuis une séquence : 0 = haut du rail, 1 = approche, 2 = vue d'ensemble de la salle (qui suit le nombre de spectateurs). -1 = non utilisé. N'agit que quand la valeur change."))
+	float CameraPath = -1.0f;
+
 	/** Plays from where the show stands to the next step, and stops there. */
 	UFUNCTION(BlueprintCallable, Category = "VibH2O|Conduite")
 	void ConduiteGo();
@@ -482,6 +492,7 @@ private:
 	void SetRailPosition(float Position);
 	bool ComputeFramedRailPosition(float& OutPosition, bool bForSchool = false) const;
 	void TickFollowSchool(float DeltaSeconds);
+	void TickCameraPath();
 
 	struct FConduiteStep
 	{
@@ -561,6 +572,8 @@ private:
 	bool bFollowingSchool = false;
 	float SchoolTarget = -1.0f;
 	double LastSchoolFramingTime = 0.0;
+	/** CameraPath as last written to the rail; unset until the first tick, which only records it. */
+	TOptional<float> AppliedCameraPath;
 	double LastFramingTime = 0.0;
 
 	// Particles.

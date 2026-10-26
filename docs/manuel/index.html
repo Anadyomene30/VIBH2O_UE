@@ -227,10 +227,24 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
 <section class="ch" id="conduite">
   <h2>La conduite : GO, précédent, suivant</h2>
   <p>La conduite transforme une séquence Unreal en liste d'étapes, comme une conduite lumière : on appuie sur <b>GO</b>, le spectacle joue jusqu'à l'étape suivante et s'y arrête. Plus besoin de se souvenir de quelle touche lance quelle séquence.</p>
+  <h3>La conduite d'exemple : SEQ_Spectacle</h3>
+  <p>La carte contient déjà une conduite prête à jouer, <code>VIBH2O/Sequences/SEQ_Spectacle</code> (dossier <b>Caméra et sortie</b> de l'Outliner), reliée à la Régie. Elle est à valider et à compléter : l'ordre et les arrêts sont une proposition.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Étape (marqueur)</th><th>GO depuis cette étape</th></tr></thead>
+    <tbody>
+      <tr><td><b>Haut du rail</b> (0 s)</td><td>Descente lente, l'eau seule : 30 s jusqu'à l'approche.</td></tr>
+      <tr><td><b>Approche</b> (30 s)</td><td>Arrivée sur la salle : 10 s jusqu'à la vue d'ensemble, cadrée selon le nombre de spectateurs.</td></tr>
+      <tr><td><b>Salle</b> (40 s)</td><td>Passage au banc (tableau 2) en 6 s ; la caméra recule pour garder tout le banc.</td></tr>
+      <tr><td><b>Banc</b> (46 s)</td><td>Retour au plan de salle en 6 s ; la caméra revient à la vue d'ensemble.</td></tr>
+      <tr><td><b>Retour salle</b> (52 s)</td><td>Fin de la séquence.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Deux pistes font tout : <span class="k">Caméra : parcours (séquence)</span> sur VibH2O_Regie (0 = haut du rail, 1 = approche, 2 = vue d'ensemble, qui suit le nombre de spectateurs) et <span class="k">Tableau : salle (0) → banc (1)</span> sur VibH2O_Stage. Pour changer une durée, déplace les clés dans Sequencer ; pour ajouter une étape, ajoute un marqueur. Les durées de la Régie (<span class="k">Durée de la descente</span>…) valent pour les boutons de la tablette, pas pour cette séquence.</p>
+  <h3>Faire sa propre conduite</h3>
   <ol class="steps">
-    <li>Une seule <b>Level Sequence</b> pour le spectacle (par exemple <code>SEQ_Spectacle</code> dans <code>VIBH2O/Sequences</code>), qui contient les séquences existantes à la suite, chacune sur sa piste.</li>
+    <li>Une seule <b>Level Sequence</b> pour le spectacle, qui contient ce qui doit s'enchaîner (pistes, ou séquences existantes en sous-séquences).</li>
     <li>Dans Sequencer, aux moments où le spectacle doit attendre, pose un <b>marqueur</b> (touche <kbd>M</kbd>) et nomme-le (double-clic) : « Descente », « Arrivée », « Vortex »… Chaque marqueur est une étape.</li>
-    <li>Glisse la séquence dans la carte. La Régie la trouve seule (la première séquence de la carte qui a des marqueurs) ; sinon, choisis-la dans VibH2O_Regie → <span class="k">Séquence du spectacle</span>.</li>
+    <li>Glisse la séquence dans la carte et choisis-la dans VibH2O_Regie → <span class="k">Séquence du spectacle</span>. Vide, la Régie prend la première séquence de la carte qui a des marqueurs.</li>
   </ol>
   <div class="tablewrap"><table>
     <thead><tr><th>Commande</th><th>Ce qui se passe</th></tr></thead>
@@ -251,7 +265,8 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
       <tr><td>OSC</td><td><code>/Regie/Conduite/Go</code>, <code>/Regie/Conduite/Precedent</code>, <code>/Regie/Conduite/Suivant</code>, <code>/Regie/Conduite/Pause</code>, <code>/Regie/Conduite/Aller 3</code>.</td></tr>
     </tbody>
   </table></div>
-  <div class="box info"><strong>Les touches 0, 1 et 2 restent</strong><span>La conduite ne remplace pas Camera_Controller : ses touches marchent comme avant. La conduite est une autre façon, plus simple, d'enchaîner le spectacle.</span></div>
+  <div class="box info"><strong>Les touches 0, 1 et 2 restent</strong><span>La conduite ne remplace pas Camera_Controller : ses touches marchent comme avant. La conduite est une autre façon, plus simple, d'enchaîner le spectacle. Les fondus de Camera_Controller, eux, ne partent qu'avec ses touches.</span></div>
+  <div class="box warn"><strong>Une seule main sur la caméra</strong><span>Pendant qu'une étape joue, c'est la séquence qui tient la caméra. Une touche 0 ou 1 pressée à ce moment se battrait avec elle : attendre que l'étape soit arrivée.</span></div>
 </section>
 
 <section class="ch" id="panneau">
