@@ -148,7 +148,8 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     <li><span>L'iPad affiche la télécommande et la pastille verte « connecté ». Verrouille-la (🔒) avant le début.</span></li>
     <li><span>Resolume reçoit le flux Spout ; la fenêtre Unreal n'est <b>pas réduite</b> (derrière Resolume, ou sur un autre écran).</span></li>
     <li><span>Numéros des spectateurs : <span class="k">Afficher les numéros</span> coché ou non selon la conduite (ou piloté par une piste Sequencer).</span></li>
-    <li><span>Caméra : touche <kbd>0</kbd> pour la descente, <kbd>1</kbd> pour l'arrivée sur la salle (voir « La descente du rail »).</span></li>
+    <li><span>Conduite : en Play, l'onglet <b>Conduite</b> de la tablette affiche « Haut du rail ». Sinon, appui maintenu sur « 1. Haut du rail » dans la liste des étapes. Puis <b>GO</b> (ou <kbd>Espace</kbd>) à chaque étape (voir « La conduite »).</span></li>
+    <li><span>Sans la conduite : touche <kbd>0</kbd> pour la descente, <kbd>1</kbd> pour l'arrivée sur la salle (voir « La descente du rail »).</span></li>
   </ul>
   <figure>
     <img src="img/details_scene.png" alt="Panneau Details de VibH2O_Stage : les boutons d'action en haut, puis la catégorie Ambiance dépliée." width="388" height="1042" style="max-width:320px">
@@ -199,7 +200,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
   <h2>La Régie : tout l'essentiel en un endroit</h2>
   <p>L'acteur <b>VibH2O_Regie</b> (dossier <b>VibH2O</b> de l'Outliner) rassemble les réglages qu'on touche en répétition : lumière, couleurs, eau, bulles, réaction aux capteurs, caméra, format de sortie. Les mêmes réglages sont dans les onglets de la tablette. Changer l'un change l'autre.</p>
   <div class="duo">
-    <figure><img src="img/tablette_spectacle.jpg" alt="Onglet Spectacle de la tablette : boutons de caméra, position sur le rail, réglages de l'image et de la descente." width="800" height="600"><figcaption>Tablette, onglet <b>Spectacle</b> : la caméra (Descente, Arrivée, Stop, Haut du rail, Vue d'ensemble) et la position sur le rail, avec le trait de la vue d'ensemble.</figcaption></figure>
+    <figure><img src="img/tablette_spectacle.jpg" alt="Onglet Spectacle de la tablette : boutons de caméra, position sur le rail, réglages et leur ligne d'aide." width="800" height="600"><figcaption>Tablette, onglet <b>Spectacle</b> : la caméra (Descente, appui maintenu ; Arrivée, Stop, Haut du rail, Vue d'ensemble) et la position sur le rail, avec le trait de la vue d'ensemble. Sous chaque réglage, sa ligne d'aide.</figcaption></figure>
     <figure><img src="img/tablette_ambiance.jpg" alt="Onglet Ambiance de la tablette : sept sélecteurs de couleur et les réglages de lumière et d'eau." width="800" height="600"><figcaption>Onglet <b>Ambiance</b> : les couleurs de chaque ambiance au sélecteur, la lumière des bulles, la couleur, la lumière et le trouble de l'eau.</figcaption></figure>
   </div>
   <div class="tablewrap"><table>
@@ -234,11 +235,15 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     <tbody>
       <tr><td><b>Haut du rail</b> (0 s)</td><td>Descente lente, l'eau seule : 30 s jusqu'à l'approche.</td></tr>
       <tr><td><b>Approche</b> (30 s)</td><td>Arrivée sur la salle : 10 s jusqu'à la vue d'ensemble, cadrée selon le nombre de spectateurs.</td></tr>
-      <tr><td><b>Salle</b> (40 s)</td><td>Passage au banc (tableau 2) en 6 s ; la caméra recule pour garder tout le banc.</td></tr>
+      <tr><td><b>Salle</b> (40 s)</td><td>Passage au banc (tableau 2) en 6 s ; la caméra recule et glisse de côté pour garder tout le banc au milieu de l'image.</td></tr>
       <tr><td><b>Banc</b> (46 s)</td><td>Retour au plan de salle en 6 s ; la caméra revient à la vue d'ensemble.</td></tr>
       <tr><td><b>Retour salle</b> (52 s)</td><td>Fin de la séquence.</td></tr>
     </tbody>
   </table></div>
+  <div class="duo">
+    <figure><img src="img/tablette_conduite.jpg" alt="Onglet Conduite de la tablette : l'étape en cours « Salle », la suivante « Banc », le bouton GO, Précédent, Suivant, Pause, et la liste des cinq étapes." width="800" height="600"><figcaption>Onglet <b>Conduite</b> : l'étape en cours en grand, la suivante dessous, <b>GO</b>, et la liste des étapes de SEQ_Spectacle.</figcaption></figure>
+    <figure><img src="img/conduite_etapes.jpg" alt="Quatre images de la caméra : l'eau à l'approche, la salle cadrée, le banc, la salle à nouveau." width="1668" height="1322"><figcaption>Ce que montre la caméra à chaque arrêt, après chaque GO (essai du 26 octobre dans le projet du spectacle).</figcaption></figure>
+  </div>
   <p>Deux pistes font tout : <span class="k">Caméra : parcours (séquence)</span> sur VibH2O_Regie (0 = haut du rail, 1 = approche, 2 = vue d'ensemble, qui suit le nombre de spectateurs) et <span class="k">Tableau : salle (0) → banc (1)</span> sur VibH2O_Stage. Pour changer une durée, déplace les clés dans Sequencer ; pour ajouter une étape, ajoute un marqueur. Les durées de la Régie (<span class="k">Durée de la descente</span>…) valent pour les boutons de la tablette, pas pour cette séquence.</p>
   <h3>Faire sa propre conduite</h3>
   <ol class="steps">
@@ -260,13 +265,14 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     <thead><tr><th>Depuis…</th><th>Comment</th></tr></thead>
     <tbody>
       <tr><td>La tablette</td><td>Onglet <b>Conduite</b>. L'étape en cours et la suivante sont écrites en grand.</td></tr>
-      <tr><td>Le clavier (en Play)</td><td><kbd>Espace</kbd> ou <kbd>Page suivante</kbd> = GO ; <kbd>Page précédente</kbd> = Précédent. Une <b>télécommande de présentation</b> (clicker) envoie justement ces touches : elle devient un bouton GO sans fil. À couper avec <span class="k">Clavier : Espace = GO</span>.</td></tr>
+      <tr><td>Le clavier (en Play, Unreal au premier plan)</td><td><kbd>Espace</kbd> ou <kbd>Page suivante</kbd> = GO ; <kbd>Page précédente</kbd> = Précédent. Une <b>télécommande de présentation</b> (clicker) envoie justement ces touches : elle devient un bouton GO sans fil. À couper avec <span class="k">Clavier : Espace = GO</span>.</td></tr>
       <tr><td>Resolume, MIDI</td><td>Directeur de cues, actions <span class="k">Conduite - GO (étape suivante)</span>, <span class="k">Conduite - Précédent</span>, <span class="k">Conduite - Suivant</span>.</td></tr>
       <tr><td>OSC</td><td><code>/Regie/Conduite/Go</code>, <code>/Regie/Conduite/Precedent</code>, <code>/Regie/Conduite/Suivant</code>, <code>/Regie/Conduite/Pause</code>, <code>/Regie/Conduite/Aller 3</code>.</td></tr>
     </tbody>
   </table></div>
   <div class="box info"><strong>Les touches 0, 1 et 2 restent</strong><span>La conduite ne remplace pas Camera_Controller : ses touches marchent comme avant. La conduite est une autre façon, plus simple, d'enchaîner le spectacle. Les fondus de Camera_Controller, eux, ne partent qu'avec ses touches.</span></div>
   <div class="box warn"><strong>Une seule main sur la caméra</strong><span>Pendant qu'une étape joue, c'est la séquence qui tient la caméra. Une touche 0 ou 1 pressée à ce moment se battrait avec elle : attendre que l'étape soit arrivée.</span></div>
+  <div class="box info"><strong>Le premier GO part du haut</strong><span>La séquence commence au haut du rail : si la caméra était ailleurs (après une répétition), le premier GO la remonte d'un coup avant de descendre. En début de représentation elle y est déjà.</span></div>
 </section>
 
 <section class="ch" id="panneau">
@@ -353,7 +359,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
   <p>Le passage du plan de salle au banc est un curseur continu, réversible, qu'on peut arrêter à mi-chemin : <span class="k">Tableau : salle (0) → banc (1)</span>. Au début du passage, chaque bulle se divise en plusieurs sœurs (même cœur, même couleur) ; puis les familles rejoignent le banc. En synchronie, le banc tourne en vortex ; hors synchronie, il s'éparpille en restant lisible.</p>
   <div class="duo">
     <figure><img src="img/division.jpg" alt="Division : chaque bulle s'est scindée en une grappe de quatre." width="1521" height="762"><figcaption>Tableau à 0,2 : la division.</figcaption></figure>
-    <figure><img src="img/vortex.jpg" alt="Le banc vu du dessus, en tourbillon." width="1521" height="762"><figcaption>Tableau à 1 : le banc, vu de la caméra du rail.</figcaption></figure>
+    <figure><img src="img/banc_centre.jpg" alt="Le banc au milieu de l'image de la caméra du rail, en anneau dispersé." width="819" height="616"><figcaption>Tableau à 1 : le banc, vu de la caméra du rail, gardé au milieu de l'image.</figcaption></figure>
   </div>
   <div class="tablewrap"><table>
     <thead><tr><th>Pour…</th><th>Fais</th></tr></thead>
@@ -366,6 +372,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     </tbody>
   </table></div>
   <p>Tous ces réglages sont aussi dans l'onglet <b>Tableau 2</b> de la tablette, avec la vitesse de rotation du vortex et celles du banc.</p>
+  <figure><img src="img/tablette_tableau2.jpg" alt="Onglet Tableau 2 de la tablette : la caméra garde tout le banc, durée de la transition, bulles filles, écart entre les sœurs, chacun avec sa ligne d'aide." width="800" height="600" style="max-width:560px"><figcaption>Onglet <b>Tableau 2</b> de la tablette.</figcaption></figure>
   <div class="box info"><strong>La caméra garde tout le banc</strong><span>En tableau 2, le banc déborde de l'emprise de la salle. La Régie recule ou avance doucement la caméra sur le rail, et la fait glisser de côté pour garder le banc au milieu de l'image (environ 3 s pour se poser) : tout le banc reste visible, même quand il dérive. Au retour en tableau 1, la caméra revient exactement à sa place et à la vue d'ensemble. Une touche de Camera_Controller ou une séquence qui bouge le rail garde la priorité. À couper avec <span class="k">La caméra garde tout le banc</span>.</span></div>
   <div class="box info"><strong>Bon à savoir</strong><span>Un son branché sur l'événement « battement » des bulles sonne aussi pour chaque fille (×4) : dans le Blueprint, filtre avec <code>Is Daughter</code>.</span></div>
 </section>
@@ -500,6 +507,9 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
       <tr><td>Bulles qui passent devant une artiste</td><td>Zone éteinte, trop petite, ou flèche mal orientée / caméra de projection non désignée.</td></tr>
       <tr><td>Image qui rame au tableau 2</td><td>Baisse <span class="k">Filles par bulle</span> (2 ou 1).</td></tr>
       <tr><td>Spout saccadé</td><td>Fenêtre Unreal réduite : la remettre, derrière Resolume.</td></tr>
+      <tr><td>Conduite : « Pas de séquence du spectacle »</td><td>VibH2O_Regie → <span class="k">Séquence du spectacle</span> est vide et aucune séquence de la carte n'a de marqueur. Choisis SEQ_Spectacle (dossier Caméra et sortie).</td></tr>
+      <tr><td>Espace ne lance pas GO</td><td>Unreal n'a pas le clavier : clique dans l'image du jeu. Ou <span class="k">Clavier : Espace = GO</span> est décoché sur VibH2O_Regie. La tablette et les cues marchent dans tous les cas.</td></tr>
+      <tr><td>La caméra ne bouge pas pendant une étape</td><td>Une touche de Camera_Controller a repris la main pendant l'étape : refaire GO depuis l'étape (ou Précédent puis GO).</td></tr>
       <tr><td>Une cue ne part pas</td><td>Le nom dans <code>/Cue/&lt;Nom&gt;</code> doit être celui de la cue ; la cue doit être <span class="k">Active</span> ; en MIDI, le port loopMIDI doit être lancé.</td></tr>
     </tbody>
   </table></div>
@@ -513,7 +523,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     <thead><tr><th>Dans le Content Browser</th><th>Ce qu'on y trouve</th></tr></thead>
     <tbody>
       <tr><td class="path">MAPS</td><td>Les 7 cartes gardées : <b>VIBH2o_PPCM_Fond</b> (le spectacle), VIBH2o_PPCM (d'origine), les trois Katja, OLD/corinnedissolve, TESTS/GS_TREESolo.</td></tr>
-      <tr><td class="path">VIBH2O</td><td>Tout ce qui est propre au projet, rangé par sorte : <b>Blueprints</b> (BP_UnderWater…), <b>Environnement</b> (eau, caustiques), <b>FX</b> (Dirt, pluie), <b>Heritage</b> (l'ancienne scène : Camera_Controller, Matrix_Controller, matériaux et Niagara des anciennes bulles, séquences Katja), <b>Importes</b> (modules Niagara importés), <b>Materiaux</b>, <b>Meshes</b>, <b>Sequences</b>, <b>Textures</b>.</td></tr>
+      <tr><td class="path">VIBH2O</td><td>Tout ce qui est propre au projet, rangé par sorte : <b>Blueprints</b> (BP_UnderWater…), <b>Environnement</b> (eau, caustiques), <b>FX</b> (Dirt, pluie), <b>Heritage</b> (l'ancienne scène : Camera_Controller, Matrix_Controller, matériaux et Niagara des anciennes bulles, séquences Katja), <b>Importes</b> (modules Niagara importés), <b>Materiaux</b>, <b>Meshes</b>, <b>Sequences</b> (dont <b>SEQ_Spectacle</b>, la conduite), <b>Textures</b>.</td></tr>
       <tr><td class="path">Chameleon, FluidNinjaLive, GaussianSplat, Scans</td><td>Les packs encore utilisés par les cartes gardées, à leur place d'origine.</td></tr>
       <tr><td class="path">Plugins → VibH2O Content</td><td>Le plugin : presets d'ambiance, bulle de démonstration.</td></tr>
     </tbody>
@@ -531,10 +541,10 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
     </tbody>
   </table></div>
   <div class="box info"><strong>Récupérer quelque chose d'archivé</strong><span>Un pack ou une ancienne carte : Unreal fermé, recopie son dossier depuis <code>_ARCHIVE_LUX_2026-10-26\Content</code> à la même place dans <code>VIBH2O_LUX\VIBH2O\Content</code>. Pour rouvrir une très vieille carte telle qu'elle était, ouvre plutôt le projet de la sauvegarde d'avant rangement (copie-le d'abord ailleurs avec son dossier Plugins).</span></div>
-  <div class="box info"><strong>L'Outliner de la carte du spectacle</strong><span><b>VibH2O</b> (scène, simulateur, lumières, Régie, exposition), <b>Fond</b> (eau, soleil, particules, fond), <b>Caméra et sortie</b> (rail, caméra, Camera_Controller, Spout), <b>DIRT</b> (nuages de particules), <b>Environnement d'origine (ne pas supprimer)</b> (l'eau d'origine, le ciel, les anciennes lumières).</span></div>
+  <div class="box info"><strong>L'Outliner de la carte du spectacle</strong><span><b>VibH2O</b> (scène, simulateur, lumières, Régie, exposition), <b>Fond</b> (eau, soleil, particules, fond), <b>Caméra et sortie</b> (rail, caméra, Camera_Controller, Spout, la conduite SEQ_Spectacle), <b>DIRT</b> (nuages de particules), <b>Environnement d'origine (ne pas supprimer)</b> (l'eau d'origine, le ciel, les anciennes lumières).</span></div>
 </section>
 
-<footer>VIBH2O — manuel de l'opérateur. Plugin VibH2O vérifié le 26 octobre 2026 : 36 tests au vert, Unreal 5.5 et 5.8, Editor, Game et Shipping.</footer>
+<footer>VIBH2O — manuel de l'opérateur. Plugin VibH2O vérifié le 26 octobre 2026 : 42 tests au vert sous Unreal 5.5, compilé pour 5.5 et 5.8 (Editor, Game et Shipping), conduite et tableau 2 essayés en Play dans le projet du spectacle.</footer>
 </main>
 </div>
 

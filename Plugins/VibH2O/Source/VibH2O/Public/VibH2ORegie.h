@@ -107,7 +107,7 @@ struct VIBH2O_API FVibH2ORegieSettings
 
 	// -------------------------------------------------------------- Tableau 2
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "La caméra garde tout le banc", ToolTip = "En tableau 2, la caméra recule ou avance doucement pour que tout le banc reste dans l'image. Elle revient à la vue d'ensemble au retour en tableau 1."))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "La caméra garde tout le banc", ToolTip = "En tableau 2, la caméra recule ou avance doucement et glisse de côté pour que tout le banc reste au milieu de l'image. Elle revient exactement à sa place au retour en tableau 1."))
 	bool bFollowSchool = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Tableau 2", meta = (DisplayName = "Transition salle → banc : durée (s)", ClampMin = "1", ClampMax = "60", ToolTip = "Temps du passage entre les deux tableaux quand on le commande."))

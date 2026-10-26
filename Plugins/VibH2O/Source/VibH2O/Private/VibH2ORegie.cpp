@@ -53,7 +53,7 @@ namespace VibH2ORegieInternal
 		{ TEXT("bParticlesFadeIn"), TEXT("Particules : sortent du brouillard"), TEXT("Spectacle"), 0.0f, 1.0f, 1.0f, TEXT("Les particules sont absentes au d\u00e9part et apparaissent pendant la descente.") },
 		{ TEXT("ParticlesAppearAt"), TEXT("Particules : apparaissent à (rail)"), TEXT("Spectacle"), 0.0f, 1.0f, 0.005f, TEXT("Moment o\u00f9 elles naissent : 0,04 = environ 7 s apr\u00e8s le d\u00e9but.") },
 
-		{ TEXT("bFollowSchool"), TEXT("La cam\u00e9ra garde tout le banc"), TEXT("Tableau 2"), 0.0f, 1.0f, 1.0f, TEXT("En tableau 2, la cam\u00e9ra recule ou avance doucement pour garder tout le banc dans l'image.") },
+		{ TEXT("bFollowSchool"), TEXT("La cam\u00e9ra garde tout le banc"), TEXT("Tableau 2"), 0.0f, 1.0f, 1.0f, TEXT("En tableau 2, la cam\u00e9ra recule ou avance doucement et glisse de c\u00f4t\u00e9 pour garder tout le banc au milieu de l'image.") },
 		{ TEXT("TransitionSeconds"), TEXT("Transition salle \u2192 banc : dur\u00e9e (s)"), TEXT("Tableau 2"), 1.0f, 60.0f, 0.5f, TEXT("Temps du passage entre les deux tableaux quand on le commande.") },
 		{ TEXT("Daughters"), TEXT("Bulles filles par spectateur"), TEXT("Tableau 2"), 0.0f, 8.0f, 1.0f, TEXT("Chaque bulle se divise en ce nombre de s\u0153urs au d\u00e9but de la transition. 0 = pas de division.") },
 		{ TEXT("SisterSpread"), TEXT("\u00c9cart entre les s\u0153urs"), TEXT("Tableau 2"), 0.0f, 150.0f, 1.0f, TEXT("Distance entre une bulle et ses filles pendant la division.") },
