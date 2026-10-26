@@ -82,6 +82,11 @@ namespace VibH2ORegieInternal
 		{ TEXT("WaterDensity"), TEXT("Eau trouble"), TEXT("Ambiance"), 0.0f, 10.0f, 0.05f, TEXT("Plus trouble : la salle appara\u00eet plus tard dans la descente.") },
 		{ TEXT("MoodTransitionSeconds"), TEXT("Bascule d'ambiance : durée (s)"), TEXT("Ambiance"), 0.0f, 30.0f, 0.5f, TEXT("Temps pour passer d'une ambiance \u00e0 l'autre.") },
 
+		{ TEXT("RoomCurvature"), TEXT("Courbure de la salle (° par siège)"), TEXT("Salle"), -15.0f, 15.0f, 0.1f, TEXT("0 = salle droite, en grille. Plus ou moins : les rangées s'arrondissent d'un côté ou de l'autre.") },
+		{ TEXT("bRoomFanOut"), TEXT("Rangées du fond en éventail"), TEXT("Salle"), 0.0f, 1.0f, 1.0f, TEXT("Salle courbée : les rangées du fond s'ouvrent, comme dans un théâtre.") },
+		{ TEXT("RoomTiers"), TEXT("Gradins : hauteur par rangée (cm)"), TEXT("Salle"), 0.0f, 150.0f, 1.0f, TEXT("Chaque rangée monte d'autant. 0 = salle à plat.") },
+		{ TEXT("RoomRelief"), TEXT("Relief (cm)"), TEXT("Salle"), 0.0f, 100.0f, 1.0f, TEXT("Petites variations de hauteur, pour une salle moins parfaite. 0 = plat.") },
+
 		{ TEXT("BubbleSize"), TEXT("Taille des bulles"), TEXT("Bulles"), 0.1f, 4.0f, 0.05f, TEXT("Taille de toutes les bulles.") },
 		{ TEXT("FloatAmplitude"), TEXT("Flottement : ampleur (cm)"), TEXT("Bulles"), 0.0f, 200.0f, 1.0f, TEXT("De combien les bulles bougent autour de leur place.") },
 		{ TEXT("FloatSpeed"), TEXT("Flottement : vitesse"), TEXT("Bulles"), 0.0f, 5.0f, 0.01f, TEXT("Vitesse de ce mouvement.") },
@@ -517,7 +522,9 @@ void AVibH2ORegie::ApplyChanged(bool bForce)
 	{
 		ApplyToCameraController();
 	}
-	if (Changed(TEXT("FramingMargin")) || Changed(TEXT("OutputFormat")))
+	// The room's shape moves its edges: the overall view follows.
+	if (Changed(TEXT("FramingMargin")) || Changed(TEXT("OutputFormat")) || Changed(TEXT("RoomCurvature"))
+		|| Changed(TEXT("bRoomFanOut")) || Changed(TEXT("RoomTiers")) || Changed(TEXT("RoomRelief")))
 	{
 		RefreshFraming();
 	}
@@ -547,6 +554,10 @@ void AVibH2ORegie::ApplyToStage()
 #define VIBH2O_PUSH(Setting, Target) if (Changed(TEXT(#Setting))) { Target = R.Setting; }
 	VIBH2O_PUSH(bShowSeatNumbers, Stage->bShowSeatNumbers);
 	VIBH2O_PUSH(BubbleBrightness, Stage->BubbleBrightness);
+	VIBH2O_PUSH(RoomCurvature, Stage->CurvatureAngle);
+	VIBH2O_PUSH(bRoomFanOut, Stage->bFanOut);
+	VIBH2O_PUSH(RoomTiers, Stage->ElevationPerRow);
+	VIBH2O_PUSH(RoomRelief, Stage->DepthAmplitude);
 	VIBH2O_PUSH(BubbleSize, Stage->BaseScale);
 	VIBH2O_PUSH(FloatAmplitude, Stage->FloatAmplitude);
 	VIBH2O_PUSH(FloatSpeed, Stage->FloatSpeed);
@@ -951,6 +962,10 @@ void AVibH2ORegie::ReadScene()
 	{
 		R.bShowSeatNumbers = Stage->bShowSeatNumbers;
 		R.BubbleBrightness = Stage->BubbleBrightness;
+		R.RoomCurvature = Stage->CurvatureAngle;
+		R.bRoomFanOut = Stage->bFanOut;
+		R.RoomTiers = Stage->ElevationPerRow;
+		R.RoomRelief = Stage->DepthAmplitude;
 		R.BubbleSize = Stage->BaseScale;
 		R.FloatAmplitude = Stage->FloatAmplitude;
 		R.FloatSpeed = Stage->FloatSpeed;

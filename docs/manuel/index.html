@@ -211,10 +211,24 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
       <tr><td><b>Image</b></td><td>Les réglages de l'image, sans connaître Unreal : <span class="k">Luminosité générale</span>, <span class="k">Contraste</span>, <span class="k">Saturation</span> (0 = noir et blanc), <span class="k">Froid ← → chaud</span>, <span class="k">Halo lumineux</span>, <span class="k">Bords assombris</span>, <span class="k">Grain</span>. Le bouton <span class="k">Revenir à l'image d'origine</span> (appui maintenu) remet l'image telle qu'elle était quand la Régie a été posée. Si l'image a été retouchée ailleurs depuis et que c'est elle qu'on veut garder comme référence : dans Unreal, sur VibH2O_Regie, bouton <span class="k">Prendre l'image actuelle comme image d'origine</span>.</td></tr>
       <tr><td><b>Tableau 2</b></td><td>Le banc et son vortex : <span class="k">La caméra garde tout le banc</span>, durée de la transition, filles par bulle, écart entre sœurs, hauteur, rayons, tours et vitesse de rotation du vortex, vitesses et comportement du banc, seuils de synchronie. Voir « Tableau 2 ».</td></tr>
       <tr><td><b>Ambiance</b></td><td>Les deux couleurs de chaque ambiance (pour les spectateurs les plus calmes et les plus agités de la salle) ; lumière des bulles ; couleur, lumière et trouble de l'eau ; durée de bascule entre ambiances.</td></tr>
-      <tr><td><b>Bulles · Réaction</b></td><td>Taille, flottement, gonflement au battement, déformation ; et ce que font les capteurs : grossissement et dérive avec l'excitation, contraste entre spectateurs, seuils calme / excité, effet de la synchronie.</td></tr>
+      <tr><td><b>Salle · Bulles</b></td><td>La forme de la salle (courbure, éventail, gradins, relief : voir ci-dessous) ; taille, flottement, gonflement au battement, déformation ; et ce que font les capteurs : grossissement et dérive avec l'excitation, contraste entre spectateurs, seuils calme / excité, effet de la synchronie.</td></tr>
       <tr><td><b>Préréglages</b></td><td>Enregistrer l'aspect actuel sous un nom (un nom qui existe déjà demande un second appui pour être remplacé) ; le rappeler (appui maintenu) ; le supprimer (appui maintenu 1,5 s). Unreal confirme chaque opération par un message en bas de la tablette. Les préréglages sont des fichiers dans <code>Saved/VibH2O/Regie</code> du projet : ils restent d'une session à l'autre.</td></tr>
     </tbody>
   </table></div>
+  <h3>La forme de la salle</h3>
+  <p>Courbée comme un théâtre ou droite comme une grille : quatre réglages, dans l'onglet <b>Salle · Bulles</b> de la tablette ou sur VibH2O_Regie (catégorie Salle). La vue d'ensemble de la caméra se recadre seule.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Réglage</th><th>Ce qu'il fait</th></tr></thead>
+    <tbody>
+      <tr><td><span class="k">Courbure de la salle (° par siège)</span></td><td>0 = salle droite, en grille. Positif ou négatif : les rangées s'arrondissent d'un côté ou de l'autre (de −15 à 15).</td></tr>
+      <tr><td><span class="k">Rangées du fond en éventail</span></td><td>Salle courbée : les rangées du fond s'ouvrent, comme dans un théâtre. Sans effet sur une salle droite.</td></tr>
+      <tr><td><span class="k">Gradins : hauteur par rangée</span></td><td>Chaque rangée monte d'autant. 0 = salle à plat.</td></tr>
+      <tr><td><span class="k">Relief</span></td><td>Petites variations de hauteur, pour une salle moins parfaite. 0 = plat.</td></tr>
+    </tbody>
+  </table></div>
+  <figure><img src="img/salle_courbure.jpg" alt="Trois vues de la salle : courbée (réglage du 26 octobre), droite en grille, courbée dans l'autre sens." width="2497" height="656"><figcaption>À gauche, le réglage actuel du projet (courbure 3, gradins 30, relief 20) ; au milieu, tout à 0 : la grille droite ; à droite, courbure −6.</figcaption></figure>
+  <figure><img src="img/tablette_salle.jpg" alt="Onglet Salle · Bulles de la tablette : forme de la salle et réglages des bulles." width="800" height="600" style="max-width:560px"><figcaption>Onglet <b>Salle · Bulles</b> de la tablette.</figcaption></figure>
+  <div class="box info"><strong>Pour garder la forme choisie</strong><span>Un réglage fait sur la tablette pendant Play s'arrête avec Play. Pour le garder : enregistre un <b>préréglage</b> (il retient aussi la forme de la salle), ou règle-le dans Unreal, sur VibH2O_Regie hors Play, puis enregistre la carte.</span></div>
   <p><b>Sous chaque réglage, une ligne dit ce qu'il change à l'écran</b>, en mots simples. Les mêmes phrases apparaissent dans Unreal en survolant le réglage.</p>
   <ul class="plain">
     <li><b>Dans Sequencer</b> : ajoute VibH2O_Regie, chaque réglage a sa piste. Une seule séquence peut ainsi faire passer d'un look à l'autre.</li>
@@ -409,7 +423,7 @@ footer { margin-top: 64px; color: var(--muted); font-size: 14px; border-top: 1px
 
 <section class="ch" id="ipad">
   <h2>La télécommande (tablette)</h2>
-  <p>Unreal sert lui-même la page de commande. Rien à installer, et ce n'est pas réservé à l'iPad : n'importe quelle tablette, téléphone ou ordinateur avec un navigateur (Chrome, Safari, Firefox, Edge) fait l'affaire. Onglets : <b>Conduite</b>, <b>Spectacle</b>, <b>Tableaux · Fond · Focus</b>, <b>Tableau 2</b>, <b>Image</b>, <b>Ambiance</b>, <b>Bulles · Réaction</b>, <b>Préréglages</b>, <b>Attracteurs · Zones</b> (voir « La Régie et la tablette »).</p>
+  <p>Unreal sert lui-même la page de commande. Rien à installer, et ce n'est pas réservé à l'iPad : n'importe quelle tablette, téléphone ou ordinateur avec un navigateur (Chrome, Safari, Firefox, Edge) fait l'affaire. Onglets : <b>Conduite</b>, <b>Spectacle</b>, <b>Tableaux · Fond · Focus</b>, <b>Tableau 2</b>, <b>Image</b>, <b>Ambiance</b>, <b>Salle · Bulles</b>, <b>Préréglages</b>, <b>Attracteurs · Zones</b> (voir « La Régie et la tablette »).</p>
   <ol class="steps">
     <li>iPad et PC sur le <b>même Wi-Fi</b> (ou le PC en filaire sur le même routeur).</li>
     <li>Lance <b>Play</b> (ou Standalone Game). Le log Unreal écrit l'adresse : <code>VibH2O: telecommande iPad — ouvrir http://192.168.1.12:8642/ dans Safari.</code></li>

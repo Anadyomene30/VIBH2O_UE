@@ -190,6 +190,20 @@ struct VIBH2O_API FVibH2ORegieSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Ambiance", meta = (DisplayName = "Bascule d'ambiance : durée (s)", ClampMin = "0.0", ClampMax = "30.0"))
 	float MoodTransitionSeconds = 4.0f;
 
+	// ------------------------------------------------------------------ Salle
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Salle", meta = (DisplayName = "Courbure de la salle (° par siège)", ClampMin = "-15.0", ClampMax = "15.0", ToolTip = "0 = salle droite, en grille. Positif ou négatif : les rangées s'arrondissent d'un côté ou de l'autre."))
+	float RoomCurvature = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Salle", meta = (DisplayName = "Rangées du fond en éventail", ToolTip = "Salle courbée : les rangées du fond s'ouvrent, comme dans un théâtre. Sans effet sur une salle droite."))
+	bool bRoomFanOut = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Salle", meta = (DisplayName = "Gradins : hauteur par rangée (cm)", ClampMin = "0.0", ClampMax = "150.0", ToolTip = "Chaque rangée monte d'autant, comme des gradins. 0 = salle à plat."))
+	float RoomTiers = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Salle", meta = (DisplayName = "Relief (cm)", ClampMin = "0.0", ClampMax = "100.0", ToolTip = "Petites variations de hauteur pour que la salle ne soit pas parfaitement plate. 0 = plat."))
+	float RoomRelief = 0.0f;
+
 	// ----------------------------------------------------------------- Bulles
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Interp, Category = "Bulles", meta = (DisplayName = "Taille des bulles", ClampMin = "0.1", ClampMax = "4.0"))

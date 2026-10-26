@@ -255,6 +255,14 @@ bool FVibH2ORegieCommandsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("La couleur choisie sur la tablette arrive a la palette"),
 		Stage->MoodPalette.Excited.ColorHigh.Equals(FLinearColor(1.0f, 0.0f, 0.0f, 1.0f), 1e-3f));
 
+	// The room's shape: straight, then curved again.
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("RoomCurvature"), TEXT("0") }));
+	TestEqual(TEXT("Courbure 0 : salle droite"), Stage->CurvatureAngle, 0.0f);
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("RoomCurvature"), TEXT("4.5") }));
+	TestEqual(TEXT("La courbure arrive a la scene"), Stage->CurvatureAngle, 4.5f);
+	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("RoomTiers"), TEXT("40") }));
+	TestEqual(TEXT("Les gradins arrivent a la scene"), Stage->ElevationPerRow, 40.0f);
+
 	// Out of range is clamped, unknown is ignored.
 	Desk->HandleRegieMessage(MakeText(TEXT("/Regie/Set"), { TEXT("BubbleBrightness"), TEXT("999") }));
 	TestEqual(TEXT("Une valeur hors bornes est ramenee dans les bornes"), Stage->BubbleBrightness, 10.0f);
