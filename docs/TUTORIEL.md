@@ -1,0 +1,459 @@
+# Tutoriel — se servir du plugin VibH2O
+
+Pour prendre en main l'installation sans rien brancher, puis y greffer son propre travail
+artistique. Aucune connaissance du code n'est requise.
+
+> Le **pourquoi** des décisions est dans [`../CLAUDE.md`](../CLAUDE.md), la référence technique
+> dans [`../Plugins/VibH2O/README.md`](../Plugins/VibH2O/README.md).
+>
+> Pour jouer le spectacle dans le projet LUX, le **manuel de l'opérateur** illustré est dans
+> [`manuel/`](manuel/index.html) (page et PDF) : mise en place, ambiances, tableaux, attracteurs,
+> zones, iPad, Resolume, dépannage.
+
+---
+
+## 1. Voir la salle vivre — deux minutes
+
+1. Ouvrir `VIBH2O_UE.uproject`.
+2. Ouvrir la carte **`Content/Maps/VibH2O_Demo`** (elle s'ouvre seule au démarrage).
+3. Appuyer sur **Play**.
+
+Vingt et une bulles apparaissent, chacune battant au rythme de son propre cœur. Elles se colorent
+du bleu à l'orange selon l'excitation, flottent, et portent des anneaux calés sur leur battement.
+
+**Rien n'est branché** : un acteur `VibH2O — Simulateur` est posé dans la carte et joue le rôle du
+patch Max/MSP. C'est lui qui invente la salle et les données.
+
+### Le mode qui sert vraiment : Simulate
+
+Plutôt que Play, appuyer sur **Alt + S** (*Simulate*). Même chose à l'écran, mais **vous gardez la
+main sur l'éditeur** : vous pouvez sélectionner des acteurs, changer leurs réglages et voir l'effet
+immédiatement, sans être enfermé dans la caméra du jeu.
+
+**C'est le mode à utiliser pour régler.** Play ne sert qu'à voir depuis la caméra du spectacle.
+
+### Et sans rien lancer du tout
+
+**Ouvrez la carte : la salle vit déjà dans l'éditeur.** Sans Play ni Simulate, le simulateur
+alimente une doublure du subsystem propre à l'éditeur, et l'acteur de scène y crée ses **vraies
+bulles** — matériau, battement, couleurs, éclairage, données simulées. C'est le mode pour régler
+les lumières et l'aspect : on voit le résultat final en tournant autour.
+
+Une seule condition : le viewport doit être **en temps réel** (`Ctrl + R`, ou le menu ☰ du
+viewport → *Realtime*). Sinon rien ne bouge.
+
+Ces bulles d'éditeur sont provisoires : jamais enregistrées dans le niveau, absentes de l'Outliner,
+et **non sélectionnables** — un clic dans la salle ne les attrape pas. Pour régler la salle,
+sélectionner `VibH2O_Stage` dans l'Outliner.
+
+- Couper : décocher `Simuler dans l'editeur` sur le simulateur (la salle se vide), ou
+  `Bulles vivantes dans l'editeur` sur la scène.
+- Changer de scénario, de nombre de colonnes ou de rangées sur le simulateur : la salle suit
+  immédiatement, toujours sans Play.
+- La doublure n'ouvre **jamais** le port réseau : Play démarre toujours un vrai subsystem, et Max
+  l'atteint normalement.
+
+Sans simulateur dans le niveau, l'acteur de scène retombe sur l'ancien aperçu : une sphère de
+débogage par siège, avec une flèche d'orientation.
+
+---
+
+## 2. Régler la salle
+
+Sélectionner l'acteur **`VibH2O_Stage`** dans l'Outliner. Le panneau Details se remplit de
+catégories `VibH2O|…`. Les plus utiles, dans l'ordre où on s'en sert :
+
+### `VibH2O|Ambiance` — calme, normal, excité : le réglage rapide
+
+C'est la première catégorie, et sur place c'est souvent la seule à ouvrir. La salle passe par
+**trois états** selon l'excitation moyenne de tout le public par rapport à son repos : **calme**,
+**normal**, **excité**. Chaque état a sa palette (froide, aqua, chaude par défaut), son énergie
+(stries plus ou moins lumineuses et rapides, surface plus ou moins agitée), son mouvement et sa
+taille. Le passage d'un état à l'autre est un fondu de quatre secondes ; une marge autour de chaque
+seuil empêche tout clignotement quand la salle hésite à la frontière.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Preset d'ambiance`** | Glisser un preset depuis le Content Browser : les palettes se chargent aussitôt. Deux sont livrés dans le contenu du plugin : `DA_VibH2O_Ambiance_FroidChaud` et `DA_VibH2O_Ambiance_Aqua`. |
+| **`Seuil calme`** / **`Seuil excite`** | Les deux frontières. |
+| **`Forcer l'etat`** | Laisser en *Automatique* pour que la salle décide ; imposer un état pour une répétition ou un moment de conduite. |
+| `Etat actuel` | Ce que la salle est en train de montrer. |
+| **`Excitation de la salle`** | La moyenne en direct, telle que la jugent les seuils. |
+| `Lumiere des bulles` / `Taille des bulles` | Lumière et taille de toutes les bulles. |
+
+> **Poser les seuils, en salle.** On ne sait pas encore exactement quelle plage Max envoie. Pas
+> besoin de le savoir : public au repos, regarder `Excitation de la salle`, mettre `Seuil calme`
+> un peu au-dessus. Pendant un moment fort, regarder à nouveau et poser `Seuil excite` un peu
+> en dessous. C'est tout.
+
+**Changer les couleurs.** Ouvrir la flèche *avancé* de la catégorie : `Palettes par etat` contient
+`Calme`, `Normal` et `Excite`, chacun avec deux couleurs — *plus calme que la salle* et *plus
+excitée que la salle* : chaque bulle se place entre les deux selon l'écart de sa personne à la
+moyenne. On y règle aussi la lumière et la vitesse des stries, l'agitation, le flottement, la
+dérive, la taille et la force du battement de chaque état. Le changement se voit tout de suite,
+viewport en temps réel. Pour garder un réglage : choisir un preset, puis cliquer **`Enregistrer
+dans le preset`** et sauvegarder l'asset. Pour en créer un nouveau : clic droit dans le Content
+Browser → *Miscellaneous* → *Data Asset* → `VibH2O - Preset d'ambiance`.
+
+**La synchronie se voit à part**, sans changer la couleur d'état : synchrones, les stries de toutes
+les bulles s'alignent en une même vague qui traverse la salle, les teintes se resserrent et un
+halo s'allume au bord ; désynchrones, chaque bulle suit ses propres stries.
+
+### `VibH2O|Geometrie` — la forme de la salle
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| `Column Spacing` / `Row Spacing` | Écartement des sièges, en centimètres. |
+| **`Curvature Angle`** | Courbe la salle. **0 = parfaitement droite.** Positif ou négatif pour courber d'un côté ou de l'autre. |
+| `bFan Out` | Coché : les rangées du fond s'élargissent, comme dans un vrai théâtre. Décoché : écartement constant partout. |
+| `bOrient To Center` | Les bulles pivotent vers le centre de la courbe. |
+| `Elevation Per Row` | Gradins : hauteur gagnée à chaque rangée. |
+| `Depth Amplitude` | Relief : ondulation douce de la nappe de bulles. |
+
+> **Faites l'essai qui fait tout comprendre.** Attrapez `Curvature Angle` et balayez-le du négatif
+> au positif, directement dans le viewport, sans rien lancer. La salle se courbe dans un sens,
+> repasse exactement droite à zéro, puis se courbe dans l'autre.
+
+### `VibH2O|Mouvement` — comment les bulles bougent
+
+`Float Amplitude` et `Float Speed` règlent le flottement permanent — elles sont sous l'eau, elles
+flottent. `Drift Threshold` et `Drift Intensity` règlent la dérive : au-delà du seuil d'excitation,
+une bulle s'écarte de sa place. **Elle ne peut mathématiquement pas atteindre la case voisine**,
+`Drift Max Ratio` s'en charge.
+
+### `VibH2O|Bulles` — l'aspect
+
+La taille générale est passée dans `Ambiance` (`Taille des bulles`). Sous *avancé* :
+`Scale Per Excitation` et `Beat Pop Amount` règlent la croissance et le sursaut au battement. `Organic Deform` et `Organic Speed` règlent la respiration de la silhouette : chaque
+bulle se déforme sur trois axes à des cadences légèrement différentes, avec une phase qui lui est
+propre — aucune n'est jamais une sphère.
+
+**Pour un rendu réaliste, rester bas** : `Organic Deform` vaut 0,035 par défaut (3,5 %). Au-delà de
+0,1, la bulle s'étire comme du caoutchouc. `Beat Pop Amount` vaut 0,10 : un gonflement au pouls,
+pas un rebond de dessin animé.
+
+### `VibH2O — Fond` — enlever le fond en un geste
+
+Sur le tulle de projection, **le noir est transparent** : ce que l'image n'éclaire pas, le public
+le traverse du regard. Enlever le fond, c'est donc laisser apparaître la scène et les circassiennes
+derrière le tulle, avec seulement les bulles et les particules en suspension devant. Pour cela, le
+noir doit être un vrai noir, pas un bleu très sombre.
+
+L'acteur **`VibH2O — Fond`** s'en charge, par quatre chemins qui font la même chose :
+
+| Depuis | Geste |
+|---|---|
+| Panneau Details | Boutons **Enlever le fond** / **Remettre le fond** (fonctionnent aussi sans Play). |
+| Clavier, en Play | Touche **B** (réglable : `Touche`) — bascule. |
+| iPad ou Max | `/Fond 0` enlève, `/Fond 1` remet ; 2e argument facultatif = durée en secondes. |
+| Sequencer | Piste `Presence du fond`, de 1 (l'eau) à 0 (noir). |
+
+Le fondu dure `Duree du fondu` (4 s par défaut), adouci aux deux bouts. `Courbe du fondu` (0,6)
+règle sa forme : mesurée dans la carte du spectacle, c'est la valeur pour laquelle l'image
+s'assombrit régulièrement ; à 1, elle tient puis chute d'un coup à la fin (le tonemapper écrase
+les basses lumières). Ce qui s'éteint : la
+lumière que **diffuse** le brouillard (sa couleur, le terme directionnel, l'albédo et l'émission du
+brouillard volumétrique) et l'atmosphère. La **densité** du brouillard reste : les bulles lointaines
+sombrent toujours dans la profondeur, mais vers le noir. Les maillages de décor (sphère de ciel,
+surface) disparaissent une fois le noir atteint ; les **systèmes de particules ne sont jamais
+touchés**, et les **lumières non plus**, sauf à cocher `Eteindre les lumieres` : les bulles gardent
+exactement leur éclairage.
+
+**Remplir depuis la carte** liste d'office les brouillards, atmosphères, lumières de ciel et
+très grands maillages ; corriger la liste `Environnement` à la main au besoin. Pour qu'un matériau
+d'artiste s'efface en douceur plutôt que d'un coup à la fin, lui faire lire le paramètre `Fond`
+d'une *Material Parameter Collection* renseignée dans `Collection de parametres`.
+
+Rien n'est écrasé : les valeurs d'origine sont gardées dans l'acteur, sauvegardées avec la carte, et
+rendues dès que le fond revient à 1 — ou si l'on supprime l'acteur.
+
+### `VibH2O_Lumieres` — l'éclairage qui suit la salle
+
+L'acteur **`VibH2O — Rig de lumieres`** porte trois projecteurs :
+- la **face** (`Key`), légèrement chaude, de devant et d'en haut ;
+- le **contre-jour** (`Back`), froid et fort, de derrière : c'est lui qui fait briller les bulles
+  de l'intérieur et dessine leur liseré ;
+- le **débouchage** (`Fill`), bas, bleu profond, pour que les ombres ne tombent pas au noir.
+
+**Il s'adapte au nombre de bulles affichées.** À chaque image, il lit où sont réellement les
+bulles et recule chaque projecteur jusqu'à ce que son cône couvre toute la salle. Il compense
+aussi la distance (loi en carré inverse) : une bulle reçoit la même lumière dans une salle de 20
+places que de 200. La salle passe de 7 × 3 aux 23 × 4 d'Alès, se courbe, se déplace ou se morphe
+en banc : les lumières suivent en glissant, sans à-coup.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| `Azimuth` / `Elevation` | D'où vient la lumière, **par rapport à la scène** : tourner l'installation tourne l'éclairage avec. |
+| `Illuminance` | La lumière **reçue par les bulles**, en lux — pas la puissance de la lampe, que le rig calcule. |
+| `Cone Angle` | Ouverture du faisceau. Plus large = plus proche et plus doux. |
+| `Volumetric Scattering` | Combien le faisceau se voit dans le brouillard. |
+| `Master Intensity` | Niveau général des trois — à animer dans Sequencer pour un fondu. |
+| `Follow Focus` | Coché : les lumières se resserrent sur le groupe de focus actif, comme une poursuite. |
+| `Follow Speed` | Vitesse à laquelle les lumières suivent un changement de salle. 0 = immédiat. |
+
+Le soleil, lui, porte les **caustiques** : le filet de lumière ondulant que la surface projette
+sous l'eau. Il tombe sur les bulles et sur le fond marin. Le réglage d'exposition global est dans
+`PostProcess` → `Exposure Compensation`.
+
+
+**`Show Seat Numbers`** écrit le numéro de chaque personne au-dessus de sa bulle. C'est ainsi qu'on
+vérifie un plan de salle d'un coup d'œil.
+
+La couleur suit l'**état de la salle** (voir `VibH2O|Ambiance` plus haut). Pour voir passer les
+trois états, mettre le simulateur en scénario *Vague collective : calme, normal, excite*.
+
+### `VibH2O|Tableaux` — passer au vortex
+
+**`Blend Alpha`** est le curseur central de l'œuvre : **0** = le plan de salle, **1** = le vortex.
+Faites-le glisser en Simulate et regardez les bulles quitter leur siège pour s'enrouler en cône.
+
+Vous pouvez vous arrêter à mi-chemin, revenir en arrière : la transition est continue dans les deux
+sens, et les cœurs ne perdent jamais le rythme.
+
+Le tableau 2 est un **vrai banc de poissons** : séparation, alignement et cohésion évalués sur le
+voisinage réel. Chaque bulle regarde là où elle nage.
+
+#### La division — `VibH2O|Tableaux|Division`
+
+Au début du passage, **chaque bulle se divise sur place** en sœurs de même taille, comme une cellule :
+les filles gonflent à l'intérieur de la mère pendant qu'elle rétrécit, puis les sœurs s'écartent.
+Le volume de la famille reste celui de la mère à chaque instant. Les sœurs gardent **le cœur et la
+couleur** de leur spectateur : une personne devient une famille, toujours reconnaissable. Une fois la
+division à moitié faite, la famille quitte son siège pour rejoindre le banc.
+
+**Tout se joue au curseur `Blend Alpha`** : en revenant vers 0, les sœurs se rapprochent et se
+refondent dans leur mère, qui retrouve sa taille et sa place exactes. Rien n'est détruit, le cœur ne
+perd jamais le rythme.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Filles par bulle`** | Combien de filles naissent de chaque bulle. **3** par défaut : une salle de 176 donne un banc de 704. **0** coupe la division. |
+| `Plafond du banc` | Nombre total de bulles à ne pas dépasser (1 000). Au-delà, moins de filles naissent. |
+| `Division : debut` / `fin` | La plage de `Blend Alpha` où la division a lieu (0 → 0,35). |
+| `Ecart des soeurs` | Distance entre les sœurs une fois divisées, en cm. |
+
+> Dans un Blueprint de bulle, **`Is Daughter`** dit si la bulle est une fille. Les filles déclenchent
+> `Sur battement` comme leur mère : pour un son par spectateur et non par sœur, filtrer sur ce test.
+
+#### Le banc — `VibH2O|Tableaux|Banc`
+
+**La synchronie collective en règle l'ordre**, entre deux états :
+
+- **En synchronie : le vortex.** Tout le banc tourne dans le même sens autour d'un axe, sur la paroi
+  d'un cône qui s'évase vers le haut — une tornade de poissons. Sa forme se règle dans
+  `VibH2O|Tableaux|Vortex` (`Vortex Base Radius`, `Vortex Top Radius`, `Vortex Height`) ; le signe de
+  `Vortex Spin Speed` donne le sens de rotation.
+- **Hors synchronie : les familles.** Chaque famille reste groupée en petit essaim, et les essaims se
+  répartissent dans tout le volume, plus lentement. Dispersé, mais chaque spectateur reste lisible.
+
+Entre les deux, les forces se mélangent : rien ne bascule d'un coup.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| **`Synchronie : dispersion sous`** | Sous ce seuil (0,35), le banc est entièrement dispersé en familles. |
+| **`Synchronie : vortex au-dessus de`** | Au-dessus (0,70), c'est le vortex plein. Fondu entre les deux. |
+| `Lissage` | Le temps que met le banc à suivre la synchronie (2 s). La mesure est bruitée : sans lissage, le vortex tremblerait. |
+| `Part de la synchronie` | 1 : la salle décide. 0 : `Ordre manuel` décide. Pour reprendre la main un moment, ou répéter sans public. |
+| `Ordre manuel` | 0 = familles dispersées, 1 = vortex. Animable dans Sequencer, comme tous les réglages ci-dessus. |
+
+Les réglages fins du comportement (rayons, poids, vitesses, volume de dispersion) sont dans le
+pilote `Flock Driver`, catégories `Banc`, `Banc|Vortex` et `Banc|Familles`. On n'y touche
+normalement pas en salle.
+
+**Pour le voir respirer** : scénario *Balayage de synchronie* avec `Blend Alpha` à 1. Le banc se
+disperse en familles, s'enroule en vortex quand la synchronie monte, puis se défait.
+
+---
+
+## 3. Piloter le simulateur
+
+Sélectionner **`VibH2O_Simulateur`** dans l'Outliner.
+
+### `VibH2O|Simulation|Salle`
+
+`Columns` et `Rows` donnent les dimensions — **modifiables pendant que ça tourne** : la salle se
+redimensionne sous le curseur. `Aisle Columns` vide des colonnes entières — les allées centrales.
+
+### `VibH2O|Simulation|Donnees`
+
+`Scenario` change ce que fait le public simulé :
+
+| Scénario | Ce que vous verrez |
+|---|---|
+| **Nominal** | Salle calme, chacun à son rythme. |
+| **Vague d'excitation** | Une vague traverse la salle de gauche à droite. |
+| **Balayage de synchronie** | La synchronie collective monte et redescend en 25 s. **À combiner avec `Blend Alpha` à 1** : les familles dispersées s'enroulent en vortex, puis se dispersent. |
+| **Pic collectif** | Toute la salle monte ensemble, puis retombe. |
+| **Coupure de capteurs** | Des capteurs se taisent : les bulles concernées se désaturent et cessent de battre. |
+| **Vague collective : calme, normal, excite** | Toute la salle passe par les trois états, chacun tenu une vingtaine de secondes (cycle de 96 s) ; la synchronie monte et descend sur sa propre période (37 s), pour voir chaque état synchrone et désynchrone. Équivalent réseau : `python Tools/vibh2o_osc_sim.py --scenario moods`. |
+
+`Send Rate Hz` règle la cadence d'envoi, `Base Bpm Min`/`Max` la plage de rythmes cardiaques.
+
+### Par la console
+
+Ouvrir la console avec la touche **²** (ou `~`), puis :
+
+| Commande | Effet |
+|---|---|
+| `VibH2O.Simulate` | Démarre ou arrête la simulation. |
+| `VibH2O.Simulate ales` | Charge **la vraie salle d'Alès** : 23 × 4 avec ses deux allées. |
+| `VibH2O.Simulate 22x8` | Une salle de 176 places, l'échelle réelle du spectacle. |
+| `VibH2O.Simulate off` | Arrête. |
+| `VibH2O.ShowDebug` | Affiche l'état : réseau, salle, moyennes. **Le premier réflexe quand rien n'apparaît.** |
+| `VibH2O.DumpRoom` | Écrit le plan de salle dans le log, une ligne par rangée. |
+
+---
+
+## 4. Brancher le vrai Max
+
+Rien à changer. Le simulateur **s'efface tout seul** dès que de vrais paquets arrivent sur le
+réseau, et reprend après trois secondes de silence. La même carte sert donc à la démo, au réglage
+et à la répétition.
+
+1. Vérifier le port dans **Edit → Project Settings → Plugins → VibH2O**, catégorie *Reseau*.
+   Défaut : **9002**, sur toutes les interfaces.
+2. Côté Max, régler l'IP du PC Windows et le même port.
+3. Lancer, puis `VibH2O.ShowDebug` : si les paquets arrivent, les compteurs montent.
+
+### Si rien n'apparaît
+
+`VibH2O.ShowDebug` dit lequel des trois problèmes vous avez :
+
+- **Écoute INACTIVE** → le port est déjà pris par un autre logiciel.
+- **0 paquet** → rien n'arrive : pare-feu, mauvaise IP, ou Max n'émet pas.
+- **Paquets reçus mais aucune salle** → le plan de salle n'a pas encore été envoyé depuis Max.
+
+### Pour tester sans Max, avec du vrai réseau
+
+```bash
+python Tools/vibh2o_osc_sim.py --preset ales --scenario wave
+```
+
+Ce simulateur-là passe par un vrai socket UDP — utile pour valider le réseau lui-même, pare-feu
+compris.
+
+---
+
+## 5. Donner leur apparence aux bulles
+
+Le plugin **ne décide pas du look**. Il pousse des valeurs dans le matériau et émet des événements ;
+le reste vous appartient.
+
+### Créer sa bulle
+
+1. Clic droit dans le Content Browser → **Blueprint Class** → chercher **`VibH2OBubbleActor`**.
+2. Y mettre son mesh et son matériau.
+3. Sur `VibH2O_Stage`, catégorie `VibH2O|Bulles`, renseigner **`Bubble Class`** avec ce Blueprint.
+
+> **Un piège à connaître.** L'acteur de scène écrit à chaque frame la position, la rotation et
+> **l'échelle de la racine** de la bulle. Mettez votre mesh à l'échelle **sur son propre composant**,
+> pas sur la racine — sinon votre réglage est écrasé. C'est voulu : la place et la taille d'une
+> bulle appartiennent à la salle, pas à la bulle.
+
+### Les valeurs disponibles dans le matériau
+
+Créez des paramètres portant exactement ces noms ; le plugin les remplit tout seul.
+
+| Paramètre | Contenu |
+|---|---|
+| `BeatPhase` | 0→1, **continu, ne saute jamais**. La base de tout ce qui est périodique. |
+| `BeatPulse` | Retombe de 1 à 0 après chaque battement. |
+| `Bpm` | Le rythme cardiaque brut. |
+| `Excitation` | 0→1. |
+| `Synchrony` | 0→1, pour cette personne. |
+| `CollectiveSynchrony` | 0→1, pour toute la salle. |
+| `StriationSpeed` | Vitesse réelle de la bulle. |
+| `FocusMask` | 1 dans le groupe en focus, moins en dehors. |
+| `Staleness` | 1 si le capteur s'est tu. |
+| `BlendAlpha` | Position entre les deux tableaux. |
+| `TintColor` | Couleur (paramètre vectoriel), tirée de la palette de l'état de salle. |
+| `MoodCalm` / `MoodNormal` / `MoodExcited` | Poids des trois états, somme égale à 1, en fondu. |
+| `MoodGlow` / `MoodTurbulence` | Lumière des stries et agitation, selon l'état. |
+| `StripePhase` / `RoomStripePhase` | Phase des stries de la bulle, et celle commune à la salle. Continues. |
+| `Coherence` | 0→1 : à quel point la bulle se cale sur la salle (synchronie). |
+| `SyncHalo` / `BubbleBrightness` / `BubbleSeed` | Halo de synchronie, lumière générale, aléa stable par bulle. |
+
+**L'astuce des anneaux concentriques**, dans le matériau :
+
+```
+frac(BeatPhase * 6 - Distance * 10)
+```
+
+produit un train d'anneaux qui s'étendent en permanence, calés sur le vrai cœur. Ils ne
+glitcheront jamais lors d'un changement de rythme — c'est toute la raison pour laquelle
+`BeatPhase` est continu.
+
+Le matériau `M_VibH2ODemoBubble` livré avec le plugin montre ces paramètres en action : stries
+lumineuses à la manière de la scène principale, alignées par `Coherence`, cadencées par
+`StripePhase`, et un anneau qui court d'un pôle à l'autre sur `BeatPhase`. Regardez-le, il n'est
+pas long.
+
+### Les événements Blueprint
+
+Dans votre Blueprint de bulle, clic droit → chercher :
+
+- **`Sur battement`** — à chaque battement de cette personne. Pour déclencher un son, un Niagara,
+  des particules.
+- **`Sur mise a jour des donnees`** — chaque frame, avec l'état complet.
+- **`Sur affectation a un siege`** — quand la bulle reçoit sa place.
+
+---
+
+## 6. Isoler une partie de la salle — le focus
+
+Sur `VibH2O_Stage`, catégorie `VibH2O|Focus` :
+
+1. Ajouter une entrée à **`Focus Groups`**, lui donner un nom, et définir son rectangle en colonnes
+   et rangées. `Extra Seat Indices` permet d'ajouter des sièges isolés.
+2. Renseigner **`Active Focus Group`** avec ce nom.
+3. Monter **`Focus Amount`** de 0 à 1.
+
+Les bulles hors du groupe s'assombrissent progressivement. **Rien ne se déplace** : le plan de salle
+reste lisible.
+
+Pour cadrer une caméra sur le groupe, le plugin donne la cible sans piloter la caméra —
+`Get Focus Center`, `Get Focus Bounds` et `Get Focus Fit Distance` sont appelables en Blueprint.
+
+---
+
+## 7. Animer dans Sequencer
+
+Tous les réglages pilotables sont animables. Dans une Level Sequence, ajouter l'acteur `VibH2O_Stage`,
+puis **+ Track** → les propriétés apparaissent : `Blend Alpha`, `Curvature Angle`, `Focus Amount`,
+et tout le reste.
+
+La séquence d'exemple **`Content/Sequences/LS_VibH2O_Recette`** anime les trois principales sur dix
+secondes.
+
+> **Pendant une séquence, Sequencer l'emporte sur l'OSC** — automatiquement, parce que la piste
+> réécrit la valeur à chaque frame alors que l'OSC n'écrit qu'à la réception. Pour couper l'entrée
+> OSC franchement pendant un rendu, passer `bIgnore Osc Control` à vrai sur le subsystem.
+
+---
+
+## 8. Vérifier que tout va bien
+
+| Besoin | Commande |
+|---|---|
+| L'outillage réseau est sain | `python Tools/selftest_osc.py` |
+| Le plugin est correct | `Automation RunTests VibH2O` dans la console |
+| Voir la recette visuelle complète | `VibH2O.DemoSweep` — quatorze captures dans `Saved/VibH2OSweep/`, puis le moteur quitte |
+| Vérifier qu'un effet ne dérange que le sien | `VibH2O.EffectIsolation` — un verdict et une capture par effet, dans `Saved/VibH2OIsolation/` |
+| Voir le tableau 2 de bout en bout | `VibH2O.SchoolSweep` — division, départ, balayage de synchronie (dispersion, vortex, dispersion), retour, avec mesures et captures dans `Saved/VibH2OSchool/` |
+
+---
+
+## Aide-mémoire
+
+| Je veux… | Faire… |
+|---|---|
+| Voir la salle vivre | Ouvrir `VibH2O_Demo`, **Alt + S** |
+| Régler la géométrie | Sélectionner `VibH2O_Stage`, catégorie `VibH2O|Geometrie` |
+| Passer au vortex | `Blend Alpha` de 0 à 1 |
+| Régler la division | `Filles par bulle`, catégorie `VibH2O|Tableaux|Division` |
+| Régler quand le vortex se forme | Les deux seuils de synchronie, catégorie `VibH2O|Tableaux|Banc` |
+| Changer de salle | `VibH2O.Simulate ales` |
+| Comprendre pourquoi rien n'apparaît | `VibH2O.ShowDebug` |
+| Voir le plan en texte | `VibH2O.DumpRoom` |
+| Changer le port réseau | Project Settings → Plugins → VibH2O → *Reseau* |
+| Mettre mon propre look | Blueprint dérivé de `VibH2OBubbleActor`, puis `Bubble Class` |

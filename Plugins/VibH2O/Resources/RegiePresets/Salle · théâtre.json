@@ -1,0 +1,6 @@
+{
+	"roomCurvature": 6,
+	"bRoomFanOut": true,
+	"roomTiers": 40,
+	"roomRelief": 15
+}

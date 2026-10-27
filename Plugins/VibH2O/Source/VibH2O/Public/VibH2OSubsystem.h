@@ -1,0 +1,539 @@
+// The living model of the installation: network, room plan, per-individual
+// state, averages, and control messages.
+//
+// It knows nothing of actors, bubbles or materials. Stage actors read from it;
+// it never drives them. That separation is what allows several views of the
+// same room, or none at all.
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Cues/VibH2OBackgroundGuard.h"
+#include "Cues/VibH2OCueTypes.h"
+#include "Cues/VibH2OKeyboardSink.h"
+#include "Cues/VibH2OMidiInput.h"
+#include "Osc/VibH2OOscReceiver.h"
+#include "Osc/VibH2OOscTypes.h"
+#include "Remote/VibH2ORemoteServer.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "Tickable.h"
+#include "VibH2OTypes.h"
+
+#include "VibH2OSubsystem.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2ORoomChangedSignature, const FVibH2ORoomSnapshot&, Room);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OEffectChangedSignature, FName, EffectName, bool, bEnabled);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFocusGroupChangedSignature, FName, GroupName);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OFloatControlSignature, float, Value);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBeatSignature, int32, IndividualId, int32, BeatCount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedFloatControlSignature, FName, TargetName, float, Value);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2ONamedPositionControlSignature, FName, TargetName, FVector2D, Position);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVibH2OControlSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FVibH2OBackdropControlSignature, float, TargetPresence, float, FadeSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVibH2OAmbianceControlSignature, int32, MoodOverrideIndex);
+DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2OCueInputEvent, const FVibH2OCueInput&);
+
+/** Operational figures, for the debug overlay and for get-in. */
+USTRUCT(BlueprintType)
+struct VIBH2O_API FVibH2ONetworkStats
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	bool bListening = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	FString Endpoint;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	FString LastError;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	int32 PacketsReceived = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	int32 MessagesReceived = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	int32 MessagesDropped = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	int32 MalformedPackets = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	int32 QueueDepth = 0;
+
+	/** Messages handled per second, smoothed. */
+	UPROPERTY(BlueprintReadOnly, Category = "VibH2O|Reseau")
+	float MessagesPerSecond = 0.0f;
+};
+
+/** Native: the OSC message type is not a reflected struct. The control desk binds to it. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FVibH2ORegieMessageSignature, const FVibH2OOscMessage&);
+
+/**
+ * The VibH2O subsystem.
+ *
+ * It drains the network thread's queue from its own tick, holds the state, and
+ * broadcasts changes. All object logic happens here, on the game thread.
+ */
+UCLASS(BlueprintType)
+class VIBH2O_API UVibH2OSubsystem : public UGameInstanceSubsystem, public FTickableGameObject
+{
+	GENERATED_BODY()
+
+public:
+	virtual ~UVibH2OSubsystem() override;
+
+	// UGameInstanceSubsystem
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
+	// FTickableGameObject
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+	virtual bool IsTickable() const override;
+	virtual ETickableTickType GetTickableTickType() const override;
+
+	/**
+	 * Shortcut from any world context.
+	 *
+	 * In the editor world, outside Play, there is no game instance and so no
+	 * real subsystem: this returns the editor stand-in instead (see
+	 * GetEditorPreview), so the stage actor and the simulator run the very
+	 * same code with nothing pressed.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O", meta = (WorldContext = "WorldContextObject"))
+	static UVibH2OSubsystem* Get(const UObject* WorldContextObject);
+
+#if WITH_EDITOR
+	/**
+	 * The stand-in subsystem of an editor world, created on first request.
+	 *
+	 * It is a full subsystem - burst settling, beats, smoothing, staleness,
+	 * averages - minus the socket: it never listens, so it cannot steal the
+	 * port from a Play session started in the same editor. Data reaches it
+	 * only through InjectOscMessage, which is what the simulator uses.
+	 * Returns nullptr for any world that is not a plain editor world.
+	 */
+	static UVibH2OSubsystem* GetEditorPreview(UWorld* World);
+
+	/**
+	 * Advances the editor stand-in. The engine never ticks it: the actors that
+	 * use it do, and this guard keeps two of them from ticking it twice in
+	 * the same frame.
+	 */
+	void TickEditorPreview(float DeltaTime);
+#endif
+
+	/** True for the editor stand-in, false for the real subsystem. */
+	bool IsEditorPreview() const { return bEditorPreview; }
+
+	// --------------------------------------------------------------- Network
+
+	/** (Re)starts listening with the current project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Reseau")
+	bool StartListening();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Reseau")
+	void StopListening();
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Reseau")
+	bool IsListening() const;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Reseau")
+	FVibH2ONetworkStats GetNetworkStats() const;
+
+	/**
+	 * Room plan and sensor messages received from the network so far - not
+	 * control, not injected. Moves only when Max (or another real sender of
+	 * data) is talking: the simulator steps aside on it.
+	 */
+	int32 GetNetworkDataMessageCount() const { return NetworkDataMessageCount; }
+
+	// ---------------------------------------------------------------- Remote
+
+	/** (Re)starts the iPad remote with the current project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	bool StartRemote();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Telecommande")
+	void StopRemote();
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	bool IsRemoteRunning() const;
+
+	/**
+	 * Addresses to type into Safari on the iPad, one per network card of this
+	 * PC: "http://192.168.1.20:8642/".
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Telecommande")
+	TArray<FString> GetRemoteUrls() const;
+
+	/**
+	 * Hands the remote the state it shows - the stage builds it, since only
+	 * the stage knows its attractors and zones. Cheap when no remote runs.
+	 */
+	void SetRemoteState(const FString& Json);
+
+	// ------------------------------------------------------------- Room plan
+
+	/**
+	 * A copy of the room plan, for Blueprint. C++ should prefer GetRoomRef(),
+	 * which avoids copying the seat array every frame.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Salle")
+	FVibH2ORoomSnapshot GetRoom() const { return Room; }
+
+	const FVibH2ORoomSnapshot& GetRoomRef() const { return Room; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Salle")
+	bool HasRoom() const { return Room.IsValid(); }
+
+	/**
+	 * Injects a room plan without going through the network. Useful to preview
+	 * a room in the editor, and for tests.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Salle")
+	void SetRoomManually(int32 InColumns, int32 InRows, const TArray<int32>& SeatIndividualIds);
+
+	/** Clears the room and every individual. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Salle")
+	void ClearRoom();
+
+	/** Renders the room as text, one line per row. For diagnosis. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Salle")
+	FString DescribeRoom() const;
+
+	// ----------------------------------------------------------- Individuals
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	bool GetIndividual(int32 IndividualId, FVibH2OIndividualState& OutState) const;
+
+	/** Direct access, no copy. Returns nullptr when the individual is unknown. */
+	const FVibH2OIndividualState* FindIndividual(int32 IndividualId) const;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	int32 GetIndividualCount() const { return Individuals.Num(); }
+
+	/** Number of individuals counting towards the averages. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	int32 GetActiveIndividualCount() const { return ActiveIndividualCount; }
+
+	/**
+	 * Collective synchrony: the mean of the individual synchronies, empty seats
+	 * and quiet sensors excluded. Max does not transmit it.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	float GetCollectiveSynchrony() const { return CollectiveSynchrony; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	float GetAverageExcitation() const { return AverageExcitation; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	float GetAverageBpm() const { return AverageBpm; }
+
+	/**
+	 * Rank of this seat among the occupied ones, 0-based, in seat-index order.
+	 * The vortex uses it to spread the bubbles out without leaving holes where
+	 * the room has them.
+	 */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	int32 GetOccupiedOrdinal(int32 SeatIndex) const;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Individus")
+	int32 GetOccupiedCount() const { return OccupiedOrdinals.Num(); }
+
+	// --------------------------------------------------------------- Effects
+
+	/** Enables or disables an effect. Scope is global, for the whole room. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Effets")
+	void SetEffectEnabled(FName EffectName, bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Effets")
+	bool IsEffectEnabled(FName EffectName) const;
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Effets")
+	TArray<FName> GetKnownEffects() const;
+
+	// --------------------------------------------------------------- Control
+
+	/**
+	 * Cuts the OSC control input - /Effect, /Blend, /Focus.
+	 *
+	 * Sensor data keeps flowing: what this prevents is a message arriving
+	 * mid-take and polluting a Sequencer track during a render.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VibH2O|Controle")
+	bool bIgnoreOscControl = false;
+
+	/** Last control values received, for actors that follow them. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	float GetOscBlendAlpha() const { return OscBlendAlpha; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	float GetOscFocusAmount() const { return OscFocusAmount; }
+
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	FName GetOscFocusGroup() const { return OscFocusGroup; }
+
+	/** Last backdrop presence asked for over OSC: 1 present, 0 removed. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Controle")
+	float GetOscBackdropTarget() const { return OscBackdropTarget; }
+
+	// ---------------------------------------------------------------- Events
+
+	/** Raised after the room plan has been rebuilt. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ORoomChangedSignature OnRoomChanged;
+
+	/** Raised on every beat of every individual. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OBeatSignature OnBeat;
+
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OEffectChangedSignature OnEffectChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFocusGroupChangedSignature OnOscFocusGroupChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFloatControlSignature OnOscBlendAlphaChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFloatControlSignature OnOscFocusAmountChanged;
+
+	/** /Attractor/<name>/ value - the attractor's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorChanged;
+
+	/** /Attractor/<name>/Share/ value - its share of the room. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscAttractorShareChanged;
+
+	/** /Attractors/Release/ - every attractor lets go. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OControlSignature OnOscAttractorsReleased;
+
+	/** /Attractors/FadeScale/ value - scales every fade time. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OFloatControlSignature OnOscAttractorFadeScaleChanged;
+
+	/** /Exclusion/<name>/ value - the zone's target activation. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedFloatControlSignature OnOscExclusionChanged;
+
+	/** /Exclusion/<name>/Position/ x y - the zone's live position, -1 to 1. */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2ONamedPositionControlSignature OnOscExclusionMoved;
+
+	/**
+	 * Raised on every /Fond message, even a repeated value: an operator who
+	 * presses "remove" again expects the fade to run, whatever the last state
+	 * was. FadeSeconds is negative when the message did not specify one.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OBackdropControlSignature OnOscBackdropChanged;
+
+	/** /Ambiance - 0 automatic, 1 calm, 2 normal, 3 excited (EVibH2OMoodOverride order). */
+	UPROPERTY(BlueprintAssignable, Category = "VibH2O|Evenements")
+	FVibH2OAmbianceControlSignature OnOscAmbianceChanged;
+
+	/** /Regie/... - for the control desk, which reads the message itself. */
+	FVibH2ORegieMessageSignature OnRegieMessage;
+
+	// ------------------------------------------------------------- Injection
+
+	/**
+	 * Handles an OSC message as if it had come off the network.
+	 *
+	 * This entry point exists for two reasons. First, to make the whole chain
+	 * testable without a socket. Second, the day a direct MIDI control path is
+	 * wired up, it will only have to build messages and push them in here - the
+	 * three command routes (Details, Blueprint, OSC) will remain the very same
+	 * functions.
+	 */
+	void InjectOscMessage(const FVibH2OOscMessage& Message);
+
+	// ------------------------------------------------------------------ Cues
+
+	/**
+	 * Every cue input, whatever its device: OSC control messages (room plan
+	 * and sensor data excluded), MIDI notes, CCs and program changes, keys.
+	 * Raised on the game thread. Cue directors listen here.
+	 *
+	 * Silenced by bIgnoreOscControl, like the other control routes: a render
+	 * must not be disturbed by a cue either.
+	 */
+	FVibH2OCueInputEvent OnCueInput;
+
+	/** Raises OnCueInput as if the input had come from a device. For tests. */
+	void InjectCueInput(const FVibH2OCueInput& Input);
+
+	/** (Re)opens the MIDI inputs named in the project settings. */
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	int32 StartMidiInput();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopMidiInput();
+
+	/** Names of the MIDI inputs currently open. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	TArray<FString> GetOpenMidiInputs() const;
+
+	/** Names of every MIDI input of this PC, open or not. */
+	UFUNCTION(BlueprintPure, Category = "VibH2O|Cues")
+	static TArray<FString> GetAvailableMidiInputs();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	bool StartKeyboardCues();
+
+	UFUNCTION(BlueprintCallable, Category = "VibH2O|Cues")
+	void StopKeyboardCues();
+
+	/**
+	 * Opens the inputs for a learn capture, and says which ones answered.
+	 * Only the editor stand-in opens anything - the real subsystem already
+	 * listens. Pair with EndInputCapture.
+	 */
+	FString BeginInputCapture();
+	void EndInputCapture();
+
+	// ----------------------------------------------------------- Diagnostics
+
+	/** Shows the network and room state on screen. */
+	UPROPERTY(BlueprintReadWrite, Category = "VibH2O|Debogage")
+	bool bShowDebugOverlay = false;
+
+private:
+	/** The built-in effects, all enabled. Shared by both kinds of subsystem. */
+	void RegisterBuiltInEffects();
+
+	void DrainQueue();
+	void HandleMessage(const FVibH2OOscMessage& Message);
+
+	bool HandleRoomMappingMessage(const FVibH2OOscMessage& Message);
+	bool HandleDataMessage(const FVibH2OOscMessage& Message);
+	bool HandleControlMessage(const FVibH2OOscMessage& Message);
+	bool HandleSteeringMessage(const FVibH2OOscMessage& Message);
+
+	void RebuildRoomFromPending();
+	void UpdateOccupiedOrdinals();
+
+	void AdvanceBeats(float DeltaTime);
+	void UpdateStaleness(double Now);
+	void UpdateAverages();
+	void UpdateDebugOverlay(float DeltaTime);
+
+	FVibH2OIndividualState& FindOrAddIndividual(int32 IndividualId);
+	bool IsEmptySeatId(int32 RawId) const;
+
+	/** Extracts the individual id from an address of the form "/Prefix/<id>/". */
+	bool ParseIndividualId(const FVibH2OOscMessage& Message, const FString& Prefix, int32& OutId) const;
+
+	/**
+	 * The receiver is held by unique pointer. Its header is included above
+	 * rather than forward-declared: the code UHT generates instantiates the
+	 * TUniquePtr destructor, which requires a complete type. The receiver header
+	 * pulls in nothing heavy - the socket types are themselves forward-declared
+	 * there.
+	 */
+	TUniquePtr<FVibH2OOscReceiver> Receiver;
+
+	/** The iPad remote. Complete type above, for the same reason. */
+	TUniquePtr<FVibH2ORemoteServer> RemoteServer;
+
+	/** Cue inputs. Complete types above, for the same reason. */
+	TUniquePtr<FVibH2OMidiInput> MidiInput;
+	TUniquePtr<FVibH2OKeyboardSink> KeyboardSink;
+	FVibH2OBackgroundGuard BackgroundGuard;
+
+	/** Opens what the project settings ask for. Real subsystem only. */
+	void InitializeCueInputs();
+	void DrainCueInputs();
+	void BroadcastOscCueInput(const FVibH2OOscMessage& Message);
+
+	/**
+	 * Set while OnCueInput is being raised. A cue that sends an OSC message
+	 * must not see it come back as a new cue input: a cue on /Blend that
+	 * sends /Blend would otherwise call itself without end.
+	 */
+	bool bBroadcastingCueInput = false;
+
+	/** Next attempt at opening a MIDI input that was missing - a loopMIDI port created late. */
+	double NextMidiRetryTime = 0.0;
+
+	int32 InputCaptureCount = 0;
+
+	UPROPERTY(Transient)
+	FVibH2ORoomSnapshot Room;
+
+	UPROPERTY(Transient)
+	TMap<int32, FVibH2OIndividualState> Individuals;
+
+	/** SeatIndex -> rank among the occupied seats. */
+	TMap<int32, int32> OccupiedOrdinals;
+
+	/**
+	 * Buffer for the burst in progress. The plan arrives with no end marker, so
+	 * we accumulate and only build after a silence.
+	 */
+	struct FPendingRoom
+	{
+		int32 Columns = 0;
+		int32 Rows = 0;
+		TMap<int32, int32> Seats;
+		bool bDirty = false;
+		double LastMessageTime = 0.0;
+
+		void Reset()
+		{
+			Seats.Reset();
+			bDirty = false;
+		}
+	};
+	FPendingRoom Pending;
+
+	TMap<FName, bool> EffectStates;
+
+	float CollectiveSynchrony = 0.0f;
+	float AverageExcitation = 0.0f;
+	float AverageBpm = 0.0f;
+	int32 ActiveIndividualCount = 0;
+
+	float OscBlendAlpha = 0.0f;
+	float OscFocusAmount = 0.0f;
+	FName OscFocusGroup = NAME_None;
+	float OscBackdropTarget = 1.0f;
+
+	/**
+	 * Set while a deliberate command is handled - a cue, the iPad. Max
+	 * repeats its control values, so they are only passed on when they
+	 * change; a command must act even when it repeats the last OSC value,
+	 * since Sequencer or the Details panel may have moved the stage since.
+	 */
+	bool bForceControlEcho = false;
+
+	/** Set while DrainQueue hands on what came off the socket. */
+	bool bDrainingNetwork = false;
+	int32 NetworkDataMessageCount = 0;
+
+	/** Only these addresses are taken from the iPad: control, never data. */
+	bool IsRemoteAddressAllowed(const FVibH2OOscMessage& Message) const;
+
+	/** The overlay's copy of GetRemoteUrls: listing adapters costs a syscall. */
+	TArray<FString> OverlayRemoteUrls;
+	double OverlayRemoteUrlsTime = -1.0;
+
+	/** Throughput counters, for the debug overlay. */
+	int32 MessagesThisSecond = 0;
+	float MessagesPerSecond = 0.0f;
+	float RateTimer = 0.0f;
+
+	/** Beat messages received on the wired-but-unused input. */
+	int32 ExternalBeatCount = 0;
+
+	bool bEditorPreview = false;
+
+	/** Engine frame of the last editor-preview tick, against double ticking. */
+	uint64 LastPreviewTickFrame = 0;
+};
