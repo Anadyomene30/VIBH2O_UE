@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "VibH2O",
+	"Description": "Recoit en OSC/UDP les donnees cardiaques de spectateurs et les donne a voir sous forme de bulles disposees comme le plan de la salle.",
+	"Category": "Installation",
+	"CreatedBy": "Dimitri Sourzac",
+	"CreatedByURL": "https://github.com/Anadyomene30/VIBH2O_UE",
+	"DocsURL": "https://github.com/Anadyomene30/VIBH2O_UE/blob/main/docs/SPEC.md",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "VibH2O",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		}
+	]
+}

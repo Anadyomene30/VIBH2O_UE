@@ -1,14 +1,41 @@
-# macOS
+# ---- Unreal Engine ----
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+
+# Assets binaires volumineux — passer par Git LFS si nécessaire
+# *.uasset
+# *.umap
+
+# ---- Python (outillage) ----
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ---- OS ----
 .DS_Store
+Thumbs.db
 
-# Node
-node_modules/
-package-lock.json
-
-# Données de spectacle (données personnelles — ne jamais commiter)
+# ---- Données de spectacle (données personnelles — ne JAMAIS commiter) ----
 data/
-user/
-qr_output/
+Records/
+RECORDS/
 
-# Claude Code — réglages locaux
+# ---- Claude Code — réglages locaux ----
 .claude/settings.local.json

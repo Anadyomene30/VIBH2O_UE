@@ -1,0 +1,25 @@
+{
+	"lightLevel": 0.6,
+	"keyLight": 1.6,
+	"keyColor": {
+		"r": 0.55,
+		"g": 0.7,
+		"b": 1,
+		"a": 1
+	},
+	"backLight": 3.0,
+	"backColor": {
+		"r": 0.3,
+		"g": 0.6,
+		"b": 1,
+		"a": 1
+	},
+	"fillLight": 0.5,
+	"fillColor": {
+		"r": 0.15,
+		"g": 0.25,
+		"b": 0.8,
+		"a": 1
+	},
+	"lightBeams": 0.4
+}

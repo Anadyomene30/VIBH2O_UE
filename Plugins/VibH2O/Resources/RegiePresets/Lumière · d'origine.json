@@ -1,0 +1,27 @@
+{
+	"lightLevel": 1.0,
+	"keyLight": 2.2,
+	"keyColor": {
+		"r": 1,
+		"g": 0.93,
+		"b": 0.82,
+		"a": 1
+	},
+	"keyAzimuth": -30,
+	"keyHeight": 50,
+	"backLight": 4.0,
+	"backColor": {
+		"r": 0.45,
+		"g": 0.85,
+		"b": 1,
+		"a": 1
+	},
+	"fillLight": 0.6,
+	"fillColor": {
+		"r": 0.25,
+		"g": 0.45,
+		"b": 1,
+		"a": 1
+	},
+	"lightBeams": 0.3
+}
