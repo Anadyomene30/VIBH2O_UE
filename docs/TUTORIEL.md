@@ -368,7 +368,7 @@ Créez des paramètres portant exactement ces noms ; le plugin les remplit tout 
 | `BlendAlpha` | Position entre les deux tableaux. |
 | `TintColor` | Couleur (paramètre vectoriel), tirée de la palette de l'état de salle. |
 | `MoodCalm` / `MoodNormal` / `MoodExcited` | Poids des trois états, somme égale à 1, en fondu. |
-| `MoodGlow` / `MoodTurbulence` | Lumière des stries et agitation, selon l'état. |
+| `MoodGlow` / `MoodTurbulence` | Lumière des stries et agitation. L'agitation suit l'état ; la lumière est la même dans les trois, l'excitation ne l'éclaircit plus. |
 | `StripePhase` / `RoomStripePhase` | Phase des stries de la bulle, et celle commune à la salle. Continues. |
 | `Coherence` | 0→1 : à quel point la bulle se cale sur la salle (synchronie). |
 | `SyncHalo` / `BubbleBrightness` / `BubbleSeed` | Halo de synchronie, lumière générale, aléa stable par bulle. |

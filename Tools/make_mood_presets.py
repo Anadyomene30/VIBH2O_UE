@@ -66,7 +66,6 @@ palette.set_editor_property('normal', normal)
 excited = palette.get_editor_property('excited')
 excited.set_editor_property('color_low', colour(0.020, 0.700, 0.700))
 excited.set_editor_property('color_high', colour(0.450, 1.000, 0.900))
-excited.set_editor_property('glow', 2.3)
 palette.set_editor_property('excited', excited)
 
 aqua.set_editor_property('palette', palette)

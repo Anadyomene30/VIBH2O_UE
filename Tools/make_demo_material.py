@@ -198,7 +198,9 @@ g = Graph(bubble)
 beat_phase = g.scalar('BeatPhase', 0.0)
 beat_pulse = g.scalar('BeatPulse', 0.0)
 g.scalar('Bpm', 60.0)
-excitation = g.scalar('Excitation', 0.0)
+# Pushed by the stage and left unwired here: arousal no longer brightens the
+# bubble. It stays a parameter so a hand-made material can still read it.
+g.scalar('Excitation', 0.0)
 g.scalar('Synchrony', 0.5)
 g.scalar('CollectiveSynchrony', 0.5)
 striation_speed = g.scalar('StriationSpeed', 0.0)
@@ -338,11 +340,13 @@ colour = g.lerp(tint, grey, staleness, -1500)
 # The bands burn a little whiter in their cores, as light-filled water does.
 band_colour = g.add(colour, g.mulc(g.power(stripes, 3.0, -1300), 0.18, -1250), -1200)
 
-# The bands' light: the mood's glow, a touch more for an aroused person, and
-# a touch more when the bubble moves fast through the water.
+# The bands' light: the mood's glow, and a touch more when the bubble moves
+# fast through the water. Arousal is deliberately absent - brightening a
+# bubble because its person is aroused washed it out instead of reading as
+# energy; arousal is carried by colour, speed, turbulence and size.
 moving = g.saturate(g.mulc(striation_speed, 0.5, -1500), -1450)
 band_gain = g.mul(g.mul(glow_mood, stripe_light, -1400),
-                  g.addc(g.add(g.mulc(excitation, 0.35, -1400), g.mulc(moving, 0.25, -1400), -1350), 0.8, -1300), -1250)
+                  g.addc(g.mulc(moving, 0.25, -1400), 0.8, -1300), -1250)
 
 emit_bands = g.mul(band_colour, g.mul(stripes, band_gain, -1100), -1000)
 emit_rim = g.mul(colour, g.mul(halo, rim_light, -1100), -1000)

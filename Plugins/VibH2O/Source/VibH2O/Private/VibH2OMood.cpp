@@ -57,11 +57,13 @@ FLinearColor FVibH2OMoodLook::ColorAt(float Position) const
 
 FVibH2OMoodPalette::FVibH2OMoodPalette()
 {
-	// Calm: deep water. Blues and indigo, slow, small, close to still. The
-	// light withdraws into the bubble rather than going out.
+	// Glow stays at its default in all three moods, deliberately: brightening
+	// the striations with arousal washed the bubble out instead of reading as
+	// energy. The mood is carried by colour, speed, turbulence and size.
+	//
+	// Calm: deep water. Blues and indigo, slow, small, close to still.
 	Calm.ColorLow = FLinearColor(0.008f, 0.020f, 0.16f, 1.0f);
 	Calm.ColorHigh = FLinearColor(0.020f, 0.11f, 0.42f, 1.0f);
-	Calm.Glow = 0.55f;
 	Calm.StripeSpeed = 0.10f;
 	Calm.Turbulence = 0.55f;
 	Calm.FloatScale = 0.75f;
@@ -73,7 +75,6 @@ FVibH2OMoodPalette::FVibH2OMoodPalette()
 	// Normal: the aqua of the main scene's water - teal to pale green.
 	Normal.ColorLow = FLinearColor(0.015f, 0.26f, 0.36f, 1.0f);
 	Normal.ColorHigh = FLinearColor(0.10f, 0.62f, 0.52f, 1.0f);
-	Normal.Glow = 1.0f;
 	Normal.StripeSpeed = 0.30f;
 	Normal.Turbulence = 1.0f;
 
@@ -82,7 +83,6 @@ FVibH2OMoodPalette::FVibH2OMoodPalette()
 	// screen is far greener in linear space than the sRGB picker suggests.
 	Excited.ColorLow = FLinearColor(0.95f, 0.32f, 0.035f, 1.0f);
 	Excited.ColorHigh = FLinearColor(1.0f, 0.06f, 0.045f, 1.0f);
-	Excited.Glow = 1.9f;
 	Excited.StripeSpeed = 0.90f;
 	Excited.Turbulence = 1.9f;
 	Excited.FloatScale = 1.35f;

@@ -120,7 +120,7 @@ L'état de salle et la synchronie ajoutent ceux-ci :
 | Paramètre | Type | Contenu |
 |---|---|---|
 | `MoodCalm`, `MoodNormal`, `MoodExcited` | scalaires | Poids des trois états, 0→1, **somme toujours égale à 1**. Ils fondent en ~4 s d'un état à l'autre. |
-| `MoodGlow` | scalaire | Lumière des stries, mélangée entre les états. |
+| `MoodGlow` | scalaire | Lumière des stries. Identique dans les trois ambiances par défaut : l'excitation n'éclaircit plus la bulle. Réglable par ambiance si on le souhaite. |
 | `MoodTurbulence` | scalaire | Agitation de surface, mélangée entre les états. |
 | `StripePhase` | scalaire | 0→1, phase des stries **propre à la bulle**. Accumulée comme `BeatPhase` : un changement d'état change sa vitesse, jamais sa position. |
 | `RoomStripePhase` | scalaire | 0→1, phase des stries **commune à toute la salle**. |

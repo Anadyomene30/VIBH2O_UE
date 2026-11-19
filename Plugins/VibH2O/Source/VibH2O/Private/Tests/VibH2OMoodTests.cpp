@@ -223,7 +223,8 @@ bool FVibH2OMoodPaletteTest::RunTest(const FString& Parameters)
 
 	// Energy rises with the mood.
 	TestTrue(TEXT("Stries plus rapides en excite qu'en calme"), Excited.StripeSpeed > Calm.StripeSpeed);
-	TestTrue(TEXT("Plus de lumiere en excite qu'en calme"), Excited.Glow > Calm.Glow);
+	// Deliberately NOT brighter: the glow no longer answers to arousal.
+	TestNearlyEqual(TEXT("Meme lumiere des stries en excite qu'en calme"), Excited.Glow, Calm.Glow, KINDA_SMALL_NUMBER);
 	TestTrue(TEXT("Bulles plus grandes en excite qu'en calme"), Excited.SizeScale > Calm.SizeScale);
 	TestTrue(TEXT("Flottement plus ample en excite qu'en calme"), Excited.FloatScale > Calm.FloatScale);
 
